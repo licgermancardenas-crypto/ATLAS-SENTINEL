@@ -1,0 +1,26 @@
+# datos crudos (se descargan con los scripts de pipeline/, no se versionan)
+data/raw/
+data/processed/
+*.csv
+*.zip
+*.xlsx
+
+# python
+.venv/
+__pycache__/
+*.pyc
+
+# node / web
+web/node_modules/
+web/dist/
+web/.env
+
+# entorno
+.env
+.env.local
+
+# claude code local
+.claude/
+
+# postgres local
+*.pgdata/
