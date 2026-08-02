@@ -29,6 +29,7 @@ Asistente de seguridad para conductores y planificación urbana en Buenos Aires.
 | Comisarías (ubicación puntual) | data.buenosaires.gob.ar/dataset/comisarias-policia-ciudad | 10KB |
 | Universidades | data.buenosaires.gob.ar/dataset/universidades | 37KB |
 | Espacios verdes públicos | data.buenosaires.gob.ar/dataset/espacios-verdes | 15MB |
+| Socioeconómico por comuna (NBI + hacinamiento) | data.buenosaires.gob.ar (Instituto de Vivienda) | <1KB |
 
 Los datos crudos no se versionan en git — se descargan localmente con los scripts de `pipeline/`.
 
@@ -53,10 +54,13 @@ Las 6 fuentes previstas para la Fase 1 (riesgo + transporte) están completas, m
 | Trenes GTFS | 248 paradas, 27 ramales | único dataset que extiende cobertura más allá de CABA hacia el conurbano; feed sin actualizar desde 2020-02-10 |
 | Universidades | 153 | lat/lon directo, sin proyección rara esta vez |
 | Espacios verdes públicos | 2.176 (plazas, plazoletas, parques) | polígonos — se guarda centroide + WKT original para join espacial futuro |
+| Socioeconómico por comuna | 15 comunas | % hogares con NBI + % hacinamiento. Sin coordenadas, se cruza por el campo "comuna" que ya existe en delitos/siniestros/alumbrado |
 
 ### Datos que se buscaron y no existen como abiertos
 
 Cantidad de efectivos/oficiales, cantidad de móviles/patrullas disponibles, ubicación de radares móviles de velocidad, y la red completa de cámaras de seguridad urbana (más allá de las 224 de control vehicular) **no están publicados** — es información operativa de seguridad que el gobierno no divulga en detalle, tiene sentido que no exista. "Botones antipánico" sí existe pero es solo un total anual a nivel ciudad, sin geolocalización, no sirve para el modelo.
+
+Nivel de ingreso y tasa de desempleo tampoco existen desglosados por comuna/barrio — solo hay totales a nivel ciudad por año (útiles para contexto, inútiles para diferenciar riesgo entre zonas). Se usan NBI y hacinamiento como proxies de vulnerabilidad socioeconómica en su lugar, que sí tienen ese desglose.
 
 ### Lecciones de esta fase
 
