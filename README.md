@@ -26,6 +26,7 @@ Asistente de seguridad para conductores y planificación urbana en Buenos Aires.
 | Hospitales | data.buenosaires.gob.ar/dataset/hospitales | 15.6KB |
 | Divisiones comisarías vecinales | data.buenosaires.gob.ar/dataset/divisiones-comisarias-vecinales | 2.5MB |
 | Trenes GTFS | data.buenosaires.gob.ar/dataset/trenes-gtfs | 7.5MB descomprimido |
+| Comisarías (ubicación puntual) | data.buenosaires.gob.ar/dataset/comisarias-policia-ciudad | 10KB |
 
 Los datos crudos no se versionan en git — se descargan localmente con los scripts de `pipeline/`.
 
@@ -46,7 +47,12 @@ Las 6 fuentes previstas para la Fase 1 (riesgo + transporte) están completas, m
 | Establecimientos educativos | 2.767 | reproyectadas desde el sistema plano legacy "0 de Flores" (ver `pipeline/geo_utils.py`), ~100m de margen de error |
 | Hospitales | 36 | públicos únicamente; mismo sistema de coordenadas que escuelas |
 | Divisiones comisarías vecinales | 45 | son polígonos de zona de patrullaje, no la ubicación puntual de cada comisaría — se guarda el centroide + el polígono original en WKT |
+| Comisarías (ubicación puntual) | 75 | complementa lo anterior con la dirección real de cada comisaría, lat/lon directo sin proyección rara |
 | Trenes GTFS | 248 paradas, 27 ramales | único dataset que extiende cobertura más allá de CABA hacia el conurbano; feed sin actualizar desde 2020-02-10 |
+
+### Datos que se buscaron y no existen como abiertos
+
+Cantidad de efectivos/oficiales, cantidad de móviles/patrullas disponibles, ubicación de radares móviles de velocidad, y la red completa de cámaras de seguridad urbana (más allá de las 224 de control vehicular) **no están publicados** — es información operativa de seguridad que el gobierno no divulga en detalle, tiene sentido que no exista. "Botones antipánico" sí existe pero es solo un total anual a nivel ciudad, sin geolocalización, no sirve para el modelo.
 
 ### Lecciones de esta fase
 
