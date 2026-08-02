@@ -30,6 +30,14 @@ Asistente de seguridad para conductores y planificación urbana en Buenos Aires.
 | Universidades | data.buenosaires.gob.ar/dataset/universidades | 37KB |
 | Espacios verdes públicos | data.buenosaires.gob.ar/dataset/espacios-verdes | 15MB |
 | Socioeconómico por comuna (NBI + hacinamiento) | data.buenosaires.gob.ar (Instituto de Vivienda) | <1KB |
+| Barrios (polígonos) | data.buenosaires.gob.ar/dataset/barrios | 651KB |
+| Radios censales (Censo 2010) | data.buenosaires.gob.ar/dataset/informacion-censal-por-radio | 2.5MB |
+| Población por comuna y por barrio | data.buenosaires.gob.ar/dataset/estructura-demografica y /barrios | <1KB c/u |
+| Calles (callejero, con jerarquía vial) | data.buenosaires.gob.ar/dataset/calles | 10.6MB |
+| Accesos por autopista (peajes/pórticos) | data.buenosaires.gob.ar/dataset/peajes-porticos-autopistas | <1KB |
+| Estadios | data.buenosaires.gob.ar/dataset/estadios | 10KB |
+| Eventos masivos (permisos) | data.buenosaires.gob.ar/dataset/permisos-eventos-masivos | ~230KB (5 años) |
+| Clima diario | NASA POWER API (power.larc.nasa.gov) | ~130KB |
 
 Los datos crudos no se versionan en git — se descargan localmente con los scripts de `pipeline/`.
 
@@ -55,12 +63,24 @@ Las 6 fuentes previstas para la Fase 1 (riesgo + transporte) están completas, m
 | Universidades | 153 | lat/lon directo, sin proyección rara esta vez |
 | Espacios verdes públicos | 2.176 (plazas, plazoletas, parques) | polígonos — se guarda centroide + WKT original para join espacial futuro |
 | Socioeconómico por comuna | 15 comunas | % hogares con NBI + % hacinamiento. Sin coordenadas, se cruza por el campo "comuna" que ya existe en delitos/siniestros/alumbrado |
+| Barrios | 48 | polígonos con comuna asignada — unidad intermedia entre comuna (15) y radio censal (3.554) para agrupar/mostrar riesgo |
+| Radios censales | 3.554 | Censo 2010 — población total, sexo, viviendas, hogares y % NBI por radio (~800 hab. c/u). Es el denominador que faltaba para "delitos per cápita" y la unidad más fina disponible con población real. Único mismatch de nombres detectado: dataset de población usa "BOCA", barrios.csv usa "LA BOCA" (corregido a mano en `pipeline/ingest_poblacion.py`) |
+| Población por comuna / por barrio | 15 comunas + 48 barrios | comuna es estimación 2017 (complementa NBI/hacinamiento, que no traía población total); barrio es censo 2010, mismo año que radios censales |
+| Calles (callejero) | 31.961 tramos | trae jerarquía vial (troncal/distribuidora/local) y sentido de circulación; 1.729 tramos sin comuna asignada (autopistas/bordes). Columna "long" del origen es largo del tramo en metros, no longitud — ver nota en `pipeline/ingest_calles.py` |
+| Accesos por autopista | 11 peajes/pórticos | AU Illia, Perito Moreno, Dellepiane, 25 de Mayo, Paseo del Bajo |
+| Estadios | 30 | mismo sistema de coordenadas legacy que escuelas/hospitales |
+| Eventos masivos | 2.898 permisos | 2019 + 2023-2026 (2020-2022 no publicados). Esquema distinto en cada archivo — ver notas de calidad abajo |
+| Clima diario | 3.866 días (2016-01-01 a hoy) | NASA POWER, punto único (Obelisco) — no diferencia microclima entre barrios |
 
 ### Datos que se buscaron y no existen como abiertos
 
 Cantidad de efectivos/oficiales, cantidad de móviles/patrullas disponibles, ubicación de radares móviles de velocidad, y la red completa de cámaras de seguridad urbana (más allá de las 224 de control vehicular) **no están publicados** — es información operativa de seguridad que el gobierno no divulga en detalle, tiene sentido que no exista. "Botones antipánico" sí existe pero es solo un total anual a nivel ciudad, sin geolocalización, no sirve para el modelo.
 
 Nivel de ingreso y tasa de desempleo tampoco existen desglosados por comuna/barrio — solo hay totales a nivel ciudad por año (útiles para contexto, inútiles para diferenciar riesgo entre zonas). Se usan NBI y hacinamiento como proxies de vulnerabilidad socioeconómica en su lugar, que sí tienen ese desglose.
+
+Series históricas diarias del Servicio Meteorológico Nacional **no son automatizables**: su único endpoint público estable solo da tiempo actual + pronóstico a 5 días, y la página de descarga de históricos está detrás de Cloudflare. Se usa NASA POWER como reemplazo (satelital, no estación puntual) — ver `pipeline/ingest_clima.py`.
+
+Segmentación de población por edad/sexo **tampoco existe por zona**: el único dataset de estructura etaria de GCBA (`estructura-demografica/est_pob_sexo...`) es serie histórica 1855-presente a nivel ciudad completa, sin ningún desglose espacial — no sirve para diferenciar riesgo entre zonas y no se ingesta. Censo 2022 por radio tampoco está publicado en este portal (solo 2001 y 2010 a esa granularidad); si hace falta, habría que cruzar con el Portal Geoestadístico de INDEC, que usa otra cartografía/códigos.
 
 ### Lecciones de esta fase
 
@@ -70,4 +90,6 @@ Los datasets de transporte (EcoBici, Molinetes) cambiaron de esquema de columnas
 - No asumir que un ZIP tiene un solo archivo adentro — desde 2022 Molinetes viene partido en ~24-26 archivos por año.
 - No asumir el mismo delimitador o encoding entre años de la misma fuente.
 - Los joins por nombre de estación (texto libre) contra datasets de referencia nunca son 100% exactos — documentar el % sin matchear en vez de asumir cobertura total.
-- **GCBA usa dos sistemas de coordenadas planas distintos entre datasets, sin documentarlo**: siniestros viales usa GKBA (Gauss-Krüger CABA 2019, oficial desde 2019), pero escuelas y hospitales todavía usan un sistema previo ("0 de Flores"). Aplicar la fórmula de uno al otro tira puntos a 90km de distancia sin ningún error visible en el código — solo se nota si se valida el rango de lat/lon contra los límites reales de la ciudad. Se calibraron ambos cruzando direcciones conocidas contra el geocodificador oficial de GCBA (`ws.usig.buenosaires.gob.ar`) en vez de confiar en el código EPSG que documenta el portal (9497), que ni siquiera existe en las bases de PROJ. Ver `pipeline/geo_utils.py`.
+- **GCBA usa dos sistemas de coordenadas planas distintos entre datasets, sin documentarlo**: siniestros viales usa GKBA (Gauss-Krüger CABA 2019, oficial desde 2019), pero escuelas y hospitales todavía usan un sistema previo ("0 de Flores"). Aplicar la fórmula de uno al otro tira puntos a 90km de distancia sin ningún error visible en el código — solo se nota si se valida el rango de lat/lon contra los límites reales de la ciudad. Se calibraron ambos cruzando direcciones conocidas contra el geocodificador oficial de GCBA (`ws.usig.buenosaires.gob.ar`) en vez de confiar en el código EPSG que documenta el portal (9497), que ni siquiera existe en las bases de PROJ. Ver `pipeline/geo_utils.py`. Estadios (agregado después) también usa el sistema legacy, no el nuevo.
+- El dataset de eventos masivos tiene **tres esquemas distintos en 5 archivos anuales** (2019 vs. 2023 vs. 2024-2026): cambia el delimitador, las columnas disponibles (barrio/aforo/lat-lon no están en todos) y hasta el encoding — el archivo 2023 es cp850 (DOS Latin US), el único de todo el proyecto que no es utf-8. Se detectó porque "Denominación" rompía el parser en utf-8 y en latin-1 daba un carácter distinto al esperado. Ver `pipeline/ingest_eventos_masivos.py`.
+- No asumir que un nombre de columna es lo que parece: en el callejero, la columna "long" es el largo del tramo en metros, no longitud geográfica.
