@@ -27,6 +27,8 @@ Asistente de seguridad para conductores y planificación urbana en Buenos Aires.
 | Divisiones comisarías vecinales | data.buenosaires.gob.ar/dataset/divisiones-comisarias-vecinales | 2.5MB |
 | Trenes GTFS | data.buenosaires.gob.ar/dataset/trenes-gtfs | 7.5MB descomprimido |
 | Comisarías (ubicación puntual) | data.buenosaires.gob.ar/dataset/comisarias-policia-ciudad | 10KB |
+| Universidades | data.buenosaires.gob.ar/dataset/universidades | 37KB |
+| Espacios verdes públicos | data.buenosaires.gob.ar/dataset/espacios-verdes | 15MB |
 
 Los datos crudos no se versionan en git — se descargan localmente con los scripts de `pipeline/`.
 
@@ -49,6 +51,8 @@ Las 6 fuentes previstas para la Fase 1 (riesgo + transporte) están completas, m
 | Divisiones comisarías vecinales | 45 | son polígonos de zona de patrullaje, no la ubicación puntual de cada comisaría — se guarda el centroide + el polígono original en WKT |
 | Comisarías (ubicación puntual) | 75 | complementa lo anterior con la dirección real de cada comisaría, lat/lon directo sin proyección rara |
 | Trenes GTFS | 248 paradas, 27 ramales | único dataset que extiende cobertura más allá de CABA hacia el conurbano; feed sin actualizar desde 2020-02-10 |
+| Universidades | 153 | lat/lon directo, sin proyección rara esta vez |
+| Espacios verdes públicos | 2.176 (plazas, plazoletas, parques) | polígonos — se guarda centroide + WKT original para join espacial futuro |
 
 ### Datos que se buscaron y no existen como abiertos
 
