@@ -144,4 +144,24 @@ Turno Tarde (el de mayor riesgo promedio):
 
 El dato que importa para el pitch: **a igual cantidad de unidades (75), solo cambiando dónde se ubican, la cobertura sube de 61.5% a 84.4%** — la infraestructura actual de comisarías no está posicionada donde el riesgo se concentra hoy. `K_PATRULLAS` y `TURNO` son parámetros al inicio del script (pensados como los sliders de un dashboard futuro).
 
+## Módulo B — Ubicación de cámaras nuevas (`src/optimization/modulo_b_camaras.py`)
+
+Weighted Max Coverage resuelto greedy (no MILP — el documento pide un ranking por ganancia marginal, que es justo lo que da el algoritmo greedy clásico). Peso por hexágono = riesgo (promedio de turnos) × boost por baja densidad de alumbrado × boost por alto flujo peatonal (ecobici + molinetes, combinados por percentil porque las escalas no son comparables) × descuento si ya está cubierto por una cámara existente. Candidatos: hexágonos a más de 100m de una cámara actual (224 cámaras reales).
+
+Con `N_CAMARAS_NUEVAS=30` y radio de cobertura 150m: **cubren 24.9% del riesgo ponderado total** que hoy no está cerca de ninguna cámara. Solo 18 de 401 hexágonos caían dentro del radio de una cámara existente antes de correr esto — la cobertura actual de cámaras es baja en términos relativos al área de la ciudad.
+
+## Módulo C — Controles de acceso (`src/optimization/modulo_c_controles.py`)
+
+A diferencia de A y B, no trabaja sobre hexágonos sueltos sino sobre el grafo vial. **Simplificación importante**: el documento pide "recorrer los tramos troncales/distribuidores" desde cada acceso, lo que requiere topología real de calles (qué tramo conecta con cuál) — `calles.parquet` son geometrías sueltas sin esa topología armada. Se aproxima el "corredor" como los tramos de jerarquía troncal/distribuidora principal dentro de un radio fijo (`RADIO_CORREDOR_M=2000`) del acceso, en vez de navegar el grafo real. Mismo espíritu, menor costo de implementación — si hace falta más precisión, este es el punto a mejorar primero.
+
+Ranking de los 11 accesos/pórticos por score combinado (percentil de accidentalidad histórica + percentil de riesgo delictivo del corredor):
+
+| # | Acceso | Autopista | Siniestros en corredor | Score |
+|---|---|---|---|---|
+| 1 | Alberti | AU 1 – 25 de Mayo | 9.164 | 0.95 |
+| 2 | Pórtico Independencia | Au Paseo del Bajo | 6.188 | 0.95 |
+| 3 | Pórtico Illia al Norte/Sur, Illia | AU Illia | 3.185 | 0.59 |
+
+El corredor de **25 de Mayo/Paseo del Bajo** concentra la mayor accidentalidad histórica de lejos — son las autopistas más troncales del microcentro, tiene sentido que salga primero.
+
 Gotchas encontrados: `siniestros_hechos` guarda lat/lon como texto, no float (se castea en `hex_utils.asignar_hex_id`); `hora_siniestro` viene como "HH:MM:SS" mientras que `franja` de delitos ya es un número 0-23 (se resuelve en `hex_utils.turno_desde_hora`, detecta el formato).
