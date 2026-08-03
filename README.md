@@ -110,4 +110,38 @@ Datasets ya cruzados con hex_id (`src/etl/assign_hex_puntual.py`, `assign_hex_ca
 
 Pendiente, y son operaciones distintas a point-in-hex (no encajan en `asignar_hex_id`): **espacios_verdes** y **comisarias.parquet** (el de zonas de patrullaje) necesitan overlay de polígono contra la grilla (% de área, no un punto); **población por hex** (denominador per cápita) sale de prorratear `poblacion_comuna`/`poblacion_barrio` por área, aunque ya se puede aproximar sin prorratear porque `hex_maestra` ya tiene `radio_censal_id` — un join directo contra `radios_censales.poblacion_total` alcanza para una primera versión.
 
+## Estado de Capa 1 v1 (modelo núcleo, sin exógenas)
+
+`src/model_core/build_training_table.py` arma `data/features/training_table.parquet`: grano (hex_id, fecha, turno), 401 hexágonos × 3.653 días (2016-2025) × 4 turnos = 5.859.412 filas (907MB en memoria, 28MB en parquet). Target: conteo total de delitos (los 6 tipos juntos — desagregar por tipo multiplicaría la tabla ~6x, se deja para v2). Features: lags 7/30/365 días y rolling 7/30 días por hex×turno, vecindad espacial (anillos H3 k=1/k=2, sobre el `roll_30d` ya rezagado de cada vecino para no filtrar información futura — usar el conteo contemporáneo del vecino sería fuga de datos), NBI por radio censal, hacinamiento por comuna (no hay a nivel radio), población, cámaras y luminarias por hex, y calendario (día de semana, mes, feriado vía API de ArgentinaDatos).
+
+`src/model_core/train_baseline.py` entrena LightGBM con objetivo Poisson, split temporal (train ≤2023, val 2024 para early stopping, test 2025). Resultado en test:
+
+| | MAE | Recall@10% área | Recall@20% área | Recall@30% área |
+|---|---|---|---|---|
+| Modelo LightGBM | 0.290 | 27.7% | 45.4% | 58.5% |
+| Baseline naive (promedio histórico hex×turno) | 0.296 | 27.4% | 44.7% | 58.4% |
+
+**Lectura honesta**: el modelo le gana apenas al baseline naive. `hex_id` y `radio_censal_id` dominan la importancia de features por lejos — la mayor parte del "riesgo" que se captura es la heterogeneidad espacial pura (qué tan peligroso es el lugar en promedio), no la dinámica temporal (rachas, contagio espacial). Con una tasa media de 0,23 delitos por hex×turno y 82,8% de celdas en cero, tiene sentido: a esta resolución el proceso es casi estacionario por celda, así que un promedio histórico ya captura casi todo. Lo bueno: **hay concentración espacial real y se está capturando** (30% del área concentra 58% de los delitos, muy por encima de lo esperable si el riesgo fuera uniforme).
+
+### v2 — exógenas (`src/model_core/agregar_exogenas.py`, `train_v2.py`)
+
+Se sumó clima (join por fecha), flag de evento masivo (point-in-hex para 2019, join por barrio para 2023-2026) y cercanía a estadio (buffer 500m, reproyectado a EPSG:5347). **No mejoró nada** respecto a v1 — mismo MAE (0.291), mismo Recall@K exacto en cada umbral. `evento_en_hex` y `evento_en_barrio` tienen importancia **0** en el modelo (nunca se usaron en ningún split): a esta resolución (hex×día×turno) los eventos son demasiado raros — `evento_en_hex` es positivo en ~0,001% de las filas — para que haya señal aprendible. Clima aporta algo de importancia (`temp_media_c` por encima de varios lags) pero no alcanza a mover el Recall@K.
+
+**Conclusión de v1 vs. v2**: el cuello de botella no son las exógenas, es que el proceso a este grano es casi puramente espacial. Antes de seguir sumando variables, tiene más sentido: (a) construir el Módulo A sobre lo que ya funciona (la concentración espacial), ya que no depende de mejorar la parte temporal, o (b) probar un grano temporal más agregado (semanal en vez de diario) donde la señal dinámica podría distinguirse mejor del ruido.
+
+## Módulo A — Asignación de patrullas (`src/optimization/modulo_a_patrullas.py`)
+
+Maximal Covering Location Problem resuelto con `pulp` (programación lineal entera, no ML) sobre `riesgo_predicho.parquet` (score de riesgo por hex×turno del modelo v1, generado por `predecir_riesgo.py`, promediado sobre 2025). Candidatos: las 75 comisarías reales + los 401 centroides de hexágonos. Radio de cobertura 800m. Restricción: ninguna comuna queda con cobertura cero.
+
+Turno Tarde (el de mayor riesgo promedio):
+
+| Escenario | Riesgo cubierto |
+|---|---|
+| Actual — 75 comisarías reales, tal como están | 61.5% |
+| Optimizado, K=20 patrullas | 40.8% |
+| Optimizado, K=40 patrullas | 62.1% |
+| **Optimizado, K=75** (mismo presupuesto que hoy) | **84.4%** |
+
+El dato que importa para el pitch: **a igual cantidad de unidades (75), solo cambiando dónde se ubican, la cobertura sube de 61.5% a 84.4%** — la infraestructura actual de comisarías no está posicionada donde el riesgo se concentra hoy. `K_PATRULLAS` y `TURNO` son parámetros al inicio del script (pensados como los sliders de un dashboard futuro).
+
 Gotchas encontrados: `siniestros_hechos` guarda lat/lon como texto, no float (se castea en `hex_utils.asignar_hex_id`); `hora_siniestro` viene como "HH:MM:SS" mientras que `franja` de delitos ya es un número 0-23 (se resuelve en `hex_utils.turno_desde_hora`, detecta el formato).
