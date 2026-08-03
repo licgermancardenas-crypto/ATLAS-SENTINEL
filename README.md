@@ -164,4 +164,25 @@ Ranking de los 11 accesos/pórticos por score combinado (percentil de accidental
 
 El corredor de **25 de Mayo/Paseo del Bajo** concentra la mayor accidentalidad histórica de lejos — son las autopistas más troncales del microcentro, tiene sentido que salga primero.
 
+## Capa 3 — Validación y explicabilidad (`src/validation/`)
+
+**SHAP** (`shap_explicabilidad.py`) matiza la lectura de Capa 1: la importancia por cantidad de *splits* de LightGBM decía que casi todo era `hex_id`. SHAP (que mide aporte real a la magnitud de la predicción, no cuántas veces se usa una feature) da otra foto:
+
+| Feature | Aporte SHAP |
+|---|---|
+| roll_30d_sum (historial 30 días, mismo hex) | 29.3% |
+| hex_id (ubicación) | 25.4% |
+| vecino_k1_roll30 + vecino_k2_roll30 (contagio espacial) | 25.4% |
+| turno + radio_censal_id + resto | ~20% |
+
+Historial reciente + vecindad espacial suman **~56%**, más que la ubicación sola — la dinámica temporal sí aporta, solo que no se notaba contando splits. Explicaciones locales (top 5 hex×turno de mayor riesgo del test) siguen el mismo patrón: 40-50% del riesgo de cada predicción se explica por `roll_30d_sum`.
+
+**Backtesting narrado + evolución mensual + calibración** (`backtesting_narrado.py`), sobre test 2025:
+
+- Junio 2025: 9.783 delitos reales vs. 10.085 predichos por el modelo (suma sobre todos los hex×turno) — muy cerca. El top 20% de hexágonos marcados como más riesgosos concentró el 46.9% de los delitos reales del mes.
+- **Recall@20% estable los 12 meses**: entre 44.1% y 47.1%, desvío de 1.3 puntos — no es una racha de un mes.
+- **Calibración casi perfecta por decil**: en el decil de mayor riesgo, predicho=0.828 vs. real=0.821; en todos los deciles el promedio predicho y el real están a menos de un 3% de diferencia. El score no es solo bueno para *rankear* hexágonos, es confiable en términos absolutos.
+
+Esto es más vendible que el resultado de Capa 1 solo: aunque el modelo apenas le gana al baseline naive en MAE, **está bien calibrado y es estable en el tiempo** — dos propiedades necesarias para que un organismo de gobierno confíe en el score.
+
 Gotchas encontrados: `siniestros_hechos` guarda lat/lon como texto, no float (se castea en `hex_utils.asignar_hex_id`); `hora_siniestro` viene como "HH:MM:SS" mientras que `franja` de delitos ya es un número 0-23 (se resuelve en `hex_utils.turno_desde_hora`, detecta el formato).
