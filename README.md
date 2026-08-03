@@ -1,14 +1,20 @@
 # ATLAS SENTINEL
 
-Asistente de seguridad para conductores y planificación urbana en Buenos Aires. Cruza delitos geolocalizados con datos de transporte (colectivos, EcoBici, subte), alumbrado público y siniestros viales para estimar riesgo por zona y horario — no solo un heatmap estático, sino un modelo que pesa el último tramo a pie y el efecto de repetición cercana (near-repeat) tras un hecho.
+Asistente de seguridad para conductores y planificación urbana en Buenos Aires (nombre de venta: **SIGE-BA**). Cruza delitos geolocalizados con datos de transporte (colectivos, EcoBici, subte), alumbrado público y siniestros viales para estimar riesgo por zona y horario — no solo un heatmap estático, sino un modelo núcleo espacio-temporal (grilla H3) del que se desprenden 3 módulos de decisión operativa (patrullas, cámaras, controles de acceso).
+
+Arquitectura técnica completa del modelo: [`arquitectura-sige-ba.pdf`](arquitectura-sige-ba.pdf).
 
 ## Estructura
 
-- `pipeline/` — scripts de ingesta y normalización de cada fuente de datos
-- `models/` — modelos de riesgo (baseline KDE, near-repeat, incertidumbre por zona)
-- `api/` — backend FastAPI que sirve rutas + score de riesgo
-- `web/` — frontend (app conductor + dashboard de planificación urbana)
+- `pipeline/` — scripts de ingesta y normalización de cada fuente de datos (Fase 1, completa)
+- `data/features/` — tablas intermedias post-cruce espacial (hex_maestra, datasets con hex_id asignado) — no versionado en git, se regenera con `src/etl/`
+- `src/etl/` — Capa 0: unificación espacio-temporal (grilla H3-8, asignación de hex_id/turno a cada dataset)
+- `src/model_core/` — Capa 1: modelo núcleo de riesgo (XGBoost/LightGBM, objetivo Poisson)
+- `src/optimization/` — Capa 2: módulos A/B/C (asignación de patrullas, cámaras nuevas, controles de acceso)
+- `src/validation/` — Capa 3: SHAP, backtesting, métricas
+- `src/export/` — genera los JSON/GeoJSON livianos que consume el dashboard
 - `notebooks/` — exploración y validación de datos
+- `models/`, `api/`, `web/` — carpetas del scaffold original; el plan vigente las reemplaza por `src/*` + `dashboard/` (Next.js, separado) — ver el PDF de arquitectura
 
 ## Fuentes de datos
 
@@ -93,3 +99,15 @@ Los datasets de transporte (EcoBici, Molinetes) cambiaron de esquema de columnas
 - **GCBA usa dos sistemas de coordenadas planas distintos entre datasets, sin documentarlo**: siniestros viales usa GKBA (Gauss-Krüger CABA 2019, oficial desde 2019), pero escuelas y hospitales todavía usan un sistema previo ("0 de Flores"). Aplicar la fórmula de uno al otro tira puntos a 90km de distancia sin ningún error visible en el código — solo se nota si se valida el rango de lat/lon contra los límites reales de la ciudad. Se calibraron ambos cruzando direcciones conocidas contra el geocodificador oficial de GCBA (`ws.usig.buenosaires.gob.ar`) en vez de confiar en el código EPSG que documenta el portal (9497), que ni siquiera existe en las bases de PROJ. Ver `pipeline/geo_utils.py`. Estadios (agregado después) también usa el sistema legacy, no el nuevo.
 - El dataset de eventos masivos tiene **tres esquemas distintos en 5 archivos anuales** (2019 vs. 2023 vs. 2024-2026): cambia el delimitador, las columnas disponibles (barrio/aforo/lat-lon no están en todos) y hasta el encoding — el archivo 2023 es cp850 (DOS Latin US), el único de todo el proyecto que no es utf-8. Se detectó porque "Denominación" rompía el parser en utf-8 y en latin-1 daba un carácter distinto al esperado. Ver `pipeline/ingest_eventos_masivos.py`.
 - No asumir que un nombre de columna es lo que parece: en el callejero, la columna "long" es el largo del tramo en metros, no longitud geográfica.
+
+## Estado de Capa 0 (unificación espacio-temporal)
+
+Grilla H3-8 generada sobre CABA (unión de los 48 barrios, no existe un dataset propio de "límite CABA"): **459 hexágonos** (`data/features/hex_maestra.parquet`), con `barrio_id`/`comuna_id` (point-in-polygon contra `barrios.parquet`) y `radio_censal_id` (contra `radios_censales.parquet`) por centroide. 58 hexágonos de borde/costa no caen dentro de ningún barrio (agua, terraplenes) — quedan sin `barrio_id`/`comuna_id`, es correcto que así sea.
+
+`h3.polygon_to_cells` con el modo por default (`contain="center"`, solo hexágonos cuyo *centro* cae adentro del polígono) dejaba 1-6% de los puntos de delitos/siniestros/alumbrado fuera de la grilla — puntos reales de CABA cerca de la costa caían en hexágonos de borde cuyo centro quedaba just afuera. Se cambió a `polygon_to_cells_experimental(..., contain="overlap")` (cualquier hexágono que toque el polígono, aunque sea parcial) y el problema bajó a <0,5%.
+
+Datasets ya cruzados con hex_id (`src/etl/assign_hex_puntual.py`, `assign_hex_calles.py`): delitos, siniestros_hechos, cámaras, alumbrado, cajeros, comisarías (ubicación puntual), escuelas, hospitales, universidades, estadios, ecobici/molinetes (estaciones), calles (por el punto medio del tramo, ya calculado en `pipeline/ingest_calles.py`), accesos_autopistas (+ tramo de calle troncal más cercano, reproyectado a EPSG:5347 para que la distancia sea en metros reales). Eventos masivos también pasó por el script pero solo 129 de 2.898 filas tienen hex_id (las de 2019, únicas con lat/lon) — el resto (2023-2026) solo tiene barrio, que es un tipo de cruce distinto (join por nombre, no point-in-hex), pendiente.
+
+Pendiente, y son operaciones distintas a point-in-hex (no encajan en `asignar_hex_id`): **espacios_verdes** y **comisarias.parquet** (el de zonas de patrullaje) necesitan overlay de polígono contra la grilla (% de área, no un punto); **población por hex** (denominador per cápita) sale de prorratear `poblacion_comuna`/`poblacion_barrio` por área, aunque ya se puede aproximar sin prorratear porque `hex_maestra` ya tiene `radio_censal_id` — un join directo contra `radios_censales.poblacion_total` alcanza para una primera versión.
+
+Gotchas encontrados: `siniestros_hechos` guarda lat/lon como texto, no float (se castea en `hex_utils.asignar_hex_id`); `hora_siniestro` viene como "HH:MM:SS" mientras que `franja` de delitos ya es un número 0-23 (se resuelve en `hex_utils.turno_desde_hora`, detecta el formato).

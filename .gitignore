@@ -1,6 +1,7 @@
-# datos crudos (se descargan con los scripts de pipeline/, no se versionan)
+# datos crudos y derivados (se regeneran con los scripts de pipeline/ y src/etl/, no se versionan)
 data/raw/
 data/processed/
+data/features/
 *.csv
 *.zip
 *.xlsx
