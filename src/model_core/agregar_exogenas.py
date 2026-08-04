@@ -94,9 +94,29 @@ def agregar_cerca_estadio(tabla: pd.DataFrame, hex_maestra: pd.DataFrame) -> pd.
     return tabla
 
 
+def optimizar_dtypes(tabla: pd.DataFrame) -> pd.DataFrame:
+    """Achica la tabla en memoria antes de mergear (máquina de 3.4GB de RAM,
+    ver README 'La restricción real'). hex_id/turno son strings repetidos
+    sobre solo 401/4 valores únicos -- category los reduce ~95%. Los float64
+    no necesitan esa precisión para features de conteo/ratio -- float32
+    a mitad de costo. Sin esto, training_table.parquet pesa 1,28GB en
+    memoria antes de mergear nada, y cada merge de pandas copia el frame."""
+    antes = tabla.memory_usage(deep=True).sum() / 1e6
+    tabla["hex_id"] = tabla["hex_id"].astype("category")
+    tabla["turno"] = tabla["turno"].astype("category")
+    for c in tabla.select_dtypes(include="float64").columns:
+        tabla[c] = tabla[c].astype("float32")
+    for c in tabla.select_dtypes(include="int64").columns:
+        tabla[c] = pd.to_numeric(tabla[c], downcast="integer")
+    despues = tabla.memory_usage(deep=True).sum() / 1e6
+    print(f"Dtypes optimizados: {antes:.0f}MB -> {despues:.0f}MB en memoria")
+    return tabla
+
+
 def main() -> None:
     tabla = pd.read_parquet(FEATURES / "training_table.parquet")
     hex_maestra = pd.read_parquet(FEATURES / "hex_maestra.parquet")
+    tabla = optimizar_dtypes(tabla)
 
     tabla = agregar_clima(tabla)
     tabla = agregar_eventos(tabla, hex_maestra)
