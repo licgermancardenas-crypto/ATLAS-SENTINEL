@@ -216,7 +216,33 @@ Solo el 0,5% de los 190.876 pares (hexágono, candidato) cambia de estado indivi
 
 **Módulo C**: el ranking de accesos cambia de forma no trivial al reemplazar el buffer por recorrido real del subgrafo de vías importantes (motorway/trunk/primary/secondary de OSM, análogo a troncal/distribuidora de GCBA). Alberti y Pórtico Independencia se mantienen 1° y 2° en ambas versiones (señal de robustez en los extremos), pero Dellepiane sube del puesto 7-8 al 3-4, Sarmiento sube del último puesto al 5°, y el grupo Illia baja del 3°-5° al 7°-9° — el buffer circular anterior sobre-representaba corredores que en la realidad no son alcanzables por vía importante en 2km reales, y sub-representaba otros conectados por una ruta más indirecta pero real.
 
-**Pendiente**: el export del dashboard (`dashboard/public/data/`) y el despliegue en Vercel todavía muestran los números anteriores (euclidiano/buffer) — no se regeneró ni redesplegó todavía dado el cambio grande en los headline numbers de Módulo A, para confirmar antes con el usuario en vez de cambiar lo que está en producción sin avisar.
+Dashboard regenerado y redesplegado con estos números (auto-deploy vía GitHub — el push disparó el build solo, 15s, sin intervención manual).
+
+## Motor de escenarios (`src/scenarios/motor_escenarios.py`)
+
+Último ítem de P1 y la brecha más grande contra la visión del producto (auditoría, sección 8): el brief pedía responder "¿qué recursos deberían moverse?", "¿cuál sería el impacto?" y "¿qué pasaría si cambian las condiciones?" de forma interactiva — antes de esto, cada pregunta era editar una constante a mano en un script y volver a correrlo. No es un gemelo digital con simulación de agentes (fuera de alcance real para una persona en esta máquina) — es la ruta pragmática que señaló la auditoría: reutilizar Capa 1 + Módulo A detrás de una función de escenarios en vez de investigación nueva.
+
+Dos tipos de escenario, porque responden preguntas distintas:
+
+**Escenario de condiciones** (perturbar features estáticas de hexágonos puntuales, re-predecir con el modelo ya entrenado, sin reentrenar). Probado triplicando `n_luminarias` en los 5 hexágonos de mayor riesgo del turno Tarde:
+
+```
+Riesgo total ciudad: 157.71 -> 157.71 (+0.00%)
+```
+
+**Delta exactamente cero** en los 5 hexágonos. No es un bug del motor — es la confirmación, ahora en términos de "palanca de política concreta" en vez de importancia de feature abstracta, de algo que este proyecto viene midiendo desde v2: el modelo nunca aprendió sensibilidad real a `n_luminarias` (importancia de splits: 1, la más baja de toda la tabla — ver sección de Capa 1). El motor de escenarios funciona correctamente; lo que expone es un límite real del modelo, no un límite del motor.
+
+**Escenario de recursos** (cambiar K_PATRULLAS o el radio de cobertura, re-resolver el MCLP de Módulo A sobre el mismo riesgo, comparar contra la cobertura actual). Curva completa, turno Tarde, radio 800m real:
+
+| K patrullas | Cobertura | vs. actual (35,0%) |
+|---|---|---|
+| 20 | 26.7% | -8.3pp |
+| 40 | 41.5% | +6.5pp |
+| 60 | 52.2% | +17.2pp |
+
+A diferencia de las condiciones estáticas, **esto sí responde con una señal clara y útil** — reasignar recursos (dónde están las patrullas) mueve la cobertura mucho más que cualquier intervención de infraestructura que el modelo haya aprendido a valorar. Es, en sí mismo, un hallazgo de producto: el apalancamiento real de este sistema está en la asignación de recursos (Módulo A/B), no en recomendar mejoras de infraestructura basadas en el modelo núcleo tal como está entrenado hoy.
+
+**Limitación explícita, no resuelta**: el motor no responde "¿cómo evolucionará en las próximas horas?" — el modelo predice un patrón histórico promedio (2025), no una proyección desde "ahora"; eso requeriría infraestructura de forecasting en tiempo real (ingesta continua, ventana móvil), fuera de alcance de este P1.
 
 ## Módulo A — Asignación de patrullas (`src/optimization/modulo_a_patrullas.py`)
 
