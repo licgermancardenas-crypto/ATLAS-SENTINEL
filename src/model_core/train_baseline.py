@@ -95,6 +95,45 @@ def recall_at_k(test: pd.DataFrame, pred_col: str, ks: list[float]) -> None:
         print(f"    top {k:.0%} de hexágonos ({top_n}) -> {capturado / total_real:.1%} de los delitos reales")
 
 
+def pai_pei(test: pd.DataFrame, pred_col: str, k: float) -> tuple[float, float]:
+    """Predictive Accuracy Index / Predictive Efficiency Index (Chainey,
+    Tompson & Uhlig 2008) — el estándar de la literatura de hotspot
+    policing, lo que hace estos resultados comparables contra papers
+    publicados en vez de solo contra el propio baseline.
+
+    PAI = (delitos capturados / delitos totales) / (área usada / área total).
+    Con hexágonos H3 de área casi idéntica entre sí, área_usada/área_total
+    ≈ k (fracción de hexágonos elegidos) — PAI ≈ Recall@k / k: "cuántas
+    veces mejor que marcar hexágonos al azar".
+
+    PEI = PAI del modelo / PAI del mejor mapa de hotspots posible con el
+    mismo k (rankeando por el delito REAL del propio período de test, en
+    vez de por el riesgo predicho — el techo teórico con total hindsight).
+    PEI cercano a 1.0 = el modelo está cerca de lo mejor que se puede
+    hacer a esa resolución; PEI bajo = hay margen real de mejora, no solo
+    ruido irreducible.
+    """
+    por_hex = test.groupby("hex_id", observed=True).agg(real=(TARGET, "sum"), predicho=(pred_col, "sum"))
+    total_real = por_hex["real"].sum()
+    n_hex = len(por_hex)
+    top_n = max(1, int(round(n_hex * k)))
+
+    capturado_modelo = por_hex.sort_values("predicho", ascending=False)["real"].iloc[:top_n].sum()
+    capturado_hindsight = por_hex.sort_values("real", ascending=False)["real"].iloc[:top_n].sum()
+
+    pai_modelo = (capturado_modelo / total_real) / k
+    pai_hindsight = (capturado_hindsight / total_real) / k
+    pei = pai_modelo / pai_hindsight if pai_hindsight > 0 else float("nan")
+    return pai_modelo, pei
+
+
+def reportar_pai_pei(test: pd.DataFrame, pred_col: str, ks: list[float]) -> None:
+    print(f"  PAI / PEI (Chainey et al. 2008):")
+    for k in ks:
+        pai, pei = pai_pei(test, pred_col, k)
+        print(f"    k={k:.0%}: PAI={pai:.2f} (x veces mejor que azar) | PEI={pei:.1%} (vs. techo con hindsight)")
+
+
 def main() -> None:
     train, val, test = cargar_splits()
     modelo = entrenar(train, val)
@@ -111,6 +150,9 @@ def main() -> None:
     recall_at_k(test, "pred_modelo", [0.05, 0.10, 0.20, 0.30])
     print("\nRecall@K — baseline naive:")
     recall_at_k(test, "pred_naive", [0.05, 0.10, 0.20, 0.30])
+
+    print("\nPAI/PEI — modelo:")
+    reportar_pai_pei(test, "pred_modelo", [0.10, 0.20, 0.30])
 
     importancias = pd.Series(modelo.feature_importances_, index=FEATURES_COLS).sort_values(ascending=False)
     print("\nImportancia de features (ganancia de splits):")

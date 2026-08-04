@@ -140,6 +140,46 @@ Se sumó clima (join por fecha), flag de evento masivo (point-in-hex para 2019, 
 
 El grano semanal le gana un poco más al baseline en error (MAE/RMSE), pero el **Recall@K —la métrica que más importa para priorizar zonas— queda prácticamente igual**. Conclusión: agregar por semana no cambia la historia de fondo, solo la afina levemente. La concentración espacial sigue siendo lo que carga el peso del modelo, con o sin más resolución temporal.
 
+## Auditoría técnica externa y remediación P0
+
+Un panel externo (ver artefacto publicado en la conversación) revisó las 16 dimensiones del proyecto contra el estado del arte de crime analytics/urban computing/investigación operativa. Dos hallazgos se marcaron **P0** (antes que cualquier otra mejora) y ya se resolvieron:
+
+### PAI/PEI (`train_baseline.py::pai_pei`) — métricas estándar de la literatura
+
+Recall@K es una métrica ad-hoc; **PAI (Predictive Accuracy Index) y PEI (Predictive Efficiency Index)** (Chainey, Tompson & Uhlig 2008) son el estándar de hotspot policing, lo que hace el resultado comparable contra papers publicados y no solo contra el propio baseline. Sobre test 2025:
+
+| k | PAI (veces mejor que azar) | PEI (vs. techo con hindsight) |
+|---|---|---|
+| 10% | 2.77 | 99.3% |
+| 20% | 2.27 | 99.4% |
+| 30% | 1.95 | 99.6% |
+
+PAI ~2-2.8x es un resultado sólido y comparable con literatura de otras ciudades. **PEI ~99% es el hallazgo más fuerte**: el modelo está a centésimas del techo teórico (el mejor mapa de hotspots posible con hindsight total) a esta resolución — no es que el modelo sea débil, es que a grano hex×día×turno casi no queda margen de mejora sin cambiar la resolución o el enfoque de fondo (coherente con todo lo demás: la heterogeneidad espacial ya se captura casi al máximo posible).
+
+### Validación espacial (`src/validation/spatial_holdout.py`)
+
+El documento de arquitectura original pedía "dejar afuera un subconjunto de hexágonos completos" y nunca se había hecho — todo el testing anterior usaba split temporal, que solo prueba interpolación en el tiempo sobre hexágonos ya vistos. Se reentrenó excluyendo 80 de 401 hexágonos (20%) **completamente** de train/val, y se comparó el test 2025 separado en vistos vs. holdout:
+
+| | MAE | PAI@20% | PEI@20% |
+|---|---|---|---|
+| Hexágonos vistos en entrenamiento (321) | 0.283 | 2.23 | 99.6% |
+| **Hexágonos holdout, nunca vistos (80)** | 0.325 | 2.31 | 98.2% |
+
+**Resultado contrario a lo previsto en la auditoría**: dado que `hex_id` domina la importancia de features, se esperaba una degradación fuerte en hexágonos nunca vistos (el modelo "no puede haber memorizado" una categoría que no existía en train). En cambio, PAI/PEI se mantienen prácticamente iguales — el MAE sí empeora (+15% relativo), pero el ranking de riesgo (lo que importa para priorizar) generaliza bien. Lectura: el modelo no depende de memorizar `hex_id` en sí, sino que apoya la predicción de un hexágono nuevo en `radio_censal_id`/`comuna_id` (unidades espaciales más gruesas, parcialmente representadas en train por hexágonos vecinos del mismo radio/comuna) y en las features socioeconómicas/de infraestructura — es decir, sí generaliza a partir de estructura, no solo de identidad. Buena noticia, y una corrección honesta a la hipótesis planteada en la auditoría: no toda crítica plausible se confirma con el dato.
+
+### Auditoría de equidad (`src/validation/auditoria_equidad.py`)
+
+Limitación documentada explícitamente: el modelo aprende de delitos **denunciados**, no de delito real — si el patrullaje histórico ya estuvo sesgado hacia ciertas zonas, el riesgo "aprendido" puede formalizar ese sesgo en vez de medir riesgo genuino (Lum & Isaac 2016; Ensign et al. 2018, *Runaway Feedback Loops in Predictive Policing*). Este proyecto no tiene forma de medir "delito real" independiente del registro policial — no se puede resolver el problema de fondo con los datos disponibles, pero sí se puede chequear una pregunta operacionalizable: ¿el riesgo predicho correlaciona con NBI/hacinamiento **más de lo que el historial delictivo por sí solo explica**?
+
+Correlación simple (15 comunas) entre `score_riesgo` medio y variable socioeconómica, y correlación parcial controlando por historial delictivo de la comuna en train:
+
+| Variable | r simple | r parcial (controlando historial) |
+|---|---|---|
+| % hogares con NBI | 0.410 | 0.139 |
+| % hacinamiento crítico | 0.047 | -0.279 |
+
+La correlación con NBI cae fuerte (0.41→0.14) al controlar por historial — la mayor parte de esa relación es indirecta (comunas con más NBI ya tenían más historial delictivo, no es que el modelo use NBI como proxy de clase social por sí solo). Hacinamiento hace lo contrario (sube en magnitud y cambia de signo) — señal a vigilar, aunque con **n=15 comunas la correlación parcial tiene muy pocos grados de libertad**, no alcanza para una conclusión fuerte en ningún sentido. Esto no es una auditoría de sesgo policial resuelta — es el chequeo honesto de qué tan independiente es el score de la vulnerabilidad socioeconómica, documentado para que quien use el sistema sepa qué mide y qué no mide.
+
 ## Módulo A — Asignación de patrullas (`src/optimization/modulo_a_patrullas.py`)
 
 Maximal Covering Location Problem resuelto con `pulp` (programación lineal entera, no ML) sobre `riesgo_predicho.parquet` (score de riesgo por hex×turno del modelo v1, generado por `predecir_riesgo.py`, promediado sobre 2025). Candidatos: las 75 comisarías reales + los 401 centroides de hexágonos. Radio de cobertura 800m. Restricción: ninguna comuna queda con cobertura cero.
