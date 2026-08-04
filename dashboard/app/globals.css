@@ -1,0 +1,94 @@
+@import "tailwindcss";
+
+/* Dark es la estética por default (herramienta de operaciones/seguridad),
+   pero se respeta prefers-color-scheme:light y un toggle futuro (data-theme). */
+:root {
+  color-scheme: dark;
+  --surface-0: #101012;
+  --surface-1: #1a1a19;
+  --surface-2: #232322;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --border: #34342f;
+
+  /* secuencial azul (riesgo), 100 = bajo, 700 = alto — validado dataviz skill (paso dark) */
+  --risk-100: #cde2fb;
+  --risk-200: #9ec5f4;
+  --risk-300: #6da7ec;
+  --risk-400: #3987e5;
+  --risk-500: #256abf;
+  --risk-600: #184f95;
+  --risk-700: #0d366b;
+
+  --status-good: #0ca30c;
+  --status-warning: #fab219;
+  --status-serious: #ec835a;
+  --status-critical: #e66767;
+
+  --accent: #d97706;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:where(:not([data-theme="dark"])) {
+    color-scheme: light;
+    --surface-0: #f8fafc;
+    --surface-1: #fcfcfb;
+    --surface-2: #ffffff;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --border: #e2e8f0;
+    --status-critical: #d03b3b;
+  }
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --surface-0: #f8fafc;
+  --surface-1: #fcfcfb;
+  --surface-2: #ffffff;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --border: #e2e8f0;
+  --status-critical: #d03b3b;
+}
+
+@theme inline {
+  --color-surface-0: var(--surface-0);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-status-good: var(--status-good);
+  --color-status-warning: var(--status-warning);
+  --color-status-serious: var(--status-serious);
+  --color-status-critical: var(--status-critical);
+  --color-risk-100: var(--risk-100);
+  --color-risk-200: var(--risk-200);
+  --color-risk-300: var(--risk-300);
+  --color-risk-400: var(--risk-400);
+  --color-risk-500: var(--risk-500);
+  --color-risk-600: var(--risk-600);
+  --color-risk-700: var(--risk-700);
+  --font-sans: var(--font-fira-sans);
+  --font-mono: var(--font-fira-code);
+}
+
+body {
+  background: var(--surface-0);
+  color: var(--text-primary);
+  font-family: var(--font-fira-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+.maplibregl-popup-content {
+  background: var(--surface-2) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 8px !important;
+  font-family: var(--font-fira-sans), sans-serif !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35) !important;
+}
+.maplibregl-popup-tip {
+  border-top-color: var(--surface-2) !important;
+}

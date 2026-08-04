@@ -185,4 +185,15 @@ Historial reciente + vecindad espacial suman **~56%**, más que la ubicación so
 
 Esto es más vendible que el resultado de Capa 1 solo: aunque el modelo apenas le gana al baseline naive en MAE, **está bien calibrado y es estable en el tiempo** — dos propiedades necesarias para que un organismo de gobierno confíe en el score.
 
+## Export + Dashboard (`src/export/`, `dashboard/`)
+
+Última etapa del roadmap. `src/export/generar_export.py` convierte los parquet de Capa 0-3 en JSON/GeoJSON livianos (~290KB en total) en `dashboard/public/data/`: `hex_riesgo.geojson` (459 hexágonos con riesgo por turno), `modulo_a/b/c.json`, `comisarias.geojson`, `camaras.geojson`, `metricas.json`. El dashboard nunca lee los parquet directo — todo pasa por este export para no acoplar el frontend al esquema de Python.
+
+`dashboard/` es un proyecto Next.js 16 + React 19 + TypeScript + Tailwind v4, en el mismo repo (no separado — ver decisión más arriba). Mapa con **MapLibre GL** (sin API key, basemap oscuro de CARTO) coloreado por una rampa secuencial azul validada con la skill de dataviz (cuantiles, no escala lineal — el riesgo está muy sesgado). Panel lateral con toggles de capas (Módulo A/B/C, comisarías/cámaras reales) y panel de métricas (calibración, evolución mensual, cobertura de Módulo A) con gráficos SVG hechos a mano siguiendo los mark specs de la skill (líneas finas, tooltips on-hover, un eje por gráfico).
+
+**Gotchas de esta etapa**:
+- MapLibre GL v6 cambió a exports nombrados únicamente (`import { Map, NavigationControl, Popup } from "maplibre-gl"`) — el patrón viejo `import maplibregl from "maplibre-gl"` con default export ya no existe.
+- `create-next-app` no scaffoldea sobre un directorio con archivos (el `public/data/` ya generado por el export) — hubo que crear en un directorio temporal y mergear.
+- No se pudo verificar visualmente con la herramienta de automatización de navegador (el Chrome que controla la extensión no llega a `localhost:3000` aunque el servidor responde bien por `curl`/PowerShell en esta misma máquina — aislamiento de red entre la extensión y este entorno). Se verificó con `npm run build` + `npm run lint` (ambos limpios) y **a ojo por el usuario en su propio navegador — confirmado, el mapa renderiza bien**.
+
 Gotchas encontrados: `siniestros_hechos` guarda lat/lon como texto, no float (se castea en `hex_utils.asignar_hex_id`); `hora_siniestro` viene como "HH:MM:SS" mientras que `franja` de delitos ya es un número 0-23 (se resuelve en `hex_utils.turno_desde_hora`, detecta el formato).
