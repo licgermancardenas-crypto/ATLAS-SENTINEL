@@ -100,15 +100,19 @@ def exportar_metricas() -> None:
     # (train_baseline.py, train_v2.py, modulo_a_patrullas.py solo imprimen) —
     # se copian acá desde los resultados ya documentados en el README. Si se
     # reentrena o se corre Módulo A con otro K, actualizar a mano los dos lados.
+    # Modulo A actualizado post-grafo vial real (P1 auditoría): la cobertura
+    # ya no es distancia euclidiana, es distancia de calle real (Dijkstra
+    # sobre el grafo dirigido de OSM) — números bastante más bajos que la
+    # versión euclidiana anterior, que estaba sobreestimada.
     metricas = {
         "v1_vs_v2": {
-            "v1": {"mae": 0.2902, "recall_20": 0.454, "recall_30": 0.585},
+            "v1": {"mae": 0.2900, "recall_20": 0.454, "recall_30": 0.586},
             "v2": {"mae": 0.2906, "recall_20": 0.454, "recall_30": 0.585},
             "baseline_naive": {"mae": 0.2961, "recall_20": 0.447, "recall_30": 0.584},
         },
         "modulo_a_cobertura": {
-            "actual_75_comisarias": 0.615,
-            "k20": 0.408, "k40": 0.621, "k75": 0.844,
+            "actual_75_comisarias": 0.3498,
+            "k20": 0.2672, "k40": 0.4151, "k75": 0.5854,
         },
         "evolucion_mensual": evolucion.to_dict(orient="records"),
         "calibracion": calibracion.to_dict(orient="records"),
