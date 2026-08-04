@@ -1,13 +1,19 @@
 """
 CAPA 1 (arquitectura-sige-ba.pdf, sección 3.2-3.5): entrena el modelo
-núcleo v1 — LightGBM, objetivo Poisson, sobre training_table.parquet.
+núcleo v1 — LightGBM, objetivo Tweedie, sobre training_table.parquet.
+
+Objetivo Tweedie, no Poisson (cambio P1 de la auditoría técnica): se
+midió sobredispersión real en conteo_delitos (varianza/media = 1,59,
+Poisson asume 1,0). train_incertidumbre.py compara ambos — Tweedie da
+MAE/PAI/PEI iguales o levemente mejores, se adopta por corrección
+estadística, no porque haya movido las métricas.
 
 Validación por split temporal (no aleatorio, sección 3.4): entrena hasta
 2023, valida con 2024 (early stopping), testea con 2025. Se compara
 contra un baseline naive (promedio histórico del mismo hex×turno en el
-período de train) y se reporta Recall@K — de los hexágonos que el modelo
-marca como más riesgosos, qué % de los delitos reales del test cae ahí.
-Esta es la métrica que más importa para el pitch (sección 3.4).
+período de train) y se reporta Recall@K, y PAI/PEI (Chainey, Tompson &
+Uhlig 2008 — estándar de la literatura de hotspot policing, hace el
+resultado comparable contra papers publicados).
 """
 
 from __future__ import annotations
@@ -49,8 +55,14 @@ def cargar_splits() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
 
 
 def entrenar(train: pd.DataFrame, val: pd.DataFrame, features_cols: list[str] = FEATURES_COLS) -> lgb.LGBMRegressor:
+    # Tweedie, no Poisson puro: la auditoría técnica midió sobredispersión real
+    # en conteo_delitos (varianza/media = 1,59; Poisson asume 1,0). Comparado
+    # en train_incertidumbre.py, Tweedie da MAE/PAI/PEI iguales o levemente
+    # mejores que Poisson — se adopta como objetivo de producción por
+    # corrección estadística, no porque haya movido las métricas.
     modelo = lgb.LGBMRegressor(
-        objective="poisson",
+        objective="tweedie",
+        tweedie_variance_power=1.5,
         n_estimators=500,
         learning_rate=0.05,
         num_leaves=63,
@@ -61,7 +73,7 @@ def entrenar(train: pd.DataFrame, val: pd.DataFrame, features_cols: list[str] = 
     modelo.fit(
         train[features_cols], train[TARGET],
         eval_set=[(val[features_cols], val[TARGET])],
-        eval_metric="poisson",
+        eval_metric="tweedie",
         callbacks=[lgb.early_stopping(30, verbose=False)],
         categorical_feature=[c for c in CATEGORICAS if c in features_cols],
     )
