@@ -26,19 +26,32 @@ No se compara contra K=75 optimizado — la pregunta que importa es "con K
 patrullas puestas donde más rinden, ¿cuánto riesgo cubro vs. lo que ya
 cubre la infraestructura fija de comisarías?", no "¿y si moviera las 75
 comisarías?".
+
+Actualización P1 (auditoría técnica externa, sección 7): "cobertura a
+800m" se medía en línea recta sobre CRS métrico — 800m euclidianos
+pueden ser bastante más en distancia real de calle si hay que rodear una
+autopista o ir contra el sentido de circulación. Se reemplaza por
+distancia de red real sobre el grafo vial de OSM (`build_grafo_vial.py`,
+MultiDiGraph **dirigido** — respeta sentido único nativamente, sin
+necesitar leer `sentido` de calles.parquet a mano). Cobertura desde cada
+candidato = todos los nodos alcanzables en <= R metros de calle real,
+vía Dijkstra de una sola fuente con corte (`cutoff`), no la distancia en
+línea recta hacia cada hex de demanda.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-import geopandas as gpd
+import networkx as nx
 import numpy as np
+import osmnx as ox
 import pandas as pd
 import pulp
 
 PROCESSED = Path(__file__).resolve().parent.parent.parent / "data" / "processed"
 FEATURES = Path(__file__).resolve().parent.parent.parent / "data" / "features"
+GRAFO_PATH = FEATURES / "grafo_vial.graphml"
 
 CRS_GEO = "EPSG:4326"
 CRS_METROS = "EPSG:5347"
@@ -71,7 +84,29 @@ def cargar_candidatos(demanda: pd.DataFrame) -> pd.DataFrame:
     return candidatos
 
 
-def matriz_cobertura(demanda: pd.DataFrame, candidatos: pd.DataFrame) -> np.ndarray:
+def matriz_cobertura_red(demanda: pd.DataFrame, candidatos: pd.DataFrame, G: nx.MultiDiGraph) -> np.ndarray:
+    nodo_demanda = ox.distance.nearest_nodes(G, demanda["lon"].to_numpy(), demanda["lat"].to_numpy())
+    nodo_candidato = ox.distance.nearest_nodes(G, candidatos["lon"].to_numpy(), candidatos["lat"].to_numpy())
+
+    cobertura = np.zeros((len(demanda), len(candidatos)), dtype=bool)
+    nodo_a_fila_demanda: dict[int, list[int]] = {}
+    for i, n in enumerate(nodo_demanda):
+        nodo_a_fila_demanda.setdefault(n, []).append(i)
+
+    for j, nodo_c in enumerate(nodo_candidato):
+        alcanzables = nx.single_source_dijkstra_path_length(G, nodo_c, cutoff=RADIO_COBERTURA_M, weight="length")
+        for nodo_dem, filas in nodo_a_fila_demanda.items():
+            if nodo_dem in alcanzables:
+                for i in filas:
+                    cobertura[i, j] = True
+    return cobertura
+
+
+def matriz_cobertura_euclidiana(demanda: pd.DataFrame, candidatos: pd.DataFrame) -> np.ndarray:
+    """La versión anterior (línea recta) — se mantiene solo para medir cuánto
+    cambia el resultado al pasar a distancia de red real, no para producción."""
+    import geopandas as gpd
+
     dem_gdf = gpd.GeoDataFrame(demanda, geometry=gpd.points_from_xy(demanda["lon"], demanda["lat"]), crs=CRS_GEO).to_crs(CRS_METROS)
     can_gdf = gpd.GeoDataFrame(candidatos, geometry=gpd.points_from_xy(candidatos["lon"], candidatos["lat"]), crs=CRS_GEO).to_crs(CRS_METROS)
 
@@ -124,11 +159,18 @@ def main() -> None:
           f"({(candidatos['tipo'] == 'comisaría existente').sum()} comisarías + "
           f"{(candidatos['tipo'] == 'hexágono candidato').sum()} hexágonos)")
 
-    cobertura = matriz_cobertura(demanda, candidatos)
+    print("Cargando grafo vial y calculando cobertura por distancia de red real (puede tardar unos minutos)...")
+    G = ox.io.load_graphml(GRAFO_PATH)
+    cobertura = matriz_cobertura_red(demanda, candidatos, G)
+
+    cobertura_euclid = matriz_cobertura_euclidiana(demanda, candidatos)
+    diff = (cobertura != cobertura_euclid).mean()
+    print(f"Diferencia vs. cobertura euclidiana anterior: {diff:.1%} de los pares (demanda, candidato) cambia de estado "
+          f"al pasar de línea recta a distancia de calle real")
 
     idx_comisarias_actuales = candidatos.index[candidatos["tipo"] == "comisaría existente"].tolist()
     pct_actual = cobertura_lograda(demanda, cobertura, idx_comisarias_actuales)
-    print(f"\nCobertura ACTUAL (75 comisarías reales, R={RADIO_COBERTURA_M}m): {pct_actual:.1%} del riesgo total")
+    print(f"\nCobertura ACTUAL (75 comisarías reales, R={RADIO_COBERTURA_M}m de calle real): {pct_actual:.1%} del riesgo total")
 
     elegidos = resolver_mclp(demanda, candidatos, cobertura, K_PATRULLAS)
     pct_optimo = cobertura_lograda(demanda, cobertura, elegidos)

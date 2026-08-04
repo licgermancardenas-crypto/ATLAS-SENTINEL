@@ -11,6 +11,9 @@ data/features/
 __pycache__/
 *.pyc
 
+# cache HTTP de osmnx (respuestas crudas de Overpass API)
+src/etl/cache/
+
 # node / web
 web/node_modules/
 web/dist/

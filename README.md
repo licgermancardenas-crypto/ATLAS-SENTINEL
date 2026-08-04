@@ -198,7 +198,25 @@ La auditoría midió sobredispersión real en `conteo_delitos` (varianza/media =
 
 Modelos guardados: `modelo_nucleo_tweedie.txt` (el mismo que ahora es `modelo_nucleo_v1.txt` de producción), `modelo_nucleo_p10.txt`, `modelo_nucleo_p50.txt`, `modelo_nucleo_p90.txt` — los cuantiles quedan disponibles para optimización robusta en Módulo A (siguiente P1), no se usan todavía en `predecir_riesgo.py`.
 
-`riesgo_predicho.parquet` ya se regeneró con el modelo Tweedie de producción (números marginalmente distintos a Poisson, la diferencia es mínima). **Pendiente**: los outputs de Módulo A/B/C y el export del dashboard (`dashboard/public/data/`) todavía reflejan la corrida anterior — dado que el cambio Tweedie-vs-Poisson es marginal, no se re-corrió toda la cadena ni se redesplegó; si hace falta el número exacto actualizado, correr `modulo_a_patrullas.py`/`modulo_b_camaras.py`/`modulo_c_controles.py` + `generar_export.py` + redeploy.
+`riesgo_predicho.parquet` ya se regeneró con el modelo Tweedie de producción (números marginalmente distintos a Poisson, la diferencia es mínima).
+
+### Grafo vial real (`src/etl/build_grafo_vial.py`) — Módulo A y C
+
+La auditoría señaló dos debilidades con la misma causa: Módulo A medía cobertura en línea recta sobre CRS métrico, Módulo C aproximaba el corredor de cada acceso con un buffer de radio fijo — ninguno de los dos usaba topología vial real. Se descargó el grafo vial real de CABA vía OSM/osmnx (**17.811 nodos, 37.036 tramos dirigidos** — dirigido, respeta sentido único nativamente, sin tener que leer `sentido` de `calles.parquet` a mano) y se cachea en `data/features/grafo_vial.graphml`.
+
+**Módulo A, resultado grande**: cobertura por distancia de red real (Dijkstra de una sola fuente con corte, no línea recta):
+
+| | Euclidiana (anterior) | Red real (actual) |
+|---|---|---|
+| Actual (75 comisarías) | 61.5% | **35.0%** |
+| Optimizado, K=40 | 62.1% | **41.5%** |
+| Ganancia | +0.6pp | **+6.5pp** |
+
+Solo el 0,5% de los 190.876 pares (hexágono, candidato) cambia de estado individualmente al pasar de línea recta a calle real — pero alcanza para tumbar la cobertura agregada en más de 20 puntos, porque muchos hexágonos dependían de un único candidato "borderline" cuya distancia real supera los 800m aunque la línea recta no. **La cifra de cobertura actual de la sección de Módulo A más arriba (61,5%) estaba sobreestimada** — la real, con calles de verdad, es 35%. La ganancia relativa de optimizar (+6,5pp en vez de +0,6pp) es ahora más convincente, no menos: hay más margen real para mejorar del que el número euclidiano sugería.
+
+**Módulo C**: el ranking de accesos cambia de forma no trivial al reemplazar el buffer por recorrido real del subgrafo de vías importantes (motorway/trunk/primary/secondary de OSM, análogo a troncal/distribuidora de GCBA). Alberti y Pórtico Independencia se mantienen 1° y 2° en ambas versiones (señal de robustez en los extremos), pero Dellepiane sube del puesto 7-8 al 3-4, Sarmiento sube del último puesto al 5°, y el grupo Illia baja del 3°-5° al 7°-9° — el buffer circular anterior sobre-representaba corredores que en la realidad no son alcanzables por vía importante en 2km reales, y sub-representaba otros conectados por una ruta más indirecta pero real.
+
+**Pendiente**: el export del dashboard (`dashboard/public/data/`) y el despliegue en Vercel todavía muestran los números anteriores (euclidiano/buffer) — no se regeneró ni redesplegó todavía dado el cambio grande en los headline numbers de Módulo A, para confirmar antes con el usuario en vez de cambiar lo que está en producción sin avisar.
 
 ## Módulo A — Asignación de patrullas (`src/optimization/modulo_a_patrullas.py`)
 
