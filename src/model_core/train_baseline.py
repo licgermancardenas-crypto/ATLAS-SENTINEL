@@ -27,6 +27,8 @@ NUMERICAS = [
     "vecino_k1_roll30", "vecino_k2_roll30", "poblacion_hex",
     "pct_hogares_nbi", "pct_hacinamiento_critico", "n_camaras", "n_luminarias",
     "pct_espacio_verde",
+    "n_escuelas_cerca", "n_hospitales_cerca", "n_universidades_cerca", "n_cajeros_cerca",
+    "flujo_ecobici", "flujo_molinetes",
 ]
 BOOLEANAS = ["es_feriado"]
 FEATURES_COLS = CATEGORICAS + NUMERICAS + BOOLEANAS

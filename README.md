@@ -180,6 +180,14 @@ Correlación simple (15 comunas) entre `score_riesgo` medio y variable socioecon
 
 La correlación con NBI cae fuerte (0.41→0.14) al controlar por historial — la mayor parte de esa relación es indirecta (comunas con más NBI ya tenían más historial delictivo, no es que el modelo use NBI como proxy de clase social por sí solo). Hacinamiento hace lo contrario (sube en magnitud y cambia de signo) — señal a vigilar, aunque con **n=15 comunas la correlación parcial tiene muy pocos grados de libertad**, no alcanza para una conclusión fuerte en ningún sentido. Esto no es una auditoría de sesgo policial resuelta — es el chequeo honesto de qué tan independiente es el score de la vulnerabilidad socioeconómica, documentado para que quien use el sistema sepa qué mide y qué no mide.
 
+## P1 de la auditoría técnica
+
+### POIs sensibles + flujo peatonal (`src/etl/agregar_poi_y_flujo.py`)
+
+Escuelas, hospitales, universidades y cajeros (buffer 300m del centroide, no "mismo hex" — evita subestimar en los bordes) y flujo EcoBici/Molinetes por hex×turno (a diferencia de cámaras/alumbrado, que son estáticos, el flujo peatonal sí depende del turno). Estaban calculados desde Capa 0 / Módulo B pero nunca llegaban al modelo núcleo — cerraban la mitad de Crime Pattern Theory (nodes/paths) ausente del feature set.
+
+**Cuarta vez que se repite el mismo patrón**: reentrenado con estas 6 features nuevas, MAE/Recall@K/PAI/PEI quedan **idénticos** a la versión anterior (0.2902, 45.4%, PEI 99.3-99.6%). `flujo_molinetes` y `flujo_ecobici` sí entran con más importancia que la mayoría de las socioeconómicas (163 y 157 respectivamente, por encima de `poblacion_hex`, NBI, hacinamiento), pero no mueven el agregado. Con v2 (exógenas), los overlays de polígono, y ahora POIs+flujo, van cuatro rondas de "sumar más contexto estático no mejora el ranking" — el hallazgo ya no es una casualidad de una corrida, es la conclusión estructural del proyecto: a este grano, el modelo está saturado en lo que la heterogeneidad espacial pura puede explicar, y hace falta un cambio de enfoque (no otra feature) para mover la aguja — exactamente lo que señala la auditoría técnica en la sección de simulación/decision intelligence, no en features adicionales.
+
 ## Módulo A — Asignación de patrullas (`src/optimization/modulo_a_patrullas.py`)
 
 Maximal Covering Location Problem resuelto con `pulp` (programación lineal entera, no ML) sobre `riesgo_predicho.parquet` (score de riesgo por hex×turno del modelo v1, generado por `predecir_riesgo.py`, promediado sobre 2025). Candidatos: las 75 comisarías reales + los 401 centroides de hexágonos. Radio de cobertura 800m. Restricción: ninguna comuna queda con cobertura cero.

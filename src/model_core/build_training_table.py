@@ -29,6 +29,12 @@ Actualización: población, % espacio verde y comisaría de patrullaje por
 hex ya no se aproximan por radio/centroide — salen de los overlays de
 polígono reales de src/etl/overlay_poligonos.py (población prorrateada
 por área, no la del radio completo).
+
+Actualización P1 (auditoría técnica externa, sección 4): POIs sensibles
+(escuelas, hospitales, universidades, cajeros — "nodes" de Crime Pattern
+Theory) y flujo peatonal EcoBici/Molinetes por turno ("paths") ya
+estaban calculados en Capa 0 / Módulo B pero nunca llegaban al modelo
+núcleo — src/etl/agregar_poi_y_flujo.py cierra ese cruce.
 """
 
 from __future__ import annotations
@@ -149,7 +155,18 @@ def agregar_socioeconomico_e_infraestructura(tabla: pd.DataFrame, hexes: pd.Data
     hexes["n_camaras"] = hexes["n_camaras"].fillna(0)
     hexes["n_luminarias"] = hexes["n_luminarias"].fillna(0)
 
+    # POIs sensibles (Crime Pattern Theory: "nodes") — src/etl/agregar_poi_y_flujo.py
+    pois = pd.read_parquet(FEATURES / "hex_pois.parquet")
+    hexes = hexes.merge(pois, on="hex_id", how="left")
+
     tabla = tabla.merge(hexes, on="hex_id", how="left")
+
+    # flujo peatonal (Crime Pattern Theory: "paths") — depende de turno, no
+    # es estático por hex como el resto de esta función, se mergea aparte.
+    flujo = pd.read_parquet(FEATURES / "hex_flujo_turno.parquet")
+    tabla = tabla.merge(flujo, on=["hex_id", "turno"], how="left")
+    tabla["flujo_ecobici"] = tabla["flujo_ecobici"].fillna(0)
+    tabla["flujo_molinetes"] = tabla["flujo_molinetes"].fillna(0)
     return tabla
 
 
