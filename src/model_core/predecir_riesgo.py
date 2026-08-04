@@ -40,7 +40,7 @@ def main() -> None:
 
     riesgo = test.groupby(["hex_id", "turno"], observed=True).agg(
         score_riesgo=("conteo_esperado", "mean"),
-        poblacion=("poblacion_total", "first"),
+        poblacion=("poblacion_hex", "first"),
     ).reset_index()
 
     hex_maestra = pd.read_parquet(FEATURES / "hex_maestra.parquet")[["hex_id", "lat", "lon", "comuna_id"]]

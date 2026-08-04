@@ -129,6 +129,8 @@ Se sumó clima (join por fecha), flag de evento masivo (point-in-hex para 2019, 
 
 **Conclusión de v1 vs. v2**: el cuello de botella no son las exógenas, es que el proceso a este grano es casi puramente espacial. Antes de seguir sumando variables, tiene más sentido: (a) construir el Módulo A sobre lo que ya funciona (la concentración espacial), ya que no depende de mejorar la parte temporal, o (b) probar un grano temporal más agregado (semanal en vez de diario) donde la señal dinámica podría distinguirse mejor del ruido.
 
+**Reentreno con los overlays de polígono** (`poblacion_hex`, `pct_espacio_verde`, `comisaria_id` de `src/etl/overlay_poligonos.py`, sumados a `build_training_table.py`): mismo resultado que v2 — MAE y Recall@K **idénticos** al modelo sin estas features (0.2902, 45.4%, 58.5%), y las tres quedan con importancia bajísima. Confirma el patrón: a esta resolución (hex×día×turno) el modelo ya captura "dónde es peligroso" a través de `hex_id`/`radio_censal_id`/historial — variables de contexto estático adicionales no aportan señal medible que esos features no capturen ya indirectamente.
+
 ## Módulo A — Asignación de patrullas (`src/optimization/modulo_a_patrullas.py`)
 
 Maximal Covering Location Problem resuelto con `pulp` (programación lineal entera, no ML) sobre `riesgo_predicho.parquet` (score de riesgo por hex×turno del modelo v1, generado por `predecir_riesgo.py`, promediado sobre 2025). Candidatos: las 75 comisarías reales + los 401 centroides de hexágonos. Radio de cobertura 800m. Restricción: ninguna comuna queda con cobertura cero.

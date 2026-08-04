@@ -21,11 +21,12 @@ import pandas as pd
 FEATURES = Path(__file__).resolve().parent.parent.parent / "data" / "features"
 MODELS_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "features" / "modelos"
 
-CATEGORICAS = ["hex_id", "turno", "comuna_id", "radio_censal_id", "dia_semana", "mes"]
+CATEGORICAS = ["hex_id", "turno", "comuna_id", "radio_censal_id", "comisaria_id", "dia_semana", "mes"]
 NUMERICAS = [
     "lag_7d", "lag_30d", "lag_365d", "roll_7d_sum", "roll_30d_sum",
-    "vecino_k1_roll30", "vecino_k2_roll30", "poblacion_total",
+    "vecino_k1_roll30", "vecino_k2_roll30", "poblacion_hex",
     "pct_hogares_nbi", "pct_hacinamiento_critico", "n_camaras", "n_luminarias",
+    "pct_espacio_verde",
 ]
 BOOLEANAS = ["es_feriado"]
 FEATURES_COLS = CATEGORICAS + NUMERICAS + BOOLEANAS

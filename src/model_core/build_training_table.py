@@ -24,6 +24,11 @@ Nota sobre NBI/hacinamiento: el documento dice que ambos salen de
 radios_censales, pero ese dataset solo tiene NBI por radio (fino).
 Hacinamiento solo existe a nivel comuna (socioeconomico_comuna.parquet)
 — se suma igual, a resolución más gruesa.
+
+Actualización: población, % espacio verde y comisaría de patrullaje por
+hex ya no se aproximan por radio/centroide — salen de los overlays de
+polígono reales de src/etl/overlay_poligonos.py (población prorrateada
+por área, no la del radio completo).
 """
 
 from __future__ import annotations
@@ -117,7 +122,7 @@ def agregar_vecindad_espacial(tabla: pd.DataFrame, hex_ids: list[str]) -> pd.Dat
 
 
 def agregar_socioeconomico_e_infraestructura(tabla: pd.DataFrame, hexes: pd.DataFrame) -> pd.DataFrame:
-    radios = pd.read_parquet(PROCESSED / "radios_censales.parquet")[["id_radio", "poblacion_total", "pct_hogares_nbi"]]
+    radios = pd.read_parquet(PROCESSED / "radios_censales.parquet")[["id_radio", "pct_hogares_nbi"]]
     hexes = hexes.merge(radios, left_on="radio_censal_id", right_on="id_radio", how="left").drop(columns="id_radio")
 
     comuna_socio = pd.read_parquet(PROCESSED / "socioeconomico_comuna.parquet")
@@ -125,6 +130,17 @@ def agregar_socioeconomico_e_infraestructura(tabla: pd.DataFrame, hexes: pd.Data
         ["comuna_id", "pct_hacinamiento_critico"]
     ]
     hexes = hexes.merge(comuna_socio, on="comuna_id", how="left")
+
+    # población prorrateada por área (src/etl/overlay_poligonos.py) en vez de
+    # la población del radio censal completo — más precisa a nivel hex.
+    poblacion = pd.read_parquet(FEATURES / "hex_poblacion.parquet")
+    hexes = hexes.merge(poblacion, on="hex_id", how="left")
+
+    espacio_verde = pd.read_parquet(FEATURES / "hex_espacios_verdes.parquet")
+    hexes = hexes.merge(espacio_verde, on="hex_id", how="left")
+
+    comisaria = pd.read_parquet(FEATURES / "hex_comisaria_patrullaje.parquet")[["hex_id", "comisaria_id"]]
+    hexes = hexes.merge(comisaria, on="hex_id", how="left")
 
     camaras = pd.read_parquet(FEATURES / "camaras_hex.parquet")["hex_id"].value_counts().rename("n_camaras")
     alumbrado = pd.read_parquet(FEATURES / "alumbrado_hex.parquet")["hex_id"].value_counts().rename("n_luminarias")
