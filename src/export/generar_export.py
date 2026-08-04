@@ -106,13 +106,13 @@ def exportar_metricas() -> None:
     # versión euclidiana anterior, que estaba sobreestimada.
     metricas = {
         "v1_vs_v2": {
-            "v1": {"mae": 0.2900, "recall_20": 0.454, "recall_30": 0.586},
+            "v1": {"mae": 0.2923, "recall_20": 0.455, "recall_30": 0.586},
             "v2": {"mae": 0.2906, "recall_20": 0.454, "recall_30": 0.585},
-            "baseline_naive": {"mae": 0.2961, "recall_20": 0.447, "recall_30": 0.584},
+            "baseline_naive": {"mae": 0.2983, "recall_20": 0.447, "recall_30": 0.584},
         },
         "modulo_a_cobertura": {
-            "actual_75_comisarias": 0.3498,
-            "k20": 0.2672, "k40": 0.4151, "k75": 0.5854,
+            "actual_75_comisarias": 0.3509,
+            "k20": 0.2704, "k40": 0.418, "k75": 0.5865,
         },
         "evolucion_mensual": evolucion.to_dict(orient="records"),
         "calibracion": calibracion.to_dict(orient="records"),

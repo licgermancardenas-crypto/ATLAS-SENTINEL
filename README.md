@@ -252,7 +252,19 @@ Primer ítem de P2 (auditoría, sección 11): 18 tests con `pytest`, corren sobr
 
 **Impacto real medido**: `delitos.parquet` tiene franja en {6, 14, 22} en **167.901 de 1.353.136 filas (12,4%)** — todas mal clasificadas de turno hasta ahora. Esto es anterior a P0/P1, viene desde Capa 0 (`assign_hex_puntual.py`) y se propaga a `training_table.parquet`, el modelo, y `riesgo_predicho.parquet` por turno.
 
-**Pendiente, no ejecutado todavía**: recascade completo (`assign_hex_puntual.py` → `agregar_poi_y_flujo.py` → `build_training_table.py` → reentrenar → `predecir_riesgo.py` → Módulo A/C → export dashboard → redeploy) — es el mismo alcance que el cambio del grafo vial, decidido con el usuario antes de correrlo dado el volumen de cómputo ya usado en esta sesión.
+**Recascade completo ejecutado** (`assign_hex_puntual.py` → `agregar_poi_y_flujo.py` → `build_training_table.py` → reentrenar → `predecir_riesgo.py` → Módulo A/B/C → export dashboard → redeploy automático vía GitHub). El impacto agregado terminó siendo chico — consistente con todo lo demás en este proyecto, donde la heterogeneidad espacial domina por sobre el resto:
+
+| | Antes del fix | Después |
+|---|---|---|
+| MAE modelo | 0.2900 | 0.2923 |
+| Recall@30% | 58.6% | 58.6% |
+| PEI@20% | 99.6% | 99.7% |
+| Módulo A, actual (75 comisarías) | 35.0% | 35.1% |
+| Módulo A, K=40 optimizado | 41.5% | 41.8% |
+| Módulo B, cobertura | 24.9% | 25.0% |
+| Módulo C, ranking de accesos | — | idéntico en orden |
+
+**Nota de honestidad**: los scripts de diagnóstico que no forman parte de la cadena de producción (`train_v2.py`, `train_semanal.py`, `train_incertidumbre.py`, `spatial_holdout.py`, `auditoria_equidad.py`) no se re-corrieron con los datos corregidos — dado lo chico del impacto agregado medido arriba, sus conclusiones cualitativas (Tweedie ≈ Poisson, el modelo generaliza bien a hexágonos nuevos, NBI mayormente explicado por historial) casi seguro se sostienen, pero los números exactos que reportan quedan desactualizados hasta que se vuelvan a correr.
 
 ## Módulo A — Asignación de patrullas (`src/optimization/modulo_a_patrullas.py`)
 
