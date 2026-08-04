@@ -14,11 +14,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import lightgbm as lgb
+import mlflow
 import numpy as np
 import pandas as pd
 
-from train_baseline import TARGET, entrenar, metricas, recall_at_k, baseline_naive
+from train_baseline import TARGET, MLFLOW_TRACKING_URI, entrenar, metricas, recall_at_k, baseline_naive
 
 FEATURES = Path(__file__).resolve().parent.parent.parent / "data" / "features"
 MODELS_DIR = FEATURES / "modelos"
@@ -45,29 +45,40 @@ def cargar_splits() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
 
 
 def main() -> None:
-    train, val, test = cargar_splits()
-    modelo = entrenar(train, val, FEATURES_COLS)
+    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+    mlflow.set_experiment("atlas-sentinel-modelo-nucleo")
 
-    test = test.copy()
-    test["pred_modelo"] = np.clip(modelo.predict(test[FEATURES_COLS]), 0, None)
-    test["pred_naive"] = baseline_naive(train, test)
+    with mlflow.start_run(run_name="semanal"):
+        train, val, test = cargar_splits()
+        modelo = entrenar(train, val, FEATURES_COLS)
+        mlflow.log_params({"n_features": len(FEATURES_COLS), "n_filas_train": len(train),
+                            "mejor_iteracion": modelo.best_iteration_, "variante": "semanal", "grano": "semana"})
 
-    print("\nMétricas en test (2025), grano semanal:")
-    metricas(test[TARGET], test["pred_modelo"], "LightGBM Poisson semanal")
-    metricas(test[TARGET], test["pred_naive"], "Baseline naive (media hist. hex×turno)")
+        test = test.copy()
+        test["pred_modelo"] = np.clip(modelo.predict(test[FEATURES_COLS]), 0, None)
+        test["pred_naive"] = baseline_naive(train, test)
 
-    print("\nRecall@K — modelo semanal:")
-    recall_at_k(test, "pred_modelo", [0.05, 0.10, 0.20, 0.30])
-    print("\nRecall@K — baseline naive:")
-    recall_at_k(test, "pred_naive", [0.05, 0.10, 0.20, 0.30])
+        print("\nMétricas en test (2025), grano semanal:")
+        m_modelo = metricas(test[TARGET], test["pred_modelo"], "LightGBM Poisson semanal")
+        m_naive = metricas(test[TARGET], test["pred_naive"], "Baseline naive (media hist. hex×turno)")
 
-    importancias = pd.Series(modelo.feature_importances_, index=FEATURES_COLS).sort_values(ascending=False)
-    print("\nImportancia de features (semanal):")
-    print(importancias)
+        print("\nRecall@K — modelo semanal:")
+        r_modelo = recall_at_k(test, "pred_modelo", [0.05, 0.10, 0.20, 0.30])
+        print("\nRecall@K — baseline naive:")
+        r_naive = recall_at_k(test, "pred_naive", [0.05, 0.10, 0.20, 0.30])
 
-    MODELS_DIR.mkdir(parents=True, exist_ok=True)
-    modelo.booster_.save_model(str(MODELS_DIR / "modelo_nucleo_semanal.txt"))
-    print(f"\nModelo guardado en {MODELS_DIR / 'modelo_nucleo_semanal.txt'}")
+        mlflow.log_metrics({f"modelo_{k}": v for k, v in {**m_modelo, **r_modelo}.items()})
+        mlflow.log_metrics({f"naive_{k}": v for k, v in {**m_naive, **r_naive}.items()})
+
+        importancias = pd.Series(modelo.feature_importances_, index=FEATURES_COLS).sort_values(ascending=False)
+        print("\nImportancia de features (semanal):")
+        print(importancias)
+
+        MODELS_DIR.mkdir(parents=True, exist_ok=True)
+        ruta_modelo = MODELS_DIR / "modelo_nucleo_semanal.txt"
+        modelo.booster_.save_model(str(ruta_modelo))
+        print(f"\nModelo guardado en {ruta_modelo}")
+        mlflow.log_artifact(str(ruta_modelo))
 
 
 if __name__ == "__main__":

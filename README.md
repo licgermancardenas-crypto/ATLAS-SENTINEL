@@ -266,6 +266,14 @@ Primer ítem de P2 (auditoría, sección 11): 18 tests con `pytest`, corren sobr
 
 **Nota de honestidad**: los scripts de diagnóstico que no forman parte de la cadena de producción (`train_v2.py`, `train_semanal.py`, `train_incertidumbre.py`, `spatial_holdout.py`, `auditoria_equidad.py`) no se re-corrieron con los datos corregidos — dado lo chico del impacto agregado medido arriba, sus conclusiones cualitativas (Tweedie ≈ Poisson, el modelo generaliza bien a hexágonos nuevos, NBI mayormente explicado por historial) casi seguro se sostienen, pero los números exactos que reportan quedan desactualizados hasta que se vuelvan a correr.
 
+## P2: MLflow (`train_baseline.py`, `train_v2.py`, `train_semanal.py`)
+
+Segundo ítem de P2 (auditoría, sección 10): cada corrida de entrenamiento ahora se registra en MLflow local (`mlflow.db`, backend SQLite — "cero infraestructura nueva" como pedía la auditoría, un solo archivo, sin server). `metricas()`, `recall_at_k()` y `reportar_pai_pei()` en `train_baseline.py` ahora devuelven valores además de imprimir, así se pueden loguear sin recalcular. `mlflow ui --backend-store-uri sqlite:///mlflow.db` levanta el dashboard de comparación de corridas.
+
+Verificado funcionando de punta a punta en `train_baseline.py` (el modelo de producción — params, métricas modelo/naive, y el `.txt` del modelo como artifact, todo quedó en la corrida `v1-tweedie`).
+
+**Límite real encontrado, no forzado**: al intentar refrescar `train_v2.py`/`train_semanal.py` con los datos post-fix de turno, `agregar_exogenas.py` tiró `numpy._core._exceptions._ArrayMemoryError` reconstruyendo `training_table_v2.parquet` (dos veces, en dos operaciones distintas de pandas) — la máquina de 3,4GB de RAM se quedó sin memoria real después de una sesión larga con muchos procesos pesados encadenados. No es un bug de código: es exactamente la restricción que la auditoría técnica nombra en su sección 13 ("La restricción real: 3,4GB de RAM"). El código de tracking de MLflow quedó agregado a ambos scripts y es correcto (mismo patrón que `train_baseline.py`, ya verificado), pero `training_table_v2.parquet`/`training_table_semanal.parquet` siguen reflejando datos de antes del fix de turno hasta que se puedan reconstruir con memoria disponible — idealmente en una sesión nueva, no al final de una ya muy larga.
+
 ## Módulo A — Asignación de patrullas (`src/optimization/modulo_a_patrullas.py`)
 
 Maximal Covering Location Problem resuelto con `pulp` (programación lineal entera, no ML) sobre `riesgo_predicho.parquet` (score de riesgo por hex×turno del modelo v1, generado por `predecir_riesgo.py`, promediado sobre 2025). Candidatos: las 75 comisarías reales + los 401 centroides de hexágonos. Radio de cobertura 800m. Restricción: ninguna comuna queda con cobertura cero.

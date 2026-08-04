@@ -14,18 +14,32 @@ contra un baseline naive (promedio histórico del mismo hex×turno en el
 período de train) y se reporta Recall@K, y PAI/PEI (Chainey, Tompson &
 Uhlig 2008 — estándar de la literatura de hotspot policing, hace el
 resultado comparable contra papers publicados).
+
+P2 de la auditoría técnica externa (sección 10): cada corrida se registra
+en MLflow local (`mlruns/` en la raíz del repo, cero infraestructura
+nueva) — params, métricas y el modelo entrenado como artifact. Antes de
+esto, comparar v1/v2/semanal/Tweedie era prosa a mano en el README; ahora
+queda además como historial consultable con `mlflow ui`.
 """
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import lightgbm as lgb
+import mlflow
 import numpy as np
 import pandas as pd
 
-FEATURES = Path(__file__).resolve().parent.parent.parent / "data" / "features"
-MODELS_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "features" / "modelos"
+RAIZ = Path(__file__).resolve().parent.parent.parent
+FEATURES = RAIZ / "data" / "features"
+MODELS_DIR = RAIZ / "data" / "features" / "modelos"
+# MLflow 3.x dejó en modo mantenimiento el backend de filesystem plano
+# ("./mlruns" sin más) — pide backend de base de datos. sqlite es la
+# opción más liviana que sigue siendo "cero infraestructura nueva" (un
+# solo archivo local, sin server).
+MLFLOW_TRACKING_URI = f"sqlite:///{(RAIZ / 'mlflow.db').as_posix()}"
 
 CATEGORICAS = ["hex_id", "turno", "comuna_id", "radio_censal_id", "comisaria_id", "dia_semana", "mes"]
 NUMERICAS = [
@@ -88,13 +102,14 @@ def baseline_naive(train: pd.DataFrame, eval_df: pd.DataFrame) -> pd.Series:
     return pd.Series(pred, index=eval_df.index).fillna(train[TARGET].mean())
 
 
-def metricas(y_true: pd.Series, y_pred: np.ndarray, nombre: str) -> None:
+def metricas(y_true: pd.Series, y_pred: np.ndarray, nombre: str) -> dict[str, float]:
     mae = np.abs(y_true - y_pred).mean()
     rmse = np.sqrt(((y_true - y_pred) ** 2).mean())
     print(f"  {nombre}: MAE={mae:.4f}  RMSE={rmse:.4f}")
+    return {"mae": mae, "rmse": rmse}
 
 
-def recall_at_k(test: pd.DataFrame, pred_col: str, ks: list[float]) -> None:
+def recall_at_k(test: pd.DataFrame, pred_col: str, ks: list[float]) -> dict[str, float]:
     """% de delitos reales del test que caen en el top-K% de hexágonos
     según riesgo total predicho (sumado sobre todo el período de test)."""
     por_hex = test.groupby("hex_id", observed=True).agg(
@@ -103,10 +118,14 @@ def recall_at_k(test: pd.DataFrame, pred_col: str, ks: list[float]) -> None:
     total_real = por_hex["real"].sum()
     n_hex = len(por_hex)
     print(f"  Recall@K (sobre {n_hex} hexágonos, {total_real:,} delitos reales en test):")
+    resultado = {}
     for k in ks:
         top_n = max(1, int(round(n_hex * k)))
         capturado = por_hex["real"].iloc[:top_n].sum()
-        print(f"    top {k:.0%} de hexágonos ({top_n}) -> {capturado / total_real:.1%} de los delitos reales")
+        recall = capturado / total_real
+        print(f"    top {k:.0%} de hexágonos ({top_n}) -> {recall:.1%} de los delitos reales")
+        resultado[f"recall_{int(k * 100)}"] = recall
+    return resultado
 
 
 def pai_pei(test: pd.DataFrame, pred_col: str, k: float) -> tuple[float, float]:
@@ -141,40 +160,73 @@ def pai_pei(test: pd.DataFrame, pred_col: str, k: float) -> tuple[float, float]:
     return pai_modelo, pei
 
 
-def reportar_pai_pei(test: pd.DataFrame, pred_col: str, ks: list[float]) -> None:
+def reportar_pai_pei(test: pd.DataFrame, pred_col: str, ks: list[float]) -> dict[str, float]:
     print(f"  PAI / PEI (Chainey et al. 2008):")
+    resultado = {}
     for k in ks:
         pai, pei = pai_pei(test, pred_col, k)
         print(f"    k={k:.0%}: PAI={pai:.2f} (x veces mejor que azar) | PEI={pei:.1%} (vs. techo con hindsight)")
+        resultado[f"pai_{int(k * 100)}"] = pai
+        resultado[f"pei_{int(k * 100)}"] = pei
+    return resultado
+
+
+def git_commit_sha() -> str:
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"], cwd=RAIZ, text=True, timeout=5
+        ).strip()
+    except Exception:
+        return "desconocido"
 
 
 def main() -> None:
-    train, val, test = cargar_splits()
-    modelo = entrenar(train, val)
+    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+    mlflow.set_experiment("atlas-sentinel-modelo-nucleo")
 
-    test = test.copy()
-    test["pred_modelo"] = np.clip(modelo.predict(test[FEATURES_COLS]), 0, None)
-    test["pred_naive"] = baseline_naive(train, test)
+    with mlflow.start_run(run_name="v1-tweedie"):
+        train, val, test = cargar_splits()
+        modelo = entrenar(train, val)
 
-    print("\nMétricas en test (2025):")
-    metricas(test[TARGET], test["pred_modelo"], "LightGBM Poisson")
-    metricas(test[TARGET], test["pred_naive"], "Baseline naive (media hist. hex×turno)")
+        mlflow.log_params({
+            "objective": "tweedie", "tweedie_variance_power": 1.5,
+            "n_estimators": 500, "learning_rate": 0.05, "num_leaves": 63,
+            "min_child_samples": 50, "mejor_iteracion": modelo.best_iteration_,
+            "n_features": len(FEATURES_COLS), "n_filas_train": len(train),
+            "git_commit": git_commit_sha(),
+        })
 
-    print("\nRecall@K — modelo:")
-    recall_at_k(test, "pred_modelo", [0.05, 0.10, 0.20, 0.30])
-    print("\nRecall@K — baseline naive:")
-    recall_at_k(test, "pred_naive", [0.05, 0.10, 0.20, 0.30])
+        test = test.copy()
+        test["pred_modelo"] = np.clip(modelo.predict(test[FEATURES_COLS]), 0, None)
+        test["pred_naive"] = baseline_naive(train, test)
 
-    print("\nPAI/PEI — modelo:")
-    reportar_pai_pei(test, "pred_modelo", [0.10, 0.20, 0.30])
+        print("\nMétricas en test (2025):")
+        m_modelo = metricas(test[TARGET], test["pred_modelo"], "LightGBM Poisson")
+        m_naive = metricas(test[TARGET], test["pred_naive"], "Baseline naive (media hist. hex×turno)")
 
-    importancias = pd.Series(modelo.feature_importances_, index=FEATURES_COLS).sort_values(ascending=False)
-    print("\nImportancia de features (ganancia de splits):")
-    print(importancias)
+        print("\nRecall@K — modelo:")
+        r_modelo = recall_at_k(test, "pred_modelo", [0.05, 0.10, 0.20, 0.30])
+        print("\nRecall@K — baseline naive:")
+        r_naive = recall_at_k(test, "pred_naive", [0.05, 0.10, 0.20, 0.30])
 
-    MODELS_DIR.mkdir(parents=True, exist_ok=True)
-    modelo.booster_.save_model(str(MODELS_DIR / "modelo_nucleo_v1.txt"))
-    print(f"\nModelo guardado en {MODELS_DIR / 'modelo_nucleo_v1.txt'}")
+        print("\nPAI/PEI — modelo:")
+        pp_modelo = reportar_pai_pei(test, "pred_modelo", [0.10, 0.20, 0.30])
+
+        mlflow.log_metrics({f"modelo_{k}": v for k, v in {**m_modelo, **r_modelo, **pp_modelo}.items()})
+        mlflow.log_metrics({f"naive_{k}": v for k, v in {**m_naive, **r_naive}.items()})
+
+        importancias = pd.Series(modelo.feature_importances_, index=FEATURES_COLS).sort_values(ascending=False)
+        print("\nImportancia de features (ganancia de splits):")
+        print(importancias)
+
+        MODELS_DIR.mkdir(parents=True, exist_ok=True)
+        ruta_modelo = MODELS_DIR / "modelo_nucleo_v1.txt"
+        modelo.booster_.save_model(str(ruta_modelo))
+        print(f"\nModelo guardado en {ruta_modelo}")
+        mlflow.log_artifact(str(ruta_modelo))
+        mlflow.log_text(importancias.to_string(), "importancia_features.txt")
+
+        print(f"\nCorrida registrada en MLflow — 'mlflow ui --backend-store-uri {mlflow.get_tracking_uri()}' para ver el dashboard")
 
 
 if __name__ == "__main__":
