@@ -244,6 +244,16 @@ A diferencia de las condiciones estáticas, **esto sí responde con una señal c
 
 **Limitación explícita, no resuelta**: el motor no responde "¿cómo evolucionará en las próximas horas?" — el modelo predice un patrón histórico promedio (2025), no una proyección desde "ahora"; eso requeriría infraestructura de forecasting en tiempo real (ingesta continua, ventana móvil), fuera de alcance de este P1.
 
+## P2: tests de propiedad (`tests/`) — encontraron un bug real
+
+Primer ítem de P2 (auditoría, sección 11): 18 tests con `pytest`, corren sobre los parquet ya generados (invariantes, no recomputan geopandas) más tests puros de lógica (`turno_desde_hora`, `pai_pei`). El test que la auditoría pidió textualmente — *"la suma de población por hex dentro de un barrio debe igualar la población del barrio"* — ya pasa (regresión del bug de `overlay_poligonos.py` ya corregido).
+
+**Los tests de `turno_desde_hora` encontraron un bug nuevo, real, no relacionado con lo que motivó escribirlos**: `hex_utils.py` usaba `pd.cut(..., right=True)` (el default), que deja cada límite exacto de turno en el bucket ANTERIOR — hora 6 caía en "Madrugada" en vez de "Mañana", hora 14 en "Mañana" en vez de "Tarde", hora 22 en "Tarde" en vez de "Noche". Se corrigió con `right=False`.
+
+**Impacto real medido**: `delitos.parquet` tiene franja en {6, 14, 22} en **167.901 de 1.353.136 filas (12,4%)** — todas mal clasificadas de turno hasta ahora. Esto es anterior a P0/P1, viene desde Capa 0 (`assign_hex_puntual.py`) y se propaga a `training_table.parquet`, el modelo, y `riesgo_predicho.parquet` por turno.
+
+**Pendiente, no ejecutado todavía**: recascade completo (`assign_hex_puntual.py` → `agregar_poi_y_flujo.py` → `build_training_table.py` → reentrenar → `predecir_riesgo.py` → Módulo A/C → export dashboard → redeploy) — es el mismo alcance que el cambio del grafo vial, decidido con el usuario antes de correrlo dado el volumen de cómputo ya usado en esta sesión.
+
 ## Módulo A — Asignación de patrullas (`src/optimization/modulo_a_patrullas.py`)
 
 Maximal Covering Location Problem resuelto con `pulp` (programación lineal entera, no ML) sobre `riesgo_predicho.parquet` (score de riesgo por hex×turno del modelo v1, generado por `predecir_riesgo.py`, promediado sobre 2025). Candidatos: las 75 comisarías reales + los 401 centroides de hexágonos. Radio de cobertura 800m. Restricción: ninguna comuna queda con cobertura cero.

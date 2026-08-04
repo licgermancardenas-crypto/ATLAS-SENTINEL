@@ -28,11 +28,17 @@ def turno_desde_hora(hora: pd.Series) -> pd.Series:
     if numerica.isna().mean() > 0.5:  # mayormente no numérico -> asumir "HH:MM:SS"
         numerica = pd.to_numeric(hora.astype(str).str.split(":").str[0], errors="coerce")
     h = numerica % 24
+    # right=False: bins semiabiertos [a, b) — con el default right=True, la
+    # hora exacta de cada límite (6, 14, 22, 2) caía en el turno ANTERIOR
+    # (ej. hora=6 -> "Madrugada" en vez de "Mañana"). Bug real encontrado por
+    # tests/test_hex_utils.py — afectaba 12,4% de delitos.parquet (toda fila
+    # con franja en {6,14,22}), ver README.
     return pd.cut(
         h,
         bins=[-0.1, 2, 6, 14, 22, 24],
         labels=["Noche", "Madrugada", "Mañana", "Tarde", "Noche"],
         ordered=False,
+        right=False,
     ).astype(str)
 
 
