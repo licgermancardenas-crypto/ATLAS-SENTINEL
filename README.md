@@ -317,18 +317,18 @@ El corredor de **25 de Mayo/Paseo del Bajo** concentra la mayor accidentalidad h
 
 | Feature | Aporte SHAP |
 |---|---|
-| roll_30d_sum (historial 30 días, mismo hex) | 29.3% |
-| hex_id (ubicación) | 25.4% |
-| vecino_k1_roll30 + vecino_k2_roll30 (contagio espacial) | 25.4% |
-| turno + radio_censal_id + resto | ~20% |
+| roll_30d_sum (historial 30 días, mismo hex) | 30.1% |
+| hex_id (ubicación) | 28.2% |
+| vecino_k1_roll30 + vecino_k2_roll30 (contagio espacial) | 24.6% |
+| turno + radio_censal_id + resto | ~17% |
 
-Historial reciente + vecindad espacial suman **~56%**, más que la ubicación sola — la dinámica temporal sí aporta, solo que no se notaba contando splits. Explicaciones locales (top 5 hex×turno de mayor riesgo del test) siguen el mismo patrón: 40-50% del riesgo de cada predicción se explica por `roll_30d_sum`.
+Historial reciente + vecindad espacial suman **~55%**, más que la ubicación sola — la dinámica temporal sí aporta, solo que no se notaba contando splits. Explicaciones locales (top 5 hex×turno de mayor riesgo del test) siguen el mismo patrón: 50% del riesgo de cada predicción se explica por `roll_30d_sum`. (Recorrido con el modelo/tabla post-fix de turno — números casi idénticos a la corrida pre-fix, consistente con el impacto agregado chico que ya midió el recascade.)
 
 **Backtesting narrado + evolución mensual + calibración** (`backtesting_narrado.py`), sobre test 2025:
 
-- Junio 2025: 9.783 delitos reales vs. 10.085 predichos por el modelo (suma sobre todos los hex×turno) — muy cerca. El top 20% de hexágonos marcados como más riesgosos concentró el 46.9% de los delitos reales del mes.
-- **Recall@20% estable los 12 meses**: entre 44.1% y 47.1%, desvío de 1.3 puntos — no es una racha de un mes.
-- **Calibración casi perfecta por decil**: en el decil de mayor riesgo, predicho=0.828 vs. real=0.821; en todos los deciles el promedio predicho y el real están a menos de un 3% de diferencia. El score no es solo bueno para *rankear* hexágonos, es confiable en términos absolutos.
+- Junio 2025: 9.783 delitos reales vs. 10.042 predichos por el modelo (suma sobre todos los hex×turno) — muy cerca. El top 20% de hexágonos marcados como más riesgosos concentró el 46.2% de los delitos reales del mes.
+- **Recall@20% estable los 12 meses**: entre 43.9% y 47.4%, media 45.8%, desvío de 1.2 puntos — no es una racha de un mes.
+- **Calibración casi perfecta por decil**: en el decil de mayor riesgo, predicho=0.805 vs. real=0.801; en todos los deciles el promedio predicho y el real están a menos de un 3% de diferencia. El score no es solo bueno para *rankear* hexágonos, es confiable en términos absolutos.
 
 Esto es más vendible que el resultado de Capa 1 solo: aunque el modelo apenas le gana al baseline naive en MAE, **está bien calibrado y es estable en el tiempo** — dos propiedades necesarias para que un organismo de gobierno confíe en el score.
 
