@@ -131,6 +131,15 @@ Se sumó clima (join por fecha), flag de evento masivo (point-in-hex para 2019, 
 
 **Reentreno con los overlays de polígono** (`poblacion_hex`, `pct_espacio_verde`, `comisaria_id` de `src/etl/overlay_poligonos.py`, sumados a `build_training_table.py`): mismo resultado que v2 — MAE y Recall@K **idénticos** al modelo sin estas features (0.2902, 45.4%, 58.5%), y las tres quedan con importancia bajísima. Confirma el patrón: a esta resolución (hex×día×turno) el modelo ya captura "dónde es peligroso" a través de `hex_id`/`radio_censal_id`/historial — variables de contexto estático adicionales no aportan señal medible que esos features no capturen ya indirectamente.
 
+**Grano semanal** (`build_training_table_semanal.py`, `train_semanal.py`): la hipótesis era que el conteo diario, muy disperso (82,8% ceros, media 0,23), enterraba señal dinámica que un grano más agregado podría revelar. Agregar por semana (401 hex × 523 semanas × 4 turnos = 838.892 filas) baja los ceros a 43,8% y sube la media a 1,59. Resultado matizado:
+
+| | MAE vs. baseline naive | Recall@20% | Recall@30% |
+|---|---|---|---|
+| Diario | 0.2902 vs 0.2961 (mejora relativa 1,99%) | 45,4% | 58,5% |
+| Semanal | 0.9239 vs 0.9510 (mejora relativa **2,85%**) | 45,5% | 58,6% |
+
+El grano semanal le gana un poco más al baseline en error (MAE/RMSE), pero el **Recall@K —la métrica que más importa para priorizar zonas— queda prácticamente igual**. Conclusión: agregar por semana no cambia la historia de fondo, solo la afina levemente. La concentración espacial sigue siendo lo que carga el peso del modelo, con o sin más resolución temporal.
+
 ## Módulo A — Asignación de patrullas (`src/optimization/modulo_a_patrullas.py`)
 
 Maximal Covering Location Problem resuelto con `pulp` (programación lineal entera, no ML) sobre `riesgo_predicho.parquet` (score de riesgo por hex×turno del modelo v1, generado por `predecir_riesgo.py`, promediado sobre 2025). Candidatos: las 75 comisarías reales + los 401 centroides de hexágonos. Radio de cobertura 800m. Restricción: ninguna comuna queda con cobertura cero.
