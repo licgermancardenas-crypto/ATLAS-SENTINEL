@@ -304,16 +304,28 @@ Verificado funcionando de punta a punta en `train_baseline.py` (el modelo de pro
 
 Maximal Covering Location Problem resuelto con `pulp` (programación lineal entera, no ML) sobre `riesgo_predicho.parquet` (score de riesgo por hex×turno del modelo v1, generado por `predecir_riesgo.py`, promediado sobre 2025). Candidatos: las 75 comisarías reales + los 401 centroides de hexágonos. Radio de cobertura 800m. Restricción: ninguna comuna queda con cobertura cero.
 
-Turno Tarde (el de mayor riesgo promedio):
+Turno Tarde (el de mayor riesgo promedio). **Números por distancia de calle real** (Dijkstra sobre el grafo dirigido de OSM, P1 de la auditoría) — la versión euclidiana anterior sobreestimaba fuerte la cobertura (daba 61,5% para el escenario actual y 84,4% para K=75) porque 800m en línea recta son bastante más que 800m de calle en una ciudad con autopistas y sentidos únicos:
 
 | Escenario | Riesgo cubierto |
 |---|---|
-| Actual — 75 comisarías reales, tal como están | 61.5% |
-| Optimizado, K=20 patrullas | 40.8% |
-| Optimizado, K=40 patrullas | 62.1% |
-| **Optimizado, K=75** (mismo presupuesto que hoy) | **84.4%** |
+| Actual — 75 comisarías reales, tal como están | 35.1% |
+| Optimizado, K=20 patrullas | 27.0% |
+| **Optimizado, K=30 patrullas** | **35.6%** |
+| Optimizado, K=40 patrullas | 41.8% |
+| Optimizado, K=60 patrullas | 52.4% |
+| **Optimizado, K=75** (mismo presupuesto que hoy) | **58.7%** |
+| Optimizado, K=110 patrullas | 70.8% |
 
-El dato que importa para el pitch: **a igual cantidad de unidades (75), solo cambiando dónde se ubican, la cobertura sube de 61.5% a 84.4%** — la infraestructura actual de comisarías no está posicionada donde el riesgo se concentra hoy. `K_PATRULLAS` y `TURNO` son parámetros al inicio del script (pensados como los sliders de un dashboard futuro).
+Dos datos para el pitch, ambos sobre distancia de calle real:
+
+- **Con 30 unidades bien ubicadas se cubre más riesgo (35,6%) que con las 75 comisarías actuales (35,1%)** — el 40% del despliegue, misma cobertura.
+- **A igual presupuesto (75), solo cambiando dónde se ubican, la cobertura pasa de 35,1% a 58,7%**: 67% más riesgo cubierto sin sumar una sola unidad.
+
+La lectura de fondo no cambió al pasar a distancia de red, solo se volvió más exigente: la infraestructura fija de comisarías no está donde el riesgo se concentra hoy.
+
+**La restricción de equidad es dura, y se nota**: con K=5 el solver devuelve `Infeasible` — no existe forma de ubicar 5 patrullas que deje a las 15 comunas con al menos un hexágono cubierto. Por debajo de ~10 unidades el problema directamente no tiene solución. Es el comportamiento correcto: el modelo no puede "resolver" el trade-off entre eficiencia y cobertura territorial abandonando comunas enteras.
+
+`K_PATRULLAS` y `TURNO` son parámetros al inicio del script (pensados como los sliders de un dashboard futuro). La curva completa de cobertura vs. K se puede regenerar reusando la matriz de cobertura una sola vez — lo caro es el Dijkstra desde los 476 candidatos (~6s), no resolver el MCLP (<1s por valor de K).
 
 ## Módulo B — Ubicación de cámaras nuevas (`src/optimization/modulo_b_camaras.py`)
 
@@ -352,7 +364,7 @@ Historial reciente + vecindad espacial suman **~55%**, más que la ubicación so
 
 - Junio 2025: 9.783 delitos reales vs. 10.042 predichos por el modelo (suma sobre todos los hex×turno) — muy cerca. El top 20% de hexágonos marcados como más riesgosos concentró el 46.2% de los delitos reales del mes.
 - **Recall@20% estable los 12 meses**: entre 43.9% y 47.4%, media 45.8%, desvío de 1.2 puntos — no es una racha de un mes.
-- **Calibración casi perfecta por decil**: en el decil de mayor riesgo, predicho=0.805 vs. real=0.801; en todos los deciles el promedio predicho y el real están a menos de un 3% de diferencia. El score no es solo bueno para *rankear* hexágonos, es confiable en términos absolutos.
+- **Calibración muy buena en los deciles que importan**: en el decil de mayor riesgo, predicho=0.805 vs. real=0.801 (0,6% de diferencia), y en los deciles 3 a 9 el error relativo nunca pasa de 2,6%. En los tres deciles más bajos el modelo **subestima** en términos relativos (decil 0: predicho 0.0065 vs. real 0.0098, un 33,5% abajo; decil 1: 16,9%; decil 2: 4,7%), aunque el error absoluto ahí es de 0,003-0,006 delitos por hex×turno — irrelevante para operaciones, porque son las celdas que ningún esquema de asignación va a priorizar. El score es confiable en términos absolutos donde se lo usa para decidir; en la cola de riesgo casi nulo, apenas conservador.
 
 Esto es más vendible que el resultado de Capa 1 solo: aunque el modelo apenas le gana al baseline naive en MAE, **está bien calibrado y es estable en el tiempo** — dos propiedades necesarias para que un organismo de gobierno confíe en el score.
 
