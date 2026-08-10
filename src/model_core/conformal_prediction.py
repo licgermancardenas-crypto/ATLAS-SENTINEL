@@ -42,7 +42,7 @@ import mlflow
 import numpy as np
 import pandas as pd
 
-from train_baseline import CATEGORICAS, FEATURES_COLS, MLFLOW_TRACKING_URI, TARGET, cargar_splits
+from train_baseline import FEATURES_COLS, MLFLOW_TRACKING_URI, TARGET, cargar_splits
 from train_incertidumbre import entrenar_cuantil
 
 FEATURES = Path(__file__).resolve().parent.parent.parent / "data" / "features"
@@ -70,41 +70,6 @@ def obtener_modelo_cuantil(alpha: float, nombre_archivo: str, train: pd.DataFram
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
     modelo.booster_.save_model(str(ruta))
     return modelo.booster_
-
-
-def achicar_floats(df: pd.DataFrame) -> pd.DataFrame:
-    """LightGBM convierte train[features_cols] a un único array float64
-    homogéneo antes de entrenar (~965MB para 4,69M filas x 27 columnas) --
-    en una máquina de 3,4GB de RAM eso alcanza para tirar ArrayMemoryError
-    por sí solo, aparte del tamaño del DataFrame ya en memoria. float32
-    alcanza de sobra para features de conteo/ratio (mismo ajuste que
-    agregar_exogenas.py, ver README)."""
-    # ojo: select_dtypes() consolida bloques internamente (otra copia grande
-    # en memoria) -- se recorre dtypes columna por columna para evitarlo.
-    for c in df.columns:
-        if df[c].dtype == "float64":
-            df[c] = df[c].astype("float32")
-        # np.result_type(int64/int32, float32) = float64 -- un solo int64
-        # (conteos de POIs cercanos) también arrastra todo el array a
-        # float64, igual que el float64 de arriba.
-        elif df[c].dtype in ("int64", "int32"):
-            df[c] = pd.to_numeric(df[c], downcast="integer")
-    return df
-
-
-def sacar_nan_categoricas(df: pd.DataFrame) -> pd.DataFrame:
-    """radio_censal_id tiene NaN (73.060 filas, hexes sin radio asignado).
-    LightGBM codifica categorías como cat.codes con -1 para NaN, y
-    Series.replace({-1: np.nan}) sobre una columna con -1 la sube a
-    float64 -- eso arrastra TODO el array combinado a float64 vía
-    np.result_type() (basic.py::_data_from_pandas), tirando abajo el
-    downcast a float32 de arriba para las 27 columnas juntas, no solo
-    para esa. Se rellena con una categoría explícita "sin_dato" antes de
-    entrenar para que el código nunca sea -1."""
-    for c in df.columns:
-        if isinstance(df[c].dtype, pd.CategoricalDtype) and df[c].isna().any():
-            df[c] = df[c].cat.add_categories(["sin_dato"]).fillna("sin_dato")
-    return df
 
 
 def _cuantil_finito(scores: np.ndarray, alpha: float) -> float:
@@ -159,9 +124,7 @@ def main() -> None:
     mlflow.set_experiment("atlas-sentinel-modelo-nucleo")
 
     with mlflow.start_run(run_name="conformal-cqr"):
-        train, val, test = cargar_splits()
-        train, val, test = achicar_floats(train), achicar_floats(val), achicar_floats(test)
-        train, val, test = sacar_nan_categoricas(train), sacar_nan_categoricas(val), sacar_nan_categoricas(test)
+        train, val, test = cargar_splits()  # ya viene con dtypes achicados
 
         n_train = len(train)
         modelo_p10 = obtener_modelo_cuantil(0.1, "modelo_nucleo_p10.txt", train, val)

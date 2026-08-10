@@ -78,7 +78,7 @@ def entrenar_cuantil(train: pd.DataFrame, val: pd.DataFrame, alpha: float) -> lg
 
 
 def main() -> None:
-    train, val, test = cargar_splits()
+    train, val, test = cargar_splits()  # ya viene con dtypes achicados
     test = test.copy()
 
     print("=== Tweedie vs. Poisson (sobredispersión) ===")
@@ -89,12 +89,16 @@ def main() -> None:
 
     modelo_tweedie.booster_.save_model(str(MODELS_DIR / "modelo_nucleo_tweedie.txt"))
 
-    print("\n=== Regresión cuantílica (p10 / p50 / p90) ===")
+    # p10/p50/p90 ya se reentrenaron post-fix de turno en conformal_prediction.py
+    # (con el mismo entrenar_cuantil) -- se reusan en vez de re-entrenar acá para
+    # no encadenar 4 entrenamientos pesados en el mismo proceso (esta máquina de
+    # 3,4GB ya mostró que eso mata el proceso por memoria).
+    print("\n=== Regresión cuantílica (p10 / p50 / p90) -- reusando modelos ya frescos ===")
     preds_cuantil = {}
     for alpha in [0.1, 0.5, 0.9]:
-        modelo_q = entrenar_cuantil(train, val, alpha)
+        ruta = MODELS_DIR / f"modelo_nucleo_p{int(alpha*100)}.txt"
+        modelo_q = lgb.Booster(model_file=str(ruta))
         preds_cuantil[alpha] = np.clip(modelo_q.predict(test[FEATURES_COLS]), 0, None)
-        modelo_q.booster_.save_model(str(MODELS_DIR / f"modelo_nucleo_p{int(alpha*100)}.txt"))
 
     test["p10"] = preds_cuantil[0.1]
     test["p50"] = preds_cuantil[0.5]

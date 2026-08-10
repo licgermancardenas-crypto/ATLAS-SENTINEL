@@ -162,10 +162,10 @@ El documento de arquitectura original pedía "dejar afuera un subconjunto de hex
 
 | | MAE | PAI@20% | PEI@20% |
 |---|---|---|---|
-| Hexágonos vistos en entrenamiento (321) | 0.283 | 2.23 | 99.6% |
-| **Hexágonos holdout, nunca vistos (80)** | 0.325 | 2.31 | 98.2% |
+| Hexágonos vistos en entrenamiento (321) | 0.284 | 2.24 | 99.8% |
+| **Hexágonos holdout, nunca vistos (80)** | 0.330 | 2.31 | 98.2% |
 
-**Resultado contrario a lo previsto en la auditoría**: dado que `hex_id` domina la importancia de features, se esperaba una degradación fuerte en hexágonos nunca vistos (el modelo "no puede haber memorizado" una categoría que no existía en train). En cambio, PAI/PEI se mantienen prácticamente iguales — el MAE sí empeora (+15% relativo), pero el ranking de riesgo (lo que importa para priorizar) generaliza bien. Lectura: el modelo no depende de memorizar `hex_id` en sí, sino que apoya la predicción de un hexágono nuevo en `radio_censal_id`/`comuna_id` (unidades espaciales más gruesas, parcialmente representadas en train por hexágonos vecinos del mismo radio/comuna) y en las features socioeconómicas/de infraestructura — es decir, sí generaliza a partir de estructura, no solo de identidad. Buena noticia, y una corrección honesta a la hipótesis planteada en la auditoría: no toda crítica plausible se confirma con el dato.
+**Resultado contrario a lo previsto en la auditoría**: dado que `hex_id` domina la importancia de features, se esperaba una degradación fuerte en hexágonos nunca vistos (el modelo "no puede haber memorizado" una categoría que no existía en train). En cambio, PAI/PEI se mantienen prácticamente iguales — el MAE sí empeora (+16% relativo), pero el ranking de riesgo (lo que importa para priorizar) generaliza bien. Lectura: el modelo no depende de memorizar `hex_id` en sí, sino que apoya la predicción de un hexágono nuevo en `radio_censal_id`/`comuna_id` (unidades espaciales más gruesas, parcialmente representadas en train por hexágonos vecinos del mismo radio/comuna) y en las features socioeconómicas/de infraestructura — es decir, sí generaliza a partir de estructura, no solo de identidad. Buena noticia, y una corrección honesta a la hipótesis planteada en la auditoría: no toda crítica plausible se confirma con el dato.
 
 ### Auditoría de equidad (`src/validation/auditoria_equidad.py`)
 
@@ -175,8 +175,8 @@ Correlación simple (15 comunas) entre `score_riesgo` medio y variable socioecon
 
 | Variable | r simple | r parcial (controlando historial) |
 |---|---|---|
-| % hogares con NBI | 0.410 | 0.139 |
-| % hacinamiento crítico | 0.047 | -0.279 |
+| % hogares con NBI | 0.409 | 0.141 |
+| % hacinamiento crítico | 0.046 | -0.278 |
 
 La correlación con NBI cae fuerte (0.41→0.14) al controlar por historial — la mayor parte de esa relación es indirecta (comunas con más NBI ya tenían más historial delictivo, no es que el modelo use NBI como proxy de clase social por sí solo). Hacinamiento hace lo contrario (sube en magnitud y cambia de signo) — señal a vigilar, aunque con **n=15 comunas la correlación parcial tiene muy pocos grados de libertad**, no alcanza para una conclusión fuerte en ningún sentido. Esto no es una auditoría de sesgo policial resuelta — es el chequeo honesto de qué tan independiente es el score de la vulnerabilidad socioeconómica, documentado para que quien use el sistema sepa qué mide y qué no mide.
 
@@ -192,7 +192,7 @@ Escuelas, hospitales, universidades y cajeros (buffer 300m del centroide, no "mi
 
 La auditoría midió sobredispersión real en `conteo_delitos` (varianza/media = 1,59; Poisson asume 1,0) y señaló que el modelo nunca cuantifica incertidumbre — emite un solo número puntual para un sistema que alimenta asignación de recursos públicos.
 
-**Tweedie vs. Poisson**: MAE 0,2900 vs. 0,2902, PAI/PEI iguales o levemente mejores (PEI 99,6-99,7% vs. 99,4-99,6%). Diferencia marginal en las métricas, pero es el objetivo estadísticamente correcto dado el `1,59` medido — **se adoptó como el objetivo de producción** en `train_baseline.py` (ver docstring del módulo), no por ganancia de métrica sino por corrección del supuesto de base.
+**Tweedie vs. Poisson**: MAE 0,2921 vs. 0,2902 (post-fix de turno; comparación original pre-fix, Poisson no se reentrena acá porque ya no es el objetivo de producción), PAI/PEI prácticamente iguales al Poisson de referencia (PAI 2,77/2,27/1,95, PEI 99,3-99,6%). Diferencia marginal en las métricas, pero es el objetivo estadísticamente correcto dado el `1,59` medido — **se adoptó como el objetivo de producción** en `train_baseline.py` (ver docstring del módulo), no por ganancia de métrica sino por corrección del supuesto de base.
 
 **Regresión cuantílica (p10/p50/p90)**, misma tabla y split: cero *quantile crossing* (p10 nunca superó a p90, 0 de 585.460 filas), pero la cobertura empírica del intervalo [p10,p90] salió en **95,2%** (post-fix de turno; 95,1% antes) contra un objetivo nominal de ~80% — los tres modelos de cuantiles se entrenan de forma independiente, sin restricción conjunta, y eso los deja sobre-calibrados (intervalos más anchos de lo que deberían). Ancho medio 0,73 delitos esperados, algo más ancho en el cuartil de mayor riesgo predicho (0,88) que en los cuartiles medios — sensato, aunque no estrictamente monótono. La corrección real que señalaba la auditoría (**conformal prediction**) se implementó después — ver sección siguiente — y el resultado es otro hallazgo negativo honesto, no una solución.
 
@@ -277,7 +277,7 @@ Primer ítem de P2 (auditoría, sección 11): 18 tests con `pytest`, corren sobr
 | Módulo B, cobertura | 24.9% | 25.0% |
 | Módulo C, ranking de accesos | — | idéntico en orden |
 
-**Nota de honestidad**: los scripts de diagnóstico que no forman parte de la cadena de producción (`train_v2.py`, `train_semanal.py`, `train_incertidumbre.py`, `spatial_holdout.py`, `auditoria_equidad.py`) no se re-corrieron con los datos corregidos — dado lo chico del impacto agregado medido arriba, sus conclusiones cualitativas (Tweedie ≈ Poisson, el modelo generaliza bien a hexágonos nuevos, NBI mayormente explicado por historial) casi seguro se sostienen, pero los números exactos que reportan quedan desactualizados hasta que se vuelvan a correr.
+**Nota de honestidad**: al momento del recascade, los scripts de diagnóstico que no forman parte de la cadena de producción (`train_v2.py`, `train_semanal.py`, `train_incertidumbre.py`, `spatial_holdout.py`, `auditoria_equidad.py`) no se habían re-corrido con los datos corregidos. Después se re-corrieron **tres de los cinco** (`train_incertidumbre.py`, `spatial_holdout.py`, `auditoria_equidad.py`) con los datos post-fix, y las conclusiones cualitativas se sostuvieron con números casi idénticos (Tweedie ≈ Poisson: MAE 0,2921; el modelo generaliza a hexágonos nuevos: PAI@20 holdout 2,31 vs. visto 2,24; NBI mayormente explicado por historial: r 0,41→0,14 al controlar). `train_v2.py` y `train_semanal.py` quedan como los dos únicos sin re-correr — su impacto ya está acotado por la tabla de arriba y sus conclusiones ("sumar exógenas/grano semanal no mueve el Recall@K") no dependen de los decimales.
 
 ## P2: MLflow (`train_baseline.py`, `train_v2.py`, `train_semanal.py`)
 

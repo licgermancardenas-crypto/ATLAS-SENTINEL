@@ -23,7 +23,7 @@ import lightgbm as lgb
 import numpy as np
 import pandas as pd
 
-from train_baseline import CATEGORICAS, FEATURES_COLS
+from train_baseline import CATEGORICAS, FEATURES_COLS, achicar_floats, sacar_nan_categoricas
 
 FEATURES = Path(__file__).resolve().parent.parent.parent / "data" / "features"
 MODELS_DIR = FEATURES / "modelos"
@@ -33,7 +33,15 @@ def main() -> None:
     tabla = pd.read_parquet(FEATURES / "training_table.parquet")
     for col in CATEGORICAS:
         tabla[col] = tabla[col].astype("category")
+    # se filtra a 2025 ANTES de downcastear -- solo se predice sobre test, así
+    # que downcastear las 5,86M filas enteras es tirar RAM (máquina de 3,4GB);
+    # la rebanada de 2025 es ~1/10. El downcast igual es necesario: sin él
+    # LightGBM promueve las 27 columnas a float64 al predecir (NaN en
+    # categóricas + int64) y revienta. Ver train_baseline.achicar_floats.
     test = tabla[tabla["fecha"].dt.year == 2025].copy()
+    del tabla
+    test = achicar_floats(test)
+    test = sacar_nan_categoricas(test)
 
     modelo = lgb.Booster(model_file=str(MODELS_DIR / "modelo_nucleo_v1.txt"))
     test["conteo_esperado"] = np.clip(modelo.predict(test[FEATURES_COLS]), 0, None)

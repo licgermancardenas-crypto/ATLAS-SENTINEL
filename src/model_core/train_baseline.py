@@ -59,6 +59,12 @@ def cargar_splits() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     tabla = pd.read_parquet(FEATURES / "training_table.parquet")
     for col in CATEGORICAS:
         tabla[col] = tabla[col].astype("category")
+    # downcast ANTES del split -- el split por máscara booleana ya necesita
+    # copiar bloques enteros, y sobre la tabla sin achicar (1,28GB en
+    # float64/int64) eso alcanza para tirar ArrayMemoryError por sí solo
+    # en esta máquina de 3,4GB de RAM (ver README, 'La restricción real').
+    tabla = achicar_floats(tabla)
+    tabla = sacar_nan_categoricas(tabla)
 
     anio = tabla["fecha"].dt.year
     train = tabla[anio <= 2023]
@@ -66,6 +72,41 @@ def cargar_splits() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     test = tabla[anio == 2025]
     print(f"Train: {len(train):,} filas (hasta 2023) | Val: {len(val):,} (2024) | Test: {len(test):,} (2025)")
     return train, val, test
+
+
+def achicar_floats(df: pd.DataFrame) -> pd.DataFrame:
+    """LightGBM convierte train[features_cols] a un único array float64
+    homogéneo antes de entrenar (~965MB para 4,69M filas x 27 columnas) --
+    en una máquina de 3,4GB de RAM eso alcanza para tirar ArrayMemoryError
+    por sí solo, aparte del tamaño del DataFrame ya en memoria. float32
+    alcanza de sobra para features de conteo/ratio (mismo ajuste que
+    agregar_exogenas.py, ver README)."""
+    # ojo: select_dtypes() consolida bloques internamente (otra copia grande
+    # en memoria) -- se recorre dtypes columna por columna para evitarlo.
+    for c in df.columns:
+        if df[c].dtype == "float64":
+            df[c] = df[c].astype("float32")
+        # np.result_type(int64/int32, float32) = float64 -- un solo int64
+        # (conteos de POIs cercanos) también arrastra todo el array a
+        # float64, igual que el float64 de arriba.
+        elif df[c].dtype in ("int64", "int32"):
+            df[c] = pd.to_numeric(df[c], downcast="integer")
+    return df
+
+
+def sacar_nan_categoricas(df: pd.DataFrame) -> pd.DataFrame:
+    """radio_censal_id tiene NaN (73.060 filas, hexes sin radio asignado).
+    LightGBM codifica categorías como cat.codes con -1 para NaN, y
+    Series.replace({-1: np.nan}) sobre una columna con -1 la sube a
+    float64 -- eso arrastra TODO el array combinado a float64 vía
+    np.result_type() (basic.py::_data_from_pandas), tirando abajo el
+    downcast a float32 de arriba para las 27 columnas juntas, no solo
+    para esa. Se rellena con una categoría explícita "sin_dato" antes de
+    entrenar para que el código nunca sea -1."""
+    for c in df.columns:
+        if isinstance(df[c].dtype, pd.CategoricalDtype) and df[c].isna().any():
+            df[c] = df[c].cat.add_categories(["sin_dato"]).fillna("sin_dato")
+    return df
 
 
 def entrenar(train: pd.DataFrame, val: pd.DataFrame, features_cols: list[str] = FEATURES_COLS) -> lgb.LGBMRegressor:

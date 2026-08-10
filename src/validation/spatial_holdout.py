@@ -29,7 +29,10 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "model_core"))
-from train_baseline import CATEGORICAS, FEATURES_COLS, TARGET, entrenar, metricas, reportar_pai_pei  # noqa: E402
+from train_baseline import (  # noqa: E402
+    CATEGORICAS, FEATURES_COLS, TARGET,
+    achicar_floats, entrenar, metricas, reportar_pai_pei, sacar_nan_categoricas,
+)
 
 FEATURES = Path(__file__).resolve().parent.parent.parent / "data" / "features"
 MODELS_DIR = FEATURES / "modelos"
@@ -42,6 +45,10 @@ def main() -> None:
     tabla = pd.read_parquet(FEATURES / "training_table.parquet")
     for col in CATEGORICAS:
         tabla[col] = tabla[col].astype("category")
+    # downcast antes de entrenar -- máquina de 3,4GB de RAM, ver README
+    # "La restricción real" y el docstring de achicar_floats.
+    tabla = achicar_floats(tabla)
+    tabla = sacar_nan_categoricas(tabla)
 
     hex_ids = sorted(tabla["hex_id"].cat.categories)
     rng = np.random.default_rng(SEMILLA)
