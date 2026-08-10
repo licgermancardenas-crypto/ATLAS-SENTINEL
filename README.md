@@ -323,6 +323,8 @@ Dos datos para el pitch, ambos sobre distancia de calle real:
 
 La lectura de fondo no cambió al pasar a distancia de red, solo se volvió más exigente: la infraestructura fija de comisarías no está donde el riesgo se concentra hoy.
 
+**La caída es de la métrica, no de los datos** (medido con las dos matrices sobre la misma demanda y los mismos candidatos): escenario actual 61,7% euclidiano vs. 35,1% de red; K=75, 84,5% vs. 58,7%. Unos 26 puntos de sobreestimación en ambos, y reproduce casi exacto los 61,5%/84,4% que reportaba la tabla euclidiana anterior — o sea que el cambio de números es enteramente atribuible a medir por calle. Detalle contraintuitivo: solo el **0,48%** de los pares (demanda, candidato) cambia de estado (836 de 190.876, casi todos porque el euclidiano cubría de más). La matriz de cobertura es rala — cada hexágono está al alcance de pocos candidatos — así que perder esas 836 conexiones alcanza para descubrir muchos hexágonos.
+
 **La restricción de equidad es dura, y se nota**: con K=5 el solver devuelve `Infeasible` — no existe forma de ubicar 5 patrullas que deje a las 15 comunas con al menos un hexágono cubierto. Por debajo de ~10 unidades el problema directamente no tiene solución. Es el comportamiento correcto: el modelo no puede "resolver" el trade-off entre eficiencia y cobertura territorial abandonando comunas enteras.
 
 `K_PATRULLAS` y `TURNO` son parámetros al inicio del script (pensados como los sliders de un dashboard futuro). La curva completa de cobertura vs. K se puede regenerar reusando la matriz de cobertura una sola vez — lo caro es el Dijkstra desde los 476 candidatos (~6s), no resolver el MCLP (<1s por valor de K).

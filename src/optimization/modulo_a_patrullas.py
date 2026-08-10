@@ -116,7 +116,14 @@ def matriz_cobertura_euclidiana(demanda: pd.DataFrame, candidatos: pd.DataFrame)
     return dist <= RADIO_COBERTURA_M
 
 
-def resolver_mclp(demanda: pd.DataFrame, candidatos: pd.DataFrame, cobertura: np.ndarray, k: int) -> list[int]:
+def resolver_mclp(
+    demanda: pd.DataFrame, candidatos: pd.DataFrame, cobertura: np.ndarray, k: int,
+    devolver_estado: bool = False,
+) -> list[int] | tuple[list[int], str]:
+    """Con devolver_estado=True devuelve además el status del solver. Hace falta
+    para el barrido de K (`barrido_k_patrullas.py`): con K chico la restricción
+    de equidad vuelve el problema infactible, y ahí `elegidos` trae basura que
+    NO se puede reportar como cobertura — hay que descartar la corrida entera."""
     n_dem, n_can = cobertura.shape
     prob = pulp.LpProblem("patrullas_mclp", pulp.LpMaximize)
 
@@ -139,9 +146,12 @@ def resolver_mclp(demanda: pd.DataFrame, candidatos: pd.DataFrame, cobertura: np
             prob += pulp.lpSum(x[i] for i in idxs) >= 1
 
     prob.solve(pulp.PULP_CBC_CMD(msg=False))
-    print(f"Estado del solver: {pulp.LpStatus[prob.status]}")
+    estado = pulp.LpStatus[prob.status]
+    print(f"Estado del solver: {estado}")
 
     elegidos = [j for j in range(n_can) if y[j].value() == 1]
+    if devolver_estado:
+        return elegidos, estado
     return elegidos
 
 
