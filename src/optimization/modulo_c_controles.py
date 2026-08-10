@@ -15,6 +15,28 @@ cada acceso se recorre el grafo real restringido a vías importantes
 fuente con corte de distancia. El resultado es el corredor real que sale
 de ese acceso, no un círculo que puede cruzar manzanas sin calle
 troncal, ni cortar antes de una que sí lo es.
+
+Dos correcciones sobre la primera versión con grafo real, encontradas al
+preparar el material de presentación:
+
+1. ACCESOS DUPLICADOS. La fuente trae 11 accesos, pero "Illia",
+   "Pórtico Illia al Sur" (a 8 metros del anterior) y "Pórtico Illia al
+   Norte" (a ~130m) son el mismo intercambiador: caían en el mismo nodo
+   del grafo, producían corredores idénticos (381 siniestros, 5 hexágonos,
+   33 nodos) y ocupaban tres de los once puestos del ranking, además de
+   desplazar los percentiles del resto. Se colapsan los accesos que
+   comparten nodo de entrada al grafo — quedan 9 corredores únicos.
+
+2. SUMA CONTRA PROMEDIO. La accidentalidad del corredor se sumaba sobre
+   sus hexágonos mientras el riesgo delictivo se promediaba. Como los
+   corredores varían 7,3x en tamaño (3 a 22 hexágonos según qué tan lejos
+   propague el subgrafo de vías importantes desde cada acceso), la suma
+   premiaba al corredor grande por ser grande. Ahora las dos componentes
+   son intensivas: siniestros POR HEXÁGONO contra riesgo promedio por
+   hexágono. Como los hexágonos H3 tienen área casi idéntica, "por
+   hexágono" es "por unidad de área".
+   El total crudo se conserva en `accidentalidad_corredor` para poder
+   auditar, pero el score usa la versión normalizada.
 """
 
 from __future__ import annotations
@@ -61,8 +83,25 @@ def main() -> None:
     riesgo = pd.read_parquet(FEATURES / "riesgo_predicho.parquet")
     riesgo_por_hex = riesgo.groupby("hex_id", observed=True)["score_riesgo"].mean()
 
+    # accesos que caen en el mismo nodo del grafo son el mismo intercambiador
+    # (ver docstring): se agrupan antes de recorrer, así el corredor se calcula
+    # una vez y no ocupa varios puestos del ranking con la misma fila.
+    accesos = accesos.reset_index(drop=True)
+    accesos["nodo_grafo"] = nodo_acceso
+    grupos = accesos.groupby("nodo_grafo", sort=False)
+    n_dup = len(accesos) - grupos.ngroups
+    if n_dup:
+        print(f"Accesos que comparten nodo de entrada al grafo: {len(accesos)} filas -> {grupos.ngroups} corredores únicos")
+
     filas = []
-    for (_, acceso), nodo in zip(accesos.reset_index(drop=True).iterrows(), nodo_acceso):
+    for nodo, grupo in grupos:
+        acceso = {
+            "nombre": " / ".join(sorted(grupo["nombre"])),
+            "autopista": " / ".join(sorted(set(grupo["autopista"]))),
+            # los agrupados están a metros entre sí (mismo nodo del grafo), así
+            # que el promedio de sus coordenadas es representativo del punto
+            "lat": float(grupo["lat"].mean()), "lon": float(grupo["lon"].mean()),
+        }
         alcanzables = nx.single_source_dijkstra_path_length(G_importante, nodo, cutoff=RADIO_CORREDOR_M, weight="length")
         nodos_corredor = list(alcanzables.keys())
 
@@ -82,13 +121,22 @@ def main() -> None:
 
         filas.append({
             "nombre": acceso["nombre"], "autopista": acceso["autopista"],
-            "accidentalidad_corredor": accidentalidad, "riesgo_delictivo_corredor": riesgo_delictivo,
+            "lat": acceso["lat"], "lon": acceso["lon"],
+            "n_accesos_agrupados": len(grupo),
+            # se guardan para poder dibujar el corredor en mapa (material de
+            # presentación): sin esto el alcance de cada acceso no es visible
+            "hexes_corredor": sorted(hexes_corredor),
+            "accidentalidad_corredor": accidentalidad,
+            # intensiva, para que compare contra el riesgo (que ya es promedio)
+            # sin premiar al corredor grande por ser grande -- ver docstring
+            "accidentalidad_por_hex": accidentalidad / len(hexes_corredor) if hexes_corredor else 0,
+            "riesgo_delictivo_corredor": riesgo_delictivo,
             "tramos_troncales": n_motorway, "tramos_distribuidores": n_primaria_secundaria,
             "hexagonos_en_corredor": len(hexes_corredor), "nodos_alcanzados": len(nodos_corredor),
         })
 
     resultado = pd.DataFrame(filas)
-    resultado["pct_accidentalidad"] = resultado["accidentalidad_corredor"].rank(pct=True)
+    resultado["pct_accidentalidad"] = resultado["accidentalidad_por_hex"].rank(pct=True)
     resultado["pct_riesgo"] = resultado["riesgo_delictivo_corredor"].rank(pct=True)
     resultado["score_control"] = (resultado["pct_accidentalidad"] + resultado["pct_riesgo"]) / 2
     resultado = resultado.sort_values("score_control", ascending=False).reset_index(drop=True)
@@ -96,7 +144,7 @@ def main() -> None:
 
     print(f"\nCorredor: nodos alcanzables por vías {sorted(JERARQUIAS_OSM_IMPORTANTES)} dentro de {RADIO_CORREDOR_M}m reales de cada acceso\n")
     print(resultado[[
-        "ranking", "nombre", "autopista", "accidentalidad_corredor",
+        "ranking", "nombre", "autopista", "accidentalidad_corredor", "accidentalidad_por_hex",
         "riesgo_delictivo_corredor", "hexagonos_en_corredor", "score_control",
     ]].to_string(index=False))
 

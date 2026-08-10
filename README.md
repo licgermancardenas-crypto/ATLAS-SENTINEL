@@ -345,17 +345,30 @@ Lo que el módulo sí aporta, y no es trivial: la **ponderación** (riesgo × os
 
 ## Módulo C — Controles de acceso (`src/optimization/modulo_c_controles.py`)
 
-A diferencia de A y B, no trabaja sobre hexágonos sueltos sino sobre el grafo vial. **Simplificación importante**: el documento pide "recorrer los tramos troncales/distribuidores" desde cada acceso, lo que requiere topología real de calles (qué tramo conecta con cuál) — `calles.parquet` son geometrías sueltas sin esa topología armada. Se aproxima el "corredor" como los tramos de jerarquía troncal/distribuidora principal dentro de un radio fijo (`RADIO_CORREDOR_M=2000`) del acceso, en vez de navegar el grafo real. Mismo espíritu, menor costo de implementación — si hace falta más precisión, este es el punto a mejorar primero.
+A diferencia de A y B, no trabaja sobre hexágonos sueltos sino sobre el grafo vial. El corredor de cada acceso se recorre con Dijkstra sobre el subgrafo de vías importantes de OSM (`motorway/trunk/primary/secondary`, 5.658 nodos de 17.811) con corte a `RADIO_CORREDOR_M=2000` — el corredor real por donde se circula, no un buffer circular. (La versión pre-P1 sí usaba un buffer de radio fijo, documentado entonces como simplificación por falta de topología navegable en `calles.parquet`; el grafo vial de OSM la volvió innecesaria.)
 
-Ranking de los 11 accesos/pórticos por score combinado (percentil de accidentalidad histórica + percentil de riesgo delictivo del corredor):
+**Dos correcciones encontradas al preparar el material de presentación** — la tabla anterior de este README (11 accesos, Alberti con 9.164 siniestros) venía de la versión con buffer y además arrastraba los dos problemas:
 
-| # | Acceso | Autopista | Siniestros en corredor | Score |
-|---|---|---|---|---|
-| 1 | Alberti | AU 1 – 25 de Mayo | 9.164 | 0.95 |
-| 2 | Pórtico Independencia | Au Paseo del Bajo | 6.188 | 0.95 |
-| 3 | Pórtico Illia al Norte/Sur, Illia | AU Illia | 3.185 | 0.59 |
+1. **Accesos duplicados.** La fuente trae 11 accesos, pero `Illia`, `Pórtico Illia al Sur` (a **8 metros** del anterior) y `Pórtico Illia al Norte` (a ~130m) son el mismo intercambiador: caían en el mismo nodo del grafo, producían corredores idénticos (381 siniestros, 5 hexágonos, 33 nodos) y ocupaban **tres de los once puestos** del ranking, además de correr los percentiles de todos los demás. Se colapsan los accesos que comparten nodo de entrada → **9 corredores únicos**.
+2. **Suma contra promedio.** La accidentalidad se sumaba sobre los hexágonos del corredor mientras el riesgo se promediaba. Como los corredores varían **7,3x en tamaño** (3 a 22 hexágonos, según cuánto propague el subgrafo desde cada acceso), la suma premiaba al corredor grande por ser grande. Ahora las dos componentes son intensivas: siniestros **por hexágono** contra riesgo promedio por hexágono. Como los H3 tienen área casi idéntica, "por hexágono" es "por unidad de área". El total crudo se conserva en `accidentalidad_corredor` para auditar.
 
-El corredor de **25 de Mayo/Paseo del Bajo** concentra la mayor accidentalidad histórica de lejos — son las autopistas más troncales del microcentro, tiene sentido que salga primero.
+Ranking corregido (9 corredores, percentil de siniestros/hex + percentil de riesgo del corredor):
+
+| # | Acceso | Autopista | Siniestros/hex | Riesgo | Hex | Score |
+|---|---|---|---|---|---|---|
+| 1 | Alberti | AU 1 – 25 de Mayo | 423 | 0,574 | 4 | 1,00 |
+| 2 | Pórtico Independencia | Au Paseo del Bajo | 228 | 0,356 | 22 | 0,89 |
+| 3 | Dellepiane II | AU Dellepiane | 148 | 0,187 | 3 | 0,78 |
+| 4 | Dellepiane I | AU Dellepiane | 98 | 0,181 | 5 | 0,56 |
+| 5 | Avellaneda | AU6 – Perito Moreno | 123 | 0,131 | 3 | 0,50 |
+| 6 | Sarmiento | AU Illia | 113 | 0,110 | 10 | 0,39 |
+| 7 | Retiro II | AU Illia | 50 | 0,163 | 3 | 0,33 |
+| 8 | Illia (3 accesos agrupados) | AU Illia / Paseo del Bajo | 76 | 0,134 | 5 | 0,33 |
+| 9 | Salguero | AU Illia | 79 | 0,075 | 8 | 0,22 |
+
+**La cabeza del ranking es robusta**: Alberti y Pórtico Independencia quedan 1º y 2º tanto con la suma cruda como con la normalización por hexágono — verificado corriendo las dos variantes. Lo que se reordena es el medio (Avellaneda sube del 9º al 5º, Salguero baja del 6º al 9º), justamente los corredores chicos que la suma penalizaba. Con 9 casos cada escalón de percentil vale 11 puntos, así que el orden del 3º al 9º no debería tomarse literal.
+
+Límites que quedan abiertos: el tamaño del corredor depende en parte de cómo OSM clasificó cada tramo (Alberti alcanza 9 nodos, Pórtico Independencia 257 — casi 30x); y la accidentalidad cuenta *todos* los siniestros del hexágono, no sólo los ocurridos sobre la traza del corredor. Filtrar por vía es la mejora que más movería los números.
 
 ## Capa 3 — Validación y explicabilidad (`src/validation/`)
 
