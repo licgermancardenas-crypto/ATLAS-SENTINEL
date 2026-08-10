@@ -95,7 +95,7 @@ export default function Dashboard() {
                 moduloC={datos.moduloC}
                 toggles={[
                   { key: "moduloA", label: "Módulo A — patrullas propuestas", color: "#d97706", checked: toggles.moduloA },
-                  { key: "moduloB", label: "Módulo B — cámaras propuestas", color: "#0ca30c", checked: toggles.moduloB },
+                  { key: "moduloB", label: "Módulo B — zonas prioritarias", color: "#0ca30c", checked: toggles.moduloB },
                   { key: "comisarias", label: "Comisarías reales", color: "#ffffff", checked: toggles.comisarias },
                   { key: "camaras", label: "Cámaras reales", color: "#e66767", checked: toggles.camaras },
                 ]}

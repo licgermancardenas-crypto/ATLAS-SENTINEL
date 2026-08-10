@@ -36,12 +36,17 @@ export default function ModulePanel({ toggles, onToggle, moduloC }: Props) {
 
       <div>
         <h3 className="text-sm font-semibold mb-1">Módulo C — controles de acceso</h3>
-        <p className="text-xs text-text-secondary mb-2">Ranking por accidentalidad + riesgo delictivo del corredor.</p>
+        {/* "por hexágono" no es un detalle: los corredores varían 7,3x en tamaño,
+            así que el total crudo premiaba al corredor grande por ser grande */}
+        <p className="text-xs text-text-secondary mb-2">
+          Ranking por siniestros y riesgo delictivo del corredor, ambos medidos por hexágono.
+        </p>
         <table className="w-full text-xs font-mono">
           <thead>
             <tr className="text-text-secondary text-left border-b border-border">
               <th className="py-1 font-normal">#</th>
               <th className="font-normal">Acceso</th>
+              <th className="font-normal text-right">Sin./hex</th>
               <th className="font-normal text-right">Score</th>
             </tr>
           </thead>
@@ -51,8 +56,12 @@ export default function ModulePanel({ toggles, onToggle, moduloC }: Props) {
                 <td className="py-1.5 text-text-secondary">{m.ranking}</td>
                 <td className="py-1.5">
                   {m.nombre}
+                  {m.n_accesos_agrupados > 1 && (
+                    <span className="text-text-secondary"> ({m.n_accesos_agrupados} accesos)</span>
+                  )}
                   <div className="text-text-secondary">{m.autopista}</div>
                 </td>
+                <td className="py-1.5 text-right tabular-nums">{Math.round(m.accidentalidad_por_hex)}</td>
                 <td className="py-1.5 text-right tabular-nums">{m.score_control.toFixed(2)}</td>
               </tr>
             ))}

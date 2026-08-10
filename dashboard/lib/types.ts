@@ -37,11 +37,22 @@ export interface ModuloB {
 export interface ModuloC {
   nombre: string;
   autopista: string;
+  lat: number;
+  lon: number;
+  /** accesos de la fuente que caen en el mismo nodo del grafo y se agruparon
+   *  como un solo corredor (el caso Illia: 3 entradas, un intercambiador) */
+  n_accesos_agrupados: number;
+  hexes_corredor: string[];
+  /** total crudo de siniestros del corredor — se conserva para auditar, pero
+   *  el ranking NO lo usa: los corredores varían 7,3x en tamaño */
   accidentalidad_corredor: number;
+  /** la que entra al score: intensiva, comparable entre corredores */
+  accidentalidad_por_hex: number;
   riesgo_delictivo_corredor: number;
   tramos_troncales: number;
   tramos_distribuidores: number;
   hexagonos_en_corredor: number;
+  nodos_alcanzados: number;
   pct_accidentalidad: number;
   pct_riesgo: number;
   score_control: number;
