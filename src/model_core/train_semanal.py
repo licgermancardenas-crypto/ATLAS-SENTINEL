@@ -12,13 +12,17 @@ baseline naive, y la importancia de features, sí lo son.
 
 from __future__ import annotations
 
+import gc
 from pathlib import Path
 
 import mlflow
 import numpy as np
 import pandas as pd
 
-from train_baseline import TARGET, MLFLOW_TRACKING_URI, entrenar, metricas, recall_at_k, baseline_naive
+from train_baseline import (
+    TARGET, MLFLOW_TRACKING_URI, achicar_floats, baseline_naive,
+    entrenar, metricas, recall_at_k, sacar_nan_categoricas,
+)
 
 FEATURES = Path(__file__).resolve().parent.parent.parent / "data" / "features"
 MODELS_DIR = FEATURES / "modelos"
@@ -38,8 +42,21 @@ def cargar_splits() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     tabla = pd.read_parquet(FEATURES / "training_table_semanal.parquet")
     for col in CATEGORICAS:
         tabla[col] = tabla[col].astype("category")
+    # downcast + relleno de NaN categóricas antes del split, igual que en
+    # train_baseline/train_v2 (máquina de 3,4GB). La tabla semanal es más
+    # chica (838k filas), pero se mantiene el mismo patrón por consistencia.
+    tabla = achicar_floats(tabla)
+    tabla = sacar_nan_categoricas(tabla)
     anio = tabla["semana"].dt.year
-    train, val, test = tabla[anio <= 2023], tabla[anio == 2024], tabla[anio == 2025]
+    # mismo recorte que train_v2: train/val solo para fit (train también para
+    # baseline_naive, que agrupa por hex_id/turno -- ambos en FEATURES_COLS),
+    # se copian para liberar el parent antes de que LightGBM aloque su matriz.
+    cols_fit = FEATURES_COLS + [TARGET]
+    train = tabla.loc[anio <= 2023, cols_fit].copy()
+    val = tabla.loc[anio == 2024, cols_fit].copy()
+    test = tabla[anio == 2025].copy()
+    del tabla
+    gc.collect()
     print(f"Train: {len(train):,} | Val: {len(val):,} | Test: {len(test):,}")
     return train, val, test
 
@@ -59,7 +76,7 @@ def main() -> None:
         test["pred_naive"] = baseline_naive(train, test)
 
         print("\nMétricas en test (2025), grano semanal:")
-        m_modelo = metricas(test[TARGET], test["pred_modelo"], "LightGBM Poisson semanal")
+        m_modelo = metricas(test[TARGET], test["pred_modelo"], "LightGBM Tweedie semanal")
         m_naive = metricas(test[TARGET], test["pred_naive"], "Baseline naive (media hist. hex×turno)")
 
         print("\nRecall@K — modelo semanal:")

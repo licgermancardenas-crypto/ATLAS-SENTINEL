@@ -109,7 +109,17 @@ def sacar_nan_categoricas(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def entrenar(train: pd.DataFrame, val: pd.DataFrame, features_cols: list[str] = FEATURES_COLS) -> lgb.LGBMRegressor:
+def entrenar_xy(
+    X_train: pd.DataFrame, y_train: pd.Series,
+    X_val: pd.DataFrame, y_val: pd.Series,
+    features_cols: list[str] = FEATURES_COLS,
+) -> lgb.LGBMRegressor:
+    """Igual que entrenar() pero recibe X/y ya separados. Sirve para que el
+    caller pueda liberar la tabla de train completa ANTES del fit: si no, en la
+    máquina de 3,4GB coexisten la tabla (~620MB), el slice train[features_cols]
+    (~600MB) y la matriz C de LightGBM (~600MB) = ~1,8GB de pico y el proceso
+    muere por OOM al construir el Dataset. Pasando X/y y borrando la tabla, el
+    pico baja a ~1,2GB (solo X pandas + matriz C)."""
     # Tweedie, no Poisson puro: la auditoría técnica midió sobredispersión real
     # en conteo_delitos (varianza/media = 1,59; Poisson asume 1,0). Comparado
     # en train_incertidumbre.py, Tweedie da MAE/PAI/PEI iguales o levemente
@@ -126,14 +136,18 @@ def entrenar(train: pd.DataFrame, val: pd.DataFrame, features_cols: list[str] = 
         verbose=-1,
     )
     modelo.fit(
-        train[features_cols], train[TARGET],
-        eval_set=[(val[features_cols], val[TARGET])],
+        X_train, y_train,
+        eval_set=[(X_val, y_val)],
         eval_metric="tweedie",
         callbacks=[lgb.early_stopping(30, verbose=False)],
         categorical_feature=[c for c in CATEGORICAS if c in features_cols],
     )
     print(f"Mejor iteración: {modelo.best_iteration_}")
     return modelo
+
+
+def entrenar(train: pd.DataFrame, val: pd.DataFrame, features_cols: list[str] = FEATURES_COLS) -> lgb.LGBMRegressor:
+    return entrenar_xy(train[features_cols], train[TARGET], val[features_cols], val[TARGET], features_cols)
 
 
 def baseline_naive(train: pd.DataFrame, eval_df: pd.DataFrame) -> pd.Series:

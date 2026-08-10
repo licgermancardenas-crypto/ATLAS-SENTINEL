@@ -125,7 +125,7 @@ Pendiente, y son operaciones distintas a point-in-hex (no encajan en `asignar_he
 
 ### v2 — exógenas (`src/model_core/agregar_exogenas.py`, `train_v2.py`)
 
-Se sumó clima (join por fecha), flag de evento masivo (point-in-hex para 2019, join por barrio para 2023-2026) y cercanía a estadio (buffer 500m, reproyectado a EPSG:5347). **No mejoró nada** respecto a v1 — mismo MAE (0.291), mismo Recall@K exacto en cada umbral. `evento_en_hex` y `evento_en_barrio` tienen importancia **0** en el modelo (nunca se usaron en ningún split): a esta resolución (hex×día×turno) los eventos son demasiado raros — `evento_en_hex` es positivo en ~0,001% de las filas — para que haya señal aprendible. Clima aporta algo de importancia (`temp_media_c` por encima de varios lags) pero no alcanza a mover el Recall@K.
+Se sumó clima (join por fecha), flag de evento masivo (point-in-hex para 2019, join por barrio para 2023-2026) y cercanía a estadio (buffer 500m, reproyectado a EPSG:5347). **No mejoró nada** respecto a v1 — MAE 0.2921 idéntico a v1, Recall@K prácticamente igual (45,5% / 58,6%). `evento_en_hex` y `evento_en_barrio` tienen importancia **0** en el modelo (nunca se usaron en ningún split): a esta resolución (hex×día×turno) los eventos son demasiado raros — `evento_en_hex` es positivo en ~0,001% de las filas — para que haya señal aprendible. Clima aporta algo de importancia (`temp_media_c` por encima de varios lags) pero no alcanza a mover el Recall@K.
 
 **Conclusión de v1 vs. v2**: el cuello de botella no son las exógenas, es que el proceso a este grano es casi puramente espacial. Antes de seguir sumando variables, tiene más sentido: (a) construir el Módulo A sobre lo que ya funciona (la concentración espacial), ya que no depende de mejorar la parte temporal, o (b) probar un grano temporal más agregado (semanal en vez de diario) donde la señal dinámica podría distinguirse mejor del ruido.
 
@@ -136,7 +136,7 @@ Se sumó clima (join por fecha), flag de evento masivo (point-in-hex para 2019, 
 | | MAE vs. baseline naive | Recall@20% | Recall@30% |
 |---|---|---|---|
 | Diario | 0.2902 vs 0.2961 (mejora relativa 1,99%) | 45,4% | 58,5% |
-| Semanal | 0.9239 vs 0.9510 (mejora relativa **2,85%**) | 45,5% | 58,6% |
+| Semanal | 0.9255 vs 0.9518 (mejora relativa **2,76%**) | 45,5% | 58,6% |
 
 El grano semanal le gana un poco más al baseline en error (MAE/RMSE), pero el **Recall@K —la métrica que más importa para priorizar zonas— queda prácticamente igual**. Conclusión: agregar por semana no cambia la historia de fondo, solo la afina levemente. La concentración espacial sigue siendo lo que carga el peso del modelo, con o sin más resolución temporal.
 
@@ -277,7 +277,14 @@ Primer ítem de P2 (auditoría, sección 11): 18 tests con `pytest`, corren sobr
 | Módulo B, cobertura | 24.9% | 25.0% |
 | Módulo C, ranking de accesos | — | idéntico en orden |
 
-**Nota de honestidad**: al momento del recascade, los scripts de diagnóstico que no forman parte de la cadena de producción (`train_v2.py`, `train_semanal.py`, `train_incertidumbre.py`, `spatial_holdout.py`, `auditoria_equidad.py`) no se habían re-corrido con los datos corregidos. Después se re-corrieron **tres de los cinco** (`train_incertidumbre.py`, `spatial_holdout.py`, `auditoria_equidad.py`) con los datos post-fix, y las conclusiones cualitativas se sostuvieron con números casi idénticos (Tweedie ≈ Poisson: MAE 0,2921; el modelo generaliza a hexágonos nuevos: PAI@20 holdout 2,31 vs. visto 2,24; NBI mayormente explicado por historial: r 0,41→0,14 al controlar). `train_v2.py` y `train_semanal.py` quedan como los dos únicos sin re-correr — su impacto ya está acotado por la tabla de arriba y sus conclusiones ("sumar exógenas/grano semanal no mueve el Recall@K") no dependen de los decimales.
+**Nota de honestidad**: al momento del recascade, los cinco scripts de diagnóstico que no forman parte de la cadena de producción (`train_v2.py`, `train_semanal.py`, `train_incertidumbre.py`, `spatial_holdout.py`, `auditoria_equidad.py`) no se habían re-corrido con los datos corregidos. Después se re-corrieron **los cinco** con los datos post-fix, y todas las conclusiones cualitativas se sostuvieron con números casi idénticos:
+- Tweedie ≈ Poisson: MAE 0,2921.
+- El modelo generaliza a hexágonos nuevos: PAI@20 holdout 2,31 vs. visto 2,24.
+- NBI mayormente explicado por historial: r 0,41→0,14 al controlar.
+- Exógenas (v2) no mueven el Recall@K: MAE 0,2921 idéntico a v1, Recall@20/30 45,5%/58,6%, `evento_en_hex`/`evento_en_barrio` con importancia 0.
+- Grano semanal solo afina levemente: modelo 0,9255 vs. naive 0,9518 (mejora relativa 2,76%), Recall@K prácticamente igual al diario (45,5%/58,6%).
+
+No quedó ningún número de diagnóstico desactualizado: el impacto agregado del fix fue chico (tabla de arriba) y ninguna conclusión dependía de los decimales.
 
 ## P2: MLflow (`train_baseline.py`, `train_v2.py`, `train_semanal.py`)
 
