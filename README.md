@@ -333,7 +333,15 @@ La lectura de fondo no cambió al pasar a distancia de red, solo se volvió más
 
 Weighted Max Coverage resuelto greedy (no MILP — el documento pide un ranking por ganancia marginal, que es justo lo que da el algoritmo greedy clásico). Peso por hexágono = riesgo (promedio de turnos) × boost por baja densidad de alumbrado × boost por alto flujo peatonal (ecobici + molinetes, combinados por percentil porque las escalas no son comparables) × descuento si ya está cubierto por una cámara existente. Candidatos: hexágonos a más de 100m de una cámara actual (224 cámaras reales).
 
-Con `N_CAMARAS_NUEVAS=30` y radio de cobertura 150m: **cubren 24.9% del riesgo ponderado total** que hoy no está cerca de ninguna cámara. Solo 18 de 401 hexágonos caían dentro del radio de una cámara existente antes de correr esto — la cobertura actual de cámaras es baja en términos relativos al área de la ciudad.
+Con `N_CAMARAS_NUEVAS=30` y radio de cobertura 150m: las 30 zonas elegidas concentran el **25,0% del riesgo ponderado total**. Solo 18 de 401 hexágonos caían dentro del radio de una cámara existente antes de correr esto — la cobertura actual de cámaras es baja en términos relativos al área de la ciudad. Ninguna de las 30 zonas priorizadas tiene hoy una cámara a menos de 150m.
+
+**Límite medido: a esta resolución el "max coverage" degenera en un ranking, y hay que decirlo así.** Los centroides de los hexágonos H3-8 están a **700m** unos de otros (mediana 701m), y el radio de cámara es de 150m — o sea que cada candidato cubre únicamente su propio hexágono y ningún otro: la matriz de cobertura es la identidad. Verificado barriendo el radio: 150m, 300m y 500m dan **0,00 vecinos cubiertos** además de sí mismo; recién a 800m aparecen 1,88. Consecuencias:
+
+- El greedy corre bien pero no tiene nada que optimizar — la ganancia marginal de cada candidato es exactamente su propio peso, por eso el ranking sale monótonamente decreciente (2,283 · 2,117 · 2,023 …). Es equivalente a ordenar por peso y cortar en 30.
+- El 25,0% **no es "riesgo cubierto por las cámaras"**: es la fracción del riesgo ponderado que vive en los 30 hexágonos más pesados. Distinto de lo que sugiere la palabra "cobertura".
+- Medir los 150m por distancia de calle en vez de línea recta **no cambia absolutamente nada** (0,00% de pares distintos, 30 de 30 ubicaciones idénticas, mismo 25,01%) — justamente porque no se cubre nada más que el propio hexágono. Por eso Módulo B no se migró al grafo vial junto con A y C: no habría cambiado un solo número.
+
+Lo que el módulo sí aporta, y no es trivial: la **ponderación** (riesgo × oscuridad × flujo peatonal, con descuento por cámara cercana) es una priorización legítima de zonas. Se reencuadra como eso — un ranking de zonas donde una cámara agrega más — y no como una optimización de cobertura. La ubicación puntual dentro de cada zona es una decisión de campo: el hexágono mide ~700m de centro a centro, mucho más que el alcance de una cámara. Hacerlo bien como problema de cobertura exigiría una grilla mucho más fina (H3-10, centroides a ~100m), pero el modelo de riesgo es H3-8 — habría que desagregar riesgo a una resolución que el modelo no tiene, o sea inventar detalle. Queda como límite conocido, no como bug pendiente.
 
 ## Módulo C — Controles de acceso (`src/optimization/modulo_c_controles.py`)
 

@@ -18,6 +18,32 @@ más de una cámara, pero pesa menos que una zona sin ninguna).
 Candidatos: los 401 centroides de hex, salvo los que caen a <100m de una
 cámara ya instalada (filtro duro, pedido explícito del documento — no
 tiene sentido proponer una cámara pegada a otra).
+
+OJO — a esta resolución el max coverage degenera en un ranking
+=============================================================
+Los centroides H3-8 están a 700m unos de otros (mediana 701m) y
+RADIO_COBERTURA_M es 150 — cada candidato cubre SOLO su propio hexágono.
+La matriz `cobertura` de greedy_max_coverage() es la identidad, así que
+la ganancia marginal de cada candidato es siempre su propio peso y el
+greedy equivale a ordenar por peso y cortar en N. Medido: a 150m, 300m y
+500m el promedio de vecinos cubiertos además de sí mismo es 0,00; recién
+a 800m sube a 1,88.
+
+Dos consecuencias que importan al reportar el resultado:
+
+1. El porcentaje que imprime main() NO es "riesgo cubierto por las
+   cámaras" — es la fracción del riesgo ponderado que vive en los N
+   hexágonos más pesados. Reportarlo como cobertura sobrevende el método.
+2. Migrar esto a distancia de red (como se hizo en Módulo A y C) no
+   cambiaría nada: verificado, 0,00% de pares distintos y las mismas 30
+   ubicaciones. Por eso quedó en distancia euclidiana.
+
+El valor real del módulo está en la PONDERACIÓN (riesgo × oscuridad ×
+flujo, con descuento por cámara cercana), que prioriza zonas donde una
+cámara agrega más. La ubicación puntual dentro de la zona es decisión de
+campo. Resolverlo de verdad como cobertura pediría una grilla H3-10
+(centroides a ~100m), pero el riesgo se modela en H3-8: habría que
+desagregar a una resolución que el modelo no tiene. Ver README.
 """
 
 from __future__ import annotations
@@ -147,7 +173,10 @@ def main() -> None:
     resultado = greedy_max_coverage(demanda, excluidos, N_CAMARAS_NUEVAS)
     cobertura_lograda = resultado["ganancia_marginal"].sum() / peso_total
 
-    print(f"\n{len(resultado)} cámaras nuevas propuestas, cubren {cobertura_lograda:.1%} del riesgo ponderado total")
+    # "concentran", no "cubren": a 150m sobre grilla H3-8 cada candidato solo
+    # cubre su propio hexágono (ver docstring del módulo) — el número es la
+    # fracción del riesgo ponderado que vive en esas N zonas, no cobertura.
+    print(f"\n{len(resultado)} zonas priorizadas, concentran {cobertura_lograda:.1%} del riesgo ponderado total")
     print(resultado[["ranking", "hex_id", "ganancia_marginal"]].head(10))
 
     FEATURES.mkdir(parents=True, exist_ok=True)
