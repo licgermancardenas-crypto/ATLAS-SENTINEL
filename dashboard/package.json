@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "npm run copiar-worker && next dev",
+    "copiar-worker": "node scripts/copiar-worker-maplibre.mjs",
+    "prebuild": "npm run copiar-worker",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"

@@ -5,6 +5,7 @@ import {
   Map as MapLibreMap,
   NavigationControl,
   Popup,
+  setWorkerUrl,
   type GeoJSONSource,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -13,6 +14,15 @@ import { Turno } from "@/lib/types";
 import { colorScaleExpression, quantileBreaks } from "@/lib/color";
 
 const CABA_CENTER: [number, number] = [-58.4416, -34.6118];
+
+// El worker de MapLibre se sirve desde public/maplibre/ y no desde el bundle.
+// Turbopack hashea los assets de media/ pero no reescribe el import que el
+// worker tiene adentro ("./maplibre-gl-shared.mjs"), así que en el bundle ese
+// import da 404, el worker nunca carga y el mapa se queda esperando el estilo
+// para siempre -- canvas en negro, cero tiles, y ni una excepción.
+// En public/ los dos archivos conviven sin hash y el import relativo resuelve.
+// Ver scripts/copiar-worker-maplibre.mjs (corre como prebuild).
+setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
 
 // Basemap oscuro de CARTO (XYZ raster, sin API key) — coincide con el tema dark.
 const BASEMAP_STYLE = {
