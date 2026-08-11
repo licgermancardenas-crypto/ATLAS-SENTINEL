@@ -42,6 +42,3 @@ next-env.d.ts
 
 .vercel
 .env*
-
-# worker de maplibre, generado por prebuild (scripts/copiar-worker-maplibre.mjs)
-/public/maplibre/
