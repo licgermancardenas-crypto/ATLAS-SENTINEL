@@ -58,6 +58,10 @@ export default function RiskMap({
   const mapaRef = useRef<MapLibreMap | null>(null);
   const [listo, setListo] = useState(false);
   const [fallo, setFallo] = useState<string | null>(null);
+  // diagnostico temporal: el mapa muere sin emitir errores y las herramientas
+  // de inspeccion remota no pueden leer la consola, asi que se registra en la
+  // propia pagina que eventos de MapLibre llegaron a dispararse
+  const [trazas, setTrazas] = useState<string[]>([]);
 
   useEffect(() => {
     if (!contenedorRef.current || mapaRef.current) return;
@@ -92,10 +96,24 @@ export default function RiskMap({
       setFallo(msg);
     });
 
+    const t0 = Date.now();
+    const registrar = (etiqueta: string) =>
+      setTrazas((t) => (t.length > 24 ? t : [...t, `${Date.now() - t0}ms ${etiqueta}`]));
+
+    for (const evento of ["styledata", "sourcedata", "dataloading", "render", "idle", "webglcontextlost"]) {
+      mapa.on(evento as "styledata", () => registrar(evento));
+    }
+
     // si a los 8 segundos el estilo no cargo, algo esta mal aunque nadie haya
     // emitido un error -- se avisa igual en vez de dejar el negro indefinido
     const aviso = window.setTimeout(() => {
       if (!mapa.isStyleLoaded()) {
+        registrar(
+          `DIAG styleLoaded=${mapa.isStyleLoaded()} loaded=${mapa.loaded()} ` +
+            `canvas=${mapa.getCanvas().width}x${mapa.getCanvas().height} ` +
+            `capas=${mapa.getStyle()?.layers?.length ?? "sin estilo"} ` +
+            `zoom=${mapa.getZoom().toFixed(1)}`
+        );
         setFallo("El mapa no terminó de cargar (el estilo base no respondió).");
       }
     }, 8000);
@@ -184,6 +202,11 @@ export default function RiskMap({
               Los datos y los paneles de la derecha siguen siendo válidos: lo que falla es
               el renderizado del mapa.
             </p>
+            {trazas.length > 0 && (
+              <pre className="text-[10px] text-text-secondary font-mono mt-2 max-h-40 overflow-auto whitespace-pre-wrap">
+                {trazas.join("\n")}
+              </pre>
+            )}
           </div>
         </div>
       )}
