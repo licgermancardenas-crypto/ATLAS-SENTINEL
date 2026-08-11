@@ -19,7 +19,12 @@ export default function MetricsPanel({ metricas }: { metricas: Metricas }) {
 
       <div>
         <h3 className="text-sm font-semibold mb-1">Calibración por decil</h3>
-        <p className="text-xs text-text-secondary mb-2">Predicho vs. real — cerca de la diagonal punteada = bien calibrado.</p>
+        {/* el promedio "bien calibrado" esconde que los deciles bajos subestiman
+            hasta 33,5% en relativo -- ver pestaña Límites */}
+        <p className="text-xs text-text-secondary mb-2">
+          Predicho vs. real — cerca de la diagonal punteada = bien calibrado. Ajusta en los
+          deciles altos (error máximo 2,6% del 3 al 9); en los más bajos subestima.
+        </p>
         <CalibracionChart datos={metricas.calibracion} />
       </div>
 

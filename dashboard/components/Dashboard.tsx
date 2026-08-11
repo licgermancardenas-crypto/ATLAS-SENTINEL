@@ -7,9 +7,10 @@ import { cargarDatosDashboard, moduloAaGeojson, moduloBaGeojson, type DatosDashb
 import RiskMap from "./RiskMap";
 import ModulePanel from "./ModulePanel";
 import MetricsPanel from "./MetricsPanel";
+import LimitsPanel from "./LimitsPanel";
 import { RISK_RAMP } from "@/lib/color";
 
-type Tab = "capas" | "metricas";
+type Tab = "capas" | "metricas" | "limites";
 
 export default function Dashboard() {
   const [datos, setDatos] = useState<DatosDashboard | null>(null);
@@ -86,11 +87,14 @@ export default function Dashboard() {
 
         <aside className="w-80 shrink-0 border-l border-border bg-surface-1 flex flex-col min-h-0">
           <div className="flex border-b border-border">
-            <TabButton active={tab === "capas"} onClick={() => setTab("capas")}>Capas y accesos</TabButton>
+            <TabButton active={tab === "capas"} onClick={() => setTab("capas")}>Capas</TabButton>
             <TabButton active={tab === "metricas"} onClick={() => setTab("metricas")}>Métricas</TabButton>
+            <TabButton active={tab === "limites"} onClick={() => setTab("limites")}>Límites</TabButton>
           </div>
           <div className="flex-1 overflow-y-auto p-4">
-            {tab === "capas" ? (
+            {tab === "limites" ? (
+              <LimitsPanel />
+            ) : tab === "capas" ? (
               <ModulePanel
                 moduloC={datos.moduloC}
                 toggles={[
