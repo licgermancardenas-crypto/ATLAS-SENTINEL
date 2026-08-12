@@ -214,6 +214,38 @@ Las superficies **correlacionan alto entre sí** (Spearman 0,84 a 0,92): en gene
 
 **No se cambió el pipeline de producción**: `predecir_riesgo.py` y los Módulos A/B/C siguen consumiendo el modelo agregado. La superficie por tipo queda disponible en `riesgo_predicho_por_tipo.parquet` y la comparación en `comparacion_modulo_a_por_tipo.json`. Pasar a producción exige antes una decisión que no es técnica: si se optimiza para un tipo, para una combinación ponderada por política, o se mantiene el agregado asumiendo la pérdida de ~10% en los tipos minoritarios.
 
+### El modelo como pronóstico: validación con origen deslizante (`backtest_pronostico.py`)
+
+El proyecto se presenta como predictivo, pero hasta acá se evaluaba con un **split fijo** (train ≤2023, test 2025). Eso mide "qué tan bien describe el riesgo típico", no "qué tan bien anticipa la semana que viene" — son preguntas distintas y la segunda es la operativa.
+
+**No hizo falta un modelo nuevo.** Todas las features dinámicas de la tabla semanal están shifteadas al menos una semana (`shift(1)` antes del rolling, `lag_1sem` incluido), así que para la fila de la semana *t* el modelo solo usa información hasta *t−1*: **no hay fuga temporal y ya era un pronóstico válido a un paso**. Lo que faltaba era el protocolo: entrenar hasta la semana *t*, predecir *t+1*, avanzar y reentrenar. 26 orígenes semanales, julio a diciembre de 2025.
+
+**Las dos referencias**, una de ellas nunca antes medida en el proyecto:
+- **Promedio histórico** por hex×turno — la de siempre. Mide si el modelo aporta sobre "este lugar es así".
+- **Persistencia** (repetir lo observado la semana pasada) — la referencia dura en series de tiempo. Si el modelo no le gana, no hay señal dinámica aprovechable.
+
+| Referencia | MAE | Recall@20% | Semanas que el modelo le gana |
+|---|---|---|---|
+| **Modelo** | **0,9195** | **46,4%** | — |
+| Persistencia | 1,1677 | 43,8% | **26 de 26** |
+| Promedio histórico | 0,9432 | 45,7% | 21 de 26 |
+
+Modelo vs. persistencia: **+21,3%** de MAE. Modelo vs. histórico: **+2,5%** (mediana +2,2%, peor semana −1,4%, mejor +11,5%).
+
+**1. Contra la persistencia gana cómodo, pero es una referencia débil acá.** 26 de 26 semanas. Con 43,8% de celdas hex×turno en cero a grano semanal, repetir la última observación es muy ruidoso: ganarle era esperable y no dice mucho.
+
+**2. Contra el promedio histórico el margen es de 2,5% — el mismo orden que ya sabíamos.** El split fijo daba 2% en el agregado y 2,76% en el semanal. El origen deslizante, que era el protocolo correcto y el que faltaba, **confirma el patrón en vez de revelar señal escondida**. Y pierde en 5 de 26 semanas.
+
+**3. En priorización espacial, empatan.** Recall@20% de 46,4% contra 45,7%: menos de un punto. Para la decisión que de verdad toman los módulos —qué hexágonos priorizar— el modelo y "este lugar es así" son equivalentes.
+
+**Conclusión: hay señal dinámica aprovechable, pero es marginal y no cambia a quién se prioriza.** Es un resultado negativo útil: cierra la pregunta de si convenía seguir invirtiendo por el lado temporal. La concentración espacial sigue siendo lo que carga el peso del sistema, ahora medido con el protocolo correcto y contra la referencia más exigente.
+
+**Error de lectura propio, vale documentarlo.** La prueba inicial con 3 orígenes daba +6,8% contra el histórico y se interpretó como que el pronóstico sí aportaba señal. Eran las tres últimas semanas de diciembre — justo donde el promedio histórico falla más: el 29/12 tuvo 900 delitos contra los ~2.400 habituales y el modelo le ganó 11,5%. **Extrapolar desde la ventana menos representativa del año invirtió la conclusión.** Con los 26 orígenes la mejora media cae a 2,4%. La lección: en series con estacionalidad fuerte, una prueba corta al final del año no es una muestra, es un caso especial.
+
+Nota de configuración: el backtest corre con 200 árboles × 31 hojas en vez de los 500 × 63 de producción — son 26 reentrenamientos en una máquina de 3,4GB y la serialización con `hex_id` categórico (401 niveles) tiraba `MemoryError`. Se aplica igual en todos los orígenes, así que la comparación es consistente, y juega **en contra** del modelo: el +2,5% es un piso, no un techo.
+
+Resultados por semana en `backtest_pronostico.parquet`; la corrida queda en MLflow como `backtest-pronostico-1sem`.
+
 ## Auditoría técnica externa y remediación P0
 
 Un panel externo (ver artefacto publicado en la conversación) revisó las 16 dimensiones del proyecto contra el estado del arte de crime analytics/urban computing/investigación operativa. Dos hallazgos se marcaron **P0** (antes que cualquier otra mejora) y ya se resolvieron:
