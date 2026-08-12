@@ -140,6 +140,37 @@ Se sumó clima (join por fecha), flag de evento masivo (point-in-hex para 2019, 
 
 El grano semanal le gana un poco más al baseline en error (MAE/RMSE), pero el **Recall@K —la métrica que más importa para priorizar zonas— queda prácticamente igual**. Conclusión: agregar por semana no cambia la historia de fondo, solo la afina levemente. La concentración espacial sigue siendo lo que carga el peso del modelo, con o sin más resolución temporal.
 
+### Desagregación por tipo de delito (`build_training_table_tipo.py`, `train_por_tipo.py`)
+
+Pendiente anotado desde v1 ("desagregar por tipo multiplicaría la tabla ~6x, se deja para v2"). El modelo núcleo predice los 6 tipos sumados, y la hipótesis era que mezclarlos diluye señal: un hexágono con mucho hurto diurno y otro con robo nocturno entran al modelo como el mismo número.
+
+**Qué cambia y qué no**: se mantiene la grilla (hex_id, fecha, turno) y solo cambian el target y lo que se deriva de él — conteo, lags 7/30/365, rolling 7/30 y vecindad espacial pasan a ser *del tipo*. El contexto (socioeconómico, infraestructura, calendario) es independiente del tipo, así que `build_training_table_tipo.py` reusa las funciones de `build_training_table.py` en vez de duplicar el pipeline. No se arma una tabla ancha de 6 targets (~35M filas, no entra en 3,4GB): se genera y entrena **un tipo por corrida**.
+
+**Cómo se compara**: cada tipo contra **su propio** baseline naive (promedio histórico hex×turno). Comparar el MAE entre tipos no dice nada — un tipo con tasa 0,0002 tiene MAE bajísimo por ser raro, no por estar bien predicho. Lo comparable es la mejora relativa sobre la propia referencia, y el PAI/PEI, que es adimensional.
+
+| Tipo | Tasa/celda | % ceros | var/media | MAE | MAE naive | Mejora | PAI@10% | PEI@10% |
+|---|---|---|---|---|---|---|---|---|
+| Homicidios | 0,0002 | 99,98% | 1,08 | 0,00025 | 0,00033 | +23,9% | 4,36 | **54,0%** |
+| Lesiones | 0,0207 | 98,1% | 1,14 | 0,0330 | 0,0363 | **+9,2%** | 3,10 | 97,6% |
+| Robo | 0,0992 | 91,4% | 1,21 | 0,1428 | 0,1524 | **+6,4%** | 2,92 | 99,2% |
+| Amenazas | 0,0157 | 98,6% | 1,34 | 0,0293 | 0,0304 | +3,7% | 2,69 | 96,0% |
+| Vialidad | 0,0140 | 98,6% | 1,04 | 0,0314 | 0,0315 | +0,3% | 2,65 | 95,2% |
+| Hurto | 0,0752 | 93,5% | 1,49 | 0,1345 | 0,1319 | **−2,0%** | 3,10 | 99,6% |
+
+**1. Desagregar recupera señal real.** El modelo agregado le gana al baseline apenas 2% (0,2902 vs. 0,2961). Lesiones le gana **9,2%** y Robo **6,4%**. Mezclar seis procesos con dinámicas distintas estaba promediando efectos que se cancelan entre sí — el modelo agregado terminaba prediciendo algo que no le sirve bien a ninguno.
+
+**2. Homicidios encabeza la tabla y hay que descartarlo igual.** El +23,9% es un espejismo: son **78 hechos en todo el año de test** (1.075 en diez años, 99,98% de celdas en cero). La mejora en términos absolutos es de 0,000078 delitos por celda — nula operativamente. La columna que lo delata es el **PEI: 54%** contra 95-99,6% de todos los demás. El PEI mide qué tan cerca está el modelo del techo alcanzable con información perfecta; a este grano no hay patrón que aprender, y el ranking se reordena entero si se mueven tres homicidios de lugar. **Caso de ordenar por la métrica equivocada**: si se mira "mejora", homicidios es el mejor modelo del proyecto; mirando PEI, es el único que no funciona.
+
+**3. Hurto es el único con mejora negativa — y conviene no modelarlo.** El promedio histórico predice mejor que el modelo (MAE 0,1345 vs. 0,1319). No es un bug: significa que el hurto es **más estacionario** que el resto, donde ocurrió históricamente predice mejor que cualquier dinámica temporal aprendible. Y a la vez tiene PEI 99,6% y PAI 3,10, o sea que concentra espacialmente tan bien como el que más. Lectura operativa: para hurto, mapa histórico y nada más.
+
+**4. La sobredispersión que justificó Tweedie era, en buena parte, artefacto de mezclar.** La auditoría midió var/media = 1,59 sobre el agregado y por eso se adoptó Tweedie en vez de Poisson. Por separado los tipos van de **1,04 a 1,49**: ninguno alcanza el 1,59 del agregado. Sumar seis procesos heterogéneos infla la dispersión por encima de la de cada uno. La decisión de usar Tweedie sigue siendo razonable para el modelo agregado, pero el diagnóstico que la motivó describía la mezcla, no el fenómeno.
+
+**5. Vialidad no pertenece a este análisis.** +0,3% es empate estadístico con el naive, y es coherente: son siniestros viales, no delitos de seguridad — su patrón lo manda la infraestructura vial, que es fija. Se deja en la tabla por completitud, pero no debería reportarse junto a los demás.
+
+Nota metodológica: los PEI de 95-99,6% en los cinco tipos que no son homicidios dicen que **a este grano queda poquísimo margen de mejora en concentración espacial**, cualquiera sea el algoritmo. La ganancia de desagregar está en el error de predicción, no en la capacidad de priorizar zonas.
+
+Los seis modelos quedan en `data/features/modelos/modelo_{tipo}.txt` y la comparación en `comparacion_por_tipo.parquet`; cada corrida queda en MLflow como `tipo-{nombre}`. **No se cambió el pipeline de producción**: `predecir_riesgo.py` y los Módulos A/B/C siguen usando el modelo agregado. Esto es, por ahora, un hallazgo analítico.
+
 ## Auditoría técnica externa y remediación P0
 
 Un panel externo (ver artefacto publicado en la conversación) revisó las 16 dimensiones del proyecto contra el estado del arte de crime analytics/urban computing/investigación operativa. Dos hallazgos se marcaron **P0** (antes que cualquier otra mejora) y ya se resolvieron:
