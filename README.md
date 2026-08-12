@@ -460,21 +460,41 @@ A diferencia de A y B, no trabaja sobre hexágonos sueltos sino sobre el grafo v
 
 Ranking corregido (9 corredores, percentil de siniestros/hex + percentil de riesgo del corredor):
 
-| # | Acceso | Autopista | Siniestros/hex | Riesgo | Hex | Score |
-|---|---|---|---|---|---|---|
-| 1 | Alberti | AU 1 – 25 de Mayo | 423 | 0,574 | 4 | 1,00 |
-| 2 | Pórtico Independencia | Au Paseo del Bajo | 228 | 0,356 | 22 | 0,89 |
-| 3 | Dellepiane II | AU Dellepiane | 148 | 0,187 | 3 | 0,78 |
-| 4 | Dellepiane I | AU Dellepiane | 98 | 0,181 | 5 | 0,56 |
-| 5 | Avellaneda | AU6 – Perito Moreno | 123 | 0,131 | 3 | 0,50 |
-| 6 | Sarmiento | AU Illia | 113 | 0,110 | 10 | 0,39 |
-| 7 | Retiro II | AU Illia | 50 | 0,163 | 3 | 0,33 |
-| 8 | Illia (3 accesos agrupados) | AU Illia / Paseo del Bajo | 76 | 0,134 | 5 | 0,33 |
-| 9 | Salguero | AU Illia | 79 | 0,075 | 8 | 0,22 |
+| # | Acceso | Autopista | Siniestros en traza | km | **Sin./km** | Riesgo | Score |
+|---|---|---|---|---|---|---|---|
+| 1 | Pórtico Independencia | Au Paseo del Bajo | 1.721 | 32,0 | **53,7** | 0,356 | 0,94 |
+| 2 | Alberti | AU 1 – 25 de Mayo | 73 | 2,2 | 33,0 | 0,574 | 0,89 |
+| 3 | Dellepiane II | AU Dellepiane | 44 | 2,0 | 22,1 | 0,187 | 0,67 |
+| 4 | Dellepiane I | AU Dellepiane | 53 | 2,1 | 25,0 | 0,181 | 0,67 |
+| 5 | Sarmiento | AU Illia | 519 | 15,7 | 33,2 | 0,110 | 0,56 |
+| 6 | Retiro II | AU Illia | 55 | 5,2 | 10,6 | 0,163 | 0,33 |
+| 7 | Avellaneda | AU6 – Perito Moreno | 39 | 2,2 | 17,9 | 0,131 | 0,33 |
+| 8 | Illia (3 accesos agrupados) | AU Illia / Paseo del Bajo | 102 | 6,7 | 15,3 | 0,134 | 0,33 |
+| 9 | Salguero | AU Illia | 266 | 13,7 | 19,4 | 0,075 | 0,28 |
 
-**La cabeza del ranking es robusta**: Alberti y Pórtico Independencia quedan 1º y 2º tanto con la suma cruda como con la normalización por hexágono — verificado corriendo las dos variantes. Lo que se reordena es el medio (Avellaneda sube del 9º al 5º, Salguero baja del 6º al 9º), justamente los corredores chicos que la suma penalizaba. Con 9 casos cada escalón de percentil vale 11 puntos, así que el orden del 3º al 9º no debería tomarse literal.
+**Tercera corrección: siniestros sobre la TRAZA, no sobre el hexágono.** Estaba anotado como el límite que más movería los números, y así fue. La accidentalidad contaba todos los siniestros de los hexágonos que toca el corredor — incluidos los de calles comunes sin relación con el acceso. Ahora se cuentan solo los que caen sobre la traza real del corredor (buffer de 30m sobre la geometría de los tramos, que cubre el ancho de calzada más el error de geocodificación) y se normalizan por **kilómetro de corredor**, que es la unidad natural del problema: un control se pone sobre una vía, no sobre un área.
 
-Límites que quedan abiertos: el tamaño del corredor depende en parte de cómo OSM clasificó cada tramo (Alberti alcanza 9 nodos, Pórtico Independencia 257 — casi 30x); y la accidentalidad cuenta *todos* los siniestros del hexágono, no sólo los ocurridos sobre la traza del corredor. Filtrar por vía es la mejora que más movería los números.
+Cuánto sobraba, medido: de lo que el conteo por hexágono le atribuía a cada corredor, **solo el 4% al 46% está realmente sobre la traza** (mediana 27%).
+
+| Acceso | Siniestros del hexágono | Sobre la traza | % real |
+|---|---|---|---|
+| **Alberti** | 1.693 | 73 | **4,3%** |
+| Dellepiane II | 443 | 44 | 9,9% |
+| Avellaneda | 370 | 39 | 10,5% |
+| Dellepiane I | 489 | 53 | 10,8% |
+| Illia (3) | 381 | 102 | 26,8% |
+| Pórtico Independencia | 5.020 | 1.721 | 34,3% |
+| Retiro II | 150 | 55 | 36,7% |
+| Salguero | 633 | 266 | 42,0% |
+| Sarmiento | 1.130 | 519 | 45,9% |
+
+**Y cambió el primer puesto.** Alberti era 1º con una accidentalidad que era **96% ruido**: 73 de sus 1.693 siniestros ocurrían sobre su corredor. Es un corredor corto (2,2 km) en pleno microcentro, así que sus hexágonos capturaban una enorme cantidad de choques de calles vecinas. Corregido, pasa a 2º y **Pórtico Independencia queda 1º** con 53,7 siniestros/km, la densidad más alta por lejos.
+
+El sesgo tenía una dirección sistemática: castigaba a los corredores largos sobre autopista —donde la traza domina el hexágono— y premiaba a los cortos en zona densa. Es exactamente el error que un ranking de este tipo no puede permitirse, porque los accesos de autopista en el centro son justamente los cortos.
+
+Nota sobre el medio de la tabla: Sarmiento tiene la segunda densidad más alta (33,2/km) pero queda 5º porque su riesgo delictivo es bajo (0,110) y el score promedia ambos percentiles. Con 9 casos cada escalón de percentil vale 11 puntos, así que el orden del 3º al 9º sigue sin poder tomarse literal.
+
+Límite que queda abierto: el tamaño del corredor depende en parte de cómo OSM clasificó cada tramo (Alberti alcanza 2,2 km de traza, Pórtico Independencia 32 — casi 15x). Normalizar por km corrige el sesgo de tamaño en el puntaje, no la variabilidad de origen.
 
 ## Capa 3 — Validación y explicabilidad (`src/validation/`)
 

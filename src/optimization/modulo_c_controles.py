@@ -43,19 +43,66 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import geopandas as gpd
 import h3
 import networkx as nx
 import osmnx as ox
 import pandas as pd
+from shapely import STRtree
+from shapely.geometry import LineString
+from shapely.ops import unary_union
 
 PROCESSED = Path(__file__).resolve().parent.parent.parent / "data" / "processed"
 FEATURES = Path(__file__).resolve().parent.parent.parent / "data" / "features"
 GRAFO_PATH = FEATURES / "grafo_vial.graphml"
 
+CRS_GEO = "EPSG:4326"
+CRS_METROS = "EPSG:5347"
+
 RADIO_CORREDOR_M = 2000
+# ancho a cada lado de la traza para contar un siniestro como "del corredor".
+# 30m cubre el ancho de calzada más el error de geocodificación (los siniestros
+# vienen geocodificados a la dirección, no al punto exacto del impacto).
+BUFFER_TRAZA_M = 30
 JERARQUIAS_OSM_IMPORTANTES = {"motorway", "trunk", "primary", "secondary",
                                "motorway_link", "trunk_link", "primary_link", "secondary_link"}
 RESOLUCION_H3 = 8
+
+
+def cargar_siniestros_puntos() -> tuple[STRtree, int]:
+    """Siniestros como puntos proyectados a metros, para contarlos sobre la
+    traza del corredor y no sobre todo el hexágono.
+
+    Las coordenadas vienen como TEXTO y con basura ('#¡REF!' en 294 filas):
+    se parsean con coerce y se descarta lo que no cae en el bbox de CABA.
+    Quedan 62.787 de 63.081 (99,5%)."""
+    d = pd.read_parquet(
+        FEATURES / "siniestros_hechos_hex.parquet",
+        columns=["latitud_siniestro", "longitud_siniestro"],
+    )
+    lat = pd.to_numeric(d["latitud_siniestro"], errors="coerce")
+    lon = pd.to_numeric(d["longitud_siniestro"], errors="coerce")
+    ok = lat.between(-34.75, -34.50) & lon.between(-58.55, -58.30)
+    print(f"Siniestros con coordenada usable: {int(ok.sum()):,} de {len(d):,} ({ok.mean():.1%})")
+
+    pts = gpd.GeoSeries(gpd.points_from_xy(lon[ok], lat[ok]), crs=CRS_GEO).to_crs(CRS_METROS)
+    return STRtree(pts.to_numpy()), int(ok.sum())
+
+
+def traza_del_corredor(subgrafo) -> tuple[object, float]:
+    """Geometría del corredor en metros y su largo en km. Usa la geometría
+    curva real del tramo donde OSM la trae; si no, la recta entre nodos."""
+    geoms = []
+    for u, v, d in subgrafo.edges(data=True):
+        g = d.get("geometry")
+        if g is None:
+            g = LineString([(subgrafo.nodes[u]["x"], subgrafo.nodes[u]["y"]),
+                            (subgrafo.nodes[v]["x"], subgrafo.nodes[v]["y"])])
+        geoms.append(g)
+    if not geoms:
+        return None, 0.0
+    traza = gpd.GeoSeries([unary_union(geoms)], crs=CRS_GEO).to_crs(CRS_METROS).iloc[0]
+    return traza, traza.length / 1000
 
 
 def es_via_importante(highway) -> bool:
@@ -76,6 +123,8 @@ def main() -> None:
     nodo_acceso = ox.distance.nearest_nodes(
         G_importante, accesos["lon"].to_numpy(), accesos["lat"].to_numpy()
     )
+
+    arbol_siniestros, _ = cargar_siniestros_puntos()
 
     siniestros = pd.read_parquet(FEATURES / "siniestros_hechos_hex.parquet")
     siniestros_por_hex = siniestros.groupby("hex_id", observed=True).size()
@@ -116,7 +165,23 @@ def main() -> None:
                           any(v in {"motorway", "motorway_link", "trunk", "trunk_link"} for v in (h if isinstance(h, list) else [h])))
         n_primaria_secundaria = len(highways_corredor) - n_motorway
 
+        # accidentalidad del HEXÁGONO -- se conserva para poder comparar contra
+        # la versión anterior, pero ya no alimenta el score: contaba todos los
+        # siniestros del hexágono, incluidos los de calles sin relación con el
+        # acceso, y en zonas céntricas densas eso inflaba el número
         accidentalidad = sum(siniestros_por_hex.get(h, 0) for h in hexes_corredor)
+
+        # accidentalidad de la TRAZA: solo los siniestros que caen sobre el
+        # corredor mismo (± BUFFER_TRAZA_M), normalizados por km de corredor.
+        # Es una densidad lineal, que es la unidad natural del problema: un
+        # control se pone sobre una vía, no sobre un área.
+        traza, largo_km = traza_del_corredor(subgrafo_corredor)
+        if traza is not None:
+            en_traza = int(len(arbol_siniestros.query(traza.buffer(BUFFER_TRAZA_M), predicate="intersects")))
+        else:
+            en_traza = 0
+        por_km = en_traza / largo_km if largo_km else 0.0
+
         riesgo_delictivo = sum(riesgo_por_hex.get(h, 0) for h in hexes_corredor) / len(hexes_corredor) if hexes_corredor else 0
 
         filas.append({
@@ -127,16 +192,19 @@ def main() -> None:
             # presentación): sin esto el alcance de cada acceso no es visible
             "hexes_corredor": sorted(hexes_corredor),
             "accidentalidad_corredor": accidentalidad,
-            # intensiva, para que compare contra el riesgo (que ya es promedio)
-            # sin premiar al corredor grande por ser grande -- ver docstring
             "accidentalidad_por_hex": accidentalidad / len(hexes_corredor) if hexes_corredor else 0,
+            # las dos que ahora importan: siniestros SOBRE la traza y su
+            # densidad lineal, que es la que entra al score
+            "siniestros_en_traza": en_traza,
+            "largo_corredor_km": round(largo_km, 2),
+            "siniestros_por_km": round(por_km, 2),
             "riesgo_delictivo_corredor": riesgo_delictivo,
             "tramos_troncales": n_motorway, "tramos_distribuidores": n_primaria_secundaria,
             "hexagonos_en_corredor": len(hexes_corredor), "nodos_alcanzados": len(nodos_corredor),
         })
 
     resultado = pd.DataFrame(filas)
-    resultado["pct_accidentalidad"] = resultado["accidentalidad_por_hex"].rank(pct=True)
+    resultado["pct_accidentalidad"] = resultado["siniestros_por_km"].rank(pct=True)
     resultado["pct_riesgo"] = resultado["riesgo_delictivo_corredor"].rank(pct=True)
     resultado["score_control"] = (resultado["pct_accidentalidad"] + resultado["pct_riesgo"]) / 2
     resultado = resultado.sort_values("score_control", ascending=False).reset_index(drop=True)
@@ -144,8 +212,8 @@ def main() -> None:
 
     print(f"\nCorredor: nodos alcanzables por vías {sorted(JERARQUIAS_OSM_IMPORTANTES)} dentro de {RADIO_CORREDOR_M}m reales de cada acceso\n")
     print(resultado[[
-        "ranking", "nombre", "autopista", "accidentalidad_corredor", "accidentalidad_por_hex",
-        "riesgo_delictivo_corredor", "hexagonos_en_corredor", "score_control",
+        "ranking", "nombre", "autopista", "siniestros_en_traza", "largo_corredor_km",
+        "siniestros_por_km", "accidentalidad_corredor", "riesgo_delictivo_corredor", "score_control",
     ]].to_string(index=False))
 
     FEATURES.mkdir(parents=True, exist_ok=True)
