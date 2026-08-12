@@ -169,7 +169,50 @@ Pendiente anotado desde v1 ("desagregar por tipo multiplicaría la tabla ~6x, se
 
 Nota metodológica: los PEI de 95-99,6% en los cinco tipos que no son homicidios dicen que **a este grano queda poquísimo margen de mejora en concentración espacial**, cualquiera sea el algoritmo. La ganancia de desagregar está en el error de predicción, no en la capacidad de priorizar zonas.
 
-Los seis modelos quedan en `data/features/modelos/modelo_{tipo}.txt` y la comparación en `comparacion_por_tipo.parquet`; cada corrida queda en MLflow como `tipo-{nombre}`. **No se cambió el pipeline de producción**: `predecir_riesgo.py` y los Módulos A/B/C siguen usando el modelo agregado. Esto es, por ahora, un hallazgo analítico.
+Los seis modelos quedan en `data/features/modelos/modelo_{tipo}.txt` y la comparación en `comparacion_por_tipo.parquet`; cada corrida queda en MLflow como `tipo-{nombre}`.
+
+### Riesgo por tipo en los módulos (`predecir_riesgo_por_tipo.py`, `comparar_modulo_a_por_tipo.py`)
+
+Desagregar mejoró la predicción del **conteo**. Pero los módulos de Capa 2 no optimizan conteos: optimizan una **priorización espacial**. Que el modelo por tipo prediga mejor no implica que cambie ninguna decisión operativa — eso hay que medirlo aparte.
+
+**Qué tipo entra en la superficie de riesgo, y por qué** (las decisiones salen de lo medido, no de criterio a mano):
+
+| Tipo | Fuente | Motivo |
+|---|---|---|
+| Robo, Lesiones, Amenazas | modelo por tipo | le ganan a su baseline (+6,4%, +9,2%, +3,7%) |
+| Hurto | **promedio histórico** | el modelo es *peor* que el naive (−2,0%): usarlo sería ignorar el propio resultado |
+| Vialidad | **excluido** | siniestros viales, no delitos de seguridad; empata con el naive |
+| Homicidios | **excluido** | 78 hechos en el año de test, PEI 54% |
+
+**La combinación es una decisión de política, no de modelo.** Los módulos consumen *una* superficie, y fundirlas exige decidir cuánto pesa una lesión contra un robo. El default en `PESOS` es peso igual sobre superficies **normalizadas** — lo único defendible sin tomar posición. Ponderar por volumen reproduciría el modelo agregado y anularía el sentido de desagregar; normalizar es necesario porque las tasas difieren ~6x entre tipos.
+
+Las superficies **correlacionan alto entre sí** (Spearman 0,84 a 0,92): en general priorizan los mismos hexágonos. Pero el MCLP no consume la correlación, consume el ranking, así que se resolvió el Módulo A una vez por superficie (K=40, turno Tarde, misma matriz de cobertura de red).
+
+**Superposición de planes** — ubicaciones compartidas sobre 40:
+
+| | robo | hurto | lesiones | amenazas | combinado | agregado |
+|---|---|---|---|---|---|---|
+| robo | — | 0,70 | 0,73 | 0,75 | 0,80 | 0,83 |
+| hurto | 0,70 | — | **0,60** | **0,60** | 0,70 | 0,80 |
+| lesiones | 0,73 | 0,60 | — | 0,80 | 0,83 | 0,63 |
+| amenazas | 0,75 | 0,60 | 0,80 | — | 0,90 | 0,70 |
+
+**Retención cruzada** — cobertura del riesgo de la fila usando el plan de la columna, sobre su propio óptimo:
+
+| | plan robo | plan hurto | plan lesiones | plan amenazas | plan combinado | plan agregado |
+|---|---|---|---|---|---|---|
+| riesgo robo | 1,000 | 0,938 | 0,944 | 0,930 | 0,970 | **0,980** |
+| riesgo hurto | 0,925 | 1,000 | 0,854 | **0,817** | 0,890 | **0,964** |
+| riesgo lesiones | 0,924 | **0,825** | 1,000 | 0,979 | 0,983 | 0,913 |
+| riesgo amenazas | 0,903 | **0,811** | 0,964 | 1,000 | 0,982 | 0,896 |
+
+**Sí cambia el plan, y no poco.** Hurto y lesiones comparten solo el **60%** de las ubicaciones: 16 de 40 difieren. Usar el plan de hurto para amenazas retiene apenas el **81,1%** de la cobertura óptima. Es coherente con la naturaleza de cada delito — el hurto se concentra en zonas comerciales del microcentro, lesiones y amenazas se reparten distinto.
+
+**Pero el plan agregado ya es un compromiso razonable.** Retiene 98,0% para robo y 96,4% para hurto (los dos que dominan el volumen), y cae a 91,3% y 89,6% para lesiones y amenazas. **Ningún plan único domina**: el peor caso del agregado (89,6%) es prácticamente igual al del combinado (89,0%). Desagregar rinde si se quiere optimizar *para un tipo específico*; para un despliegue único, el agregado no está lejos del mejor compromiso posible.
+
+**Bug propio, encontrado y corregido — cambiaba la conclusión.** La primera corrida de `comparar_modulo_a_por_tipo.py` daba 85-97,5% de superposición, y con eso la lectura habría sido "desagregar no cambia nada operativamente" — la conclusión contraria a la real. La causa: `demanda` ya traía una columna `score_riesgo` (la agregada), y al renombrar `score_lesiones → score_riesgo` quedaban **dos columnas con el mismo nombre**; `resolver_mclp` terminaba optimizando un DataFrame en vez de una Serie, en silencio. Se detectó porque una celda de retención cruzada daba **1,015** — matemáticamente imposible: ningún plan puede cubrir más riesgo que el plan óptimo para ese riesgo. Se agregó un `assert` que verifica que quede una sola columna de score. La lección: en una matriz de comparación, la diagonal y las cotas conocidas son el control de sanidad.
+
+**No se cambió el pipeline de producción**: `predecir_riesgo.py` y los Módulos A/B/C siguen consumiendo el modelo agregado. La superficie por tipo queda disponible en `riesgo_predicho_por_tipo.parquet` y la comparación en `comparacion_modulo_a_por_tipo.json`. Pasar a producción exige antes una decisión que no es técnica: si se optimiza para un tipo, para una combinación ponderada por política, o se mantiene el agregado asumiendo la pérdida de ~10% en los tipos minoritarios.
 
 ## Auditoría técnica externa y remediación P0
 
