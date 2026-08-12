@@ -449,6 +449,33 @@ Con `N_CAMARAS_NUEVAS=30` y radio de cobertura 150m: las 30 zonas elegidas conce
 
 Lo que el módulo sí aporta, y no es trivial: la **ponderación** (riesgo × oscuridad × flujo peatonal, con descuento por cámara cercana) es una priorización legítima de zonas. Se reencuadra como eso — un ranking de zonas donde una cámara agrega más — y no como una optimización de cobertura. La ubicación puntual dentro de cada zona es una decisión de campo: el hexágono mide ~700m de centro a centro, mucho más que el alcance de una cámara. Hacerlo bien como problema de cobertura exigiría una grilla mucho más fina (H3-10, centroides a ~100m), pero el modelo de riesgo es H3-8 — habría que desagregar riesgo a una resolución que el modelo no tiene, o sea inventar detalle. Queda como límite conocido, no como bug pendiente.
 
+### Módulo B sobre la red vial (`modulo_b_camaras_red.py`) — el límite anterior, resuelto
+
+El diagnóstico era que el problema mezclaba dos resoluciones: el riesgo se modela a H3-8 y la decisión se toma a escala de esquina. La salida **no** fue forzar el riesgo a una grilla más fina —eso sería inventar detalle que el modelo no tiene— sino **mantener el riesgo donde está y cambiar el universo de candidatos**. Mismo movimiento conceptual que en el Módulo C al pasar del hexágono a la traza, y por la misma razón: la infraestructura vial es la unidad natural, no el área.
+
+| | Versión hexágonos | Versión red vial |
+|---|---|---|
+| Demanda | 401 centroides H3-8 | **37.036 tramos de calle**, pesados por largo × peso del hexágono |
+| Candidatos | 401 centroides | **17.811 intersecciones** (donde se monta una cámara) |
+| Cobertura | euclidiana desde el centroide | **≤150 m de distancia de calle** |
+| Tramos que cubre un candidato | 1 (sólo el propio hexágono) | **mediana 18, máximo 93** |
+
+**El número clave**: la mediana de tramo es **103 m** contra un radio de 150 m. A escala de tramo los 150 m sí discriminan entre vecinos, que es exactamente lo que la versión anterior no lograba — ahí los centroides estaban a 700 m y ningún candidato alcanzaba a otro.
+
+**Resultado**: 30 cámaras cubren el **7,0% del riesgo ponderado** sobre **86,4 km** de calle. Son el 2,2% de los 3.927 km de la red capturando el 7,0% del riesgo — una concentración de **3,2x**. (No es comparable con el "25%" de la versión anterior: aquel era la fracción del peso que vive en 30 hexágonos de 0,74 km² cada uno, no cobertura.)
+
+**Tres cosas que la formulación anterior no podía hacer, y ésta sí:**
+
+1. **Poner más de una cámara en la misma zona.** Las 30 cámaras caen en 21 hexágonos distintos: siete zonas reciben dos o tres. Con un candidato por hexágono eso era estructuralmente imposible, y es una respuesta obvia cuando una zona concentra mucho riesgo sobre varias calles.
+2. **Ganancia marginal de verdad marginal.** El 4º candidato cubre 80 tramos pero rinde menos que el 3º, que cubre 16, porque se solapa con lo ya cubierto. Antes la "ganancia" era el peso del hexágono y no había interacción posible entre candidatos.
+3. **Ubicaciones accionables.** El resultado son intersecciones con coordenadas, no zonas de 700 m dentro de las cuales había que decidir a ojo.
+
+Sólo **13 de las 30 ubicaciones** caen en hexágonos que la versión anterior también elegía: más de la mitad del plan cambia.
+
+Se conserva del módulo original la **ponderación** —riesgo × boost por baja iluminación × boost por flujo peatonal, con descuento del 30% si ya hay cámara a menos de 150 m y exclusión de candidatos a menos de 100 m— porque era la parte defendible. Lo que se reemplazó es el problema de cobertura, que era la parte que no se sostenía.
+
+`modulo_b_camaras.py` (versión hexágonos) se conserva para poder comparar; `modulo_b_camaras_red.py` es la que corresponde usar.
+
 ## Módulo C — Controles de acceso (`src/optimization/modulo_c_controles.py`)
 
 A diferencia de A y B, no trabaja sobre hexágonos sueltos sino sobre el grafo vial. El corredor de cada acceso se recorre con Dijkstra sobre el subgrafo de vías importantes de OSM (`motorway/trunk/primary/secondary`, 5.658 nodos de 17.811) con corte a `RADIO_CORREDOR_M=2000` — el corredor real por donde se circula, no un buffer circular. (La versión pre-P1 sí usaba un buffer de radio fijo, documentado entonces como simplificación por falta de topología navegable en `calles.parquet`; el grafo vial de OSM la volvió innecesaria.)
