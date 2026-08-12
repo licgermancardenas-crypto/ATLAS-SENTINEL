@@ -496,6 +496,23 @@ Nota sobre el medio de la tabla: Sarmiento tiene la segunda densidad más alta (
 
 Límite que queda abierto: el tamaño del corredor depende en parte de cómo OSM clasificó cada tramo (Alberti alcanza 2,2 km de traza, Pórtico Independencia 32 — casi 15x). Normalizar por km corrige el sesgo de tamaño en el puntaje, no la variabilidad de origen.
 
+**Sensibilidad al ancho del buffer (`sensibilidad_buffer_traza.py`) — y el primer puesto no aguanta.** Contar los siniestros "del corredor" exige decidir a qué distancia de la calzada deja de contar uno. Los 30 m se eligieron por primeros principios (ancho de vía + error de geocodificación), pero es una elección, así que se recorrió de 10 a 75 m:
+
+| Buffer | 1º | 2º | Siniestros en traza | Spearman vs. 30 m |
+|---|---|---|---|---|
+| 10 m | Pórtico Independencia | Alberti | 2.117 | 0,650 |
+| 20 m | Pórtico Independencia | Alberti | 2.550 | 0,933 |
+| **30 m** | **Pórtico Independencia** | Alberti | 2.872 | 1,000 |
+| 40 m | **Alberti** | Pórtico Independencia | 3.111 | 0,967 |
+| 50 m | **Alberti** | Pórtico Independencia | 3.387 | 0,967 |
+| 75 m | **Alberti** | Pórtico Independencia | 3.762 | 0,883 |
+
+**El par de los dos primeros es robusto — el orden entre ellos no.** Alberti y Pórtico Independencia son siempre los dos primeros, con cualquier buffer. Pero **quién queda 1º se da vuelta a los 40 m**: tres anchos dan uno y tres dan el otro. El medio de la tabla también se mueve (4 a 6 de 9 puestos cambian según el ancho).
+
+El mecanismo es el mismo sesgo que se corrigió, reapareciendo: Alberti tiene una traza corta (2,2 km) en zona densa, así que **ensanchar el buffer le devuelve los choques de calles vecinas** y le infla la densidad rápido; Pórtico Independencia tiene 32 km y absorbe proporcionalmente menos. Los 30 m se sostienen justamente por ser lo bastante ajustados como para excluir la calle de al lado — pero conviene decir que el 1º contra el 2º depende de esa elección.
+
+**Error propio en la métrica de control.** La primera versión comparaba los dos primeros como *conjunto* (`set`), así que informaba "top2 igual: sí" para los seis anchos y ocultaba que se dan vuelta entre sí. Se corrigió a comparación por orden. Segunda vez en el proyecto que una métrica de verificación mal elegida esconde justo lo que tenía que detectar — la primera fue ordenar los tipos de delito por "mejora" en vez de PEI.
+
 ## Capa 3 — Validación y explicabilidad (`src/validation/`)
 
 **SHAP** (`shap_explicabilidad.py`) matiza la lectura de Capa 1: la importancia por cantidad de *splits* de LightGBM decía que casi todo era `hex_id`. SHAP (que mide aporte real a la magnitud de la predicción, no cuántas veces se usa una feature) da otra foto:
