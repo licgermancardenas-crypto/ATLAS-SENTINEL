@@ -22,15 +22,3 @@ export function quantileBreaks(valores: number[], nBins: number): number[] {
   }
   return breaks;
 }
-
-// El tipo de expresión de MapLibre depende genéricamente de la propiedad de
-// paint que reciba (fill-color, line-width, etc.) — se tipa laxo acá adrede
-// en vez de pelear con esos genéricos, y se castea en el punto de uso.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function colorScaleExpression(propiedad: string, breaks: number[]): any {
-  const stops: unknown[] = ["step", ["get", propiedad], RISK_RAMP[0]];
-  breaks.forEach((b, i) => {
-    stops.push(b, RISK_RAMP[i + 1]);
-  });
-  return stops;
-}

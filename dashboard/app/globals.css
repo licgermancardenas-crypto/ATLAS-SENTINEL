@@ -26,6 +26,15 @@
   --status-critical: #e66767;
 
   --accent: #d97706;
+
+  /* mapa SVG (ver components/MapaSVG.tsx) — el fondo es la ciudad real
+     dibujada desde datos, no un basemap de tiles */
+  --mapa-agua: #0b1016;
+  --mapa-tierra: #1a1e24;
+  --via-menor: rgba(255, 255, 255, 0.13);
+  --via-media: rgba(255, 255, 255, 0.24);
+  --via-troncal: #6b7480;
+  --barrio-linea: rgba(255, 255, 255, 0.14);
 }
 
 @media (prefers-color-scheme: light) {
@@ -38,6 +47,12 @@
     --text-secondary: #52514e;
     --border: #e2e8f0;
     --status-critical: #d03b3b;
+    --mapa-agua: #ccd9e0;
+    --mapa-tierra: #f4f2ee;
+    --via-menor: rgba(18, 22, 28, 0.17);
+    --via-media: rgba(18, 22, 28, 0.34);
+    --via-troncal: #8e949c;
+    --barrio-linea: rgba(18, 22, 28, 0.16);
   }
 }
 

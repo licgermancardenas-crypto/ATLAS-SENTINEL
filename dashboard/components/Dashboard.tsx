@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import type { FeatureCollection } from "geojson";
 import { TURNOS, Turno } from "@/lib/types";
 import { cargarDatosDashboard, moduloAaGeojson, moduloBaGeojson, type DatosDashboard } from "@/lib/data";
-import RiskMap from "./RiskMap";
+import { cargarMapaBase, type MapaBase } from "@/lib/mapa";
+import MapaSVG from "./MapaSVG";
 import ModulePanel from "./ModulePanel";
 import MetricsPanel from "./MetricsPanel";
 import LimitsPanel from "./LimitsPanel";
@@ -14,6 +15,7 @@ type Tab = "capas" | "metricas" | "limites";
 
 export default function Dashboard() {
   const [datos, setDatos] = useState<DatosDashboard | null>(null);
+  const [mapa, setMapa] = useState<MapaBase | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [turno, setTurno] = useState<Turno>("tarde");
   const [tab, setTab] = useState<Tab>("capas");
@@ -28,12 +30,15 @@ export default function Dashboard() {
     cargarDatosDashboard()
       .then(setDatos)
       .catch((e) => setError(String(e)));
+    cargarMapaBase()
+      .then(setMapa)
+      .catch((e) => setError(String(e)));
   }, []);
 
   if (error) {
     return <div className="p-6 text-status-critical text-sm">Error cargando datos: {error}</div>;
   }
-  if (!datos) {
+  if (!datos || !mapa) {
     return (
       <div className="flex-1 flex items-center justify-center text-text-secondary text-sm">
         Cargando SIGE-BA…
@@ -70,17 +75,19 @@ export default function Dashboard() {
 
       <div className="flex-1 flex min-h-0">
         <div className="flex-1 relative">
-          <RiskMap
+          <MapaSVG
             turno={turno}
-            hexData={datos.hexRiesgo}
-            showModuloA={toggles.moduloA}
-            showModuloB={toggles.moduloB}
-            showComisarias={toggles.comisarias}
-            showCamaras={toggles.camaras}
-            moduloAData={moduloAGeojson}
-            moduloBData={moduloBGeojson}
-            comisariasData={datos.comisarias}
-            camarasData={datos.camaras}
+            base={mapa}
+            capas={[
+              { id: "comisarias", datos: datos.comisarias, visible: toggles.comisarias,
+                color: "#ffffff", r: 3.5, nombre: "Comisaría" },
+              { id: "camaras", datos: datos.camaras, visible: toggles.camaras,
+                color: "#e66767", r: 3, nombre: "Cámara" },
+              { id: "moduloB", datos: moduloBGeojson, visible: toggles.moduloB,
+                color: "#0ca30c", r: 5, nombre: "Zona prioritaria" },
+              { id: "moduloA", datos: moduloAGeojson, visible: toggles.moduloA,
+                color: "#d97706", r: 5, nombre: "Patrulla propuesta" },
+            ]}
           />
           <RiskLegend />
         </div>
