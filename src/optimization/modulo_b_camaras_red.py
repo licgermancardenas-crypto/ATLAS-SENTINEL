@@ -83,7 +83,7 @@ def main() -> None:
         extremos.append((idx_nodo[u], idx_nodo[v]))
     peso_tramo = np.array(peso_tramo, dtype="float64")
     extremos = np.array(extremos, dtype="int32")
-    print(f"Demanda: {len(peso_tramo):,} tramos | peso total {peso_tramo.sum():.1f}")
+    print(f"Demanda: {len(peso_tramo):,} tramos | peso bruto {peso_tramo.sum():.1f} (antes del descuento)")
 
     # --- cámaras existentes: descuento a lo ya cubierto, exclusión de candidatos ---
     camaras = pd.read_parquet(PROCESSED / "camaras.parquet").dropna(subset=["latitud", "longitud"])
@@ -101,6 +101,7 @@ def main() -> None:
     print(f"Tramos con cámara existente a <={RADIO_COBERTURA_M}m: {int(ya_cubierto.sum()):,} "
           f"({ya_cubierto.mean():.1%}) — pesan {DESCUENTO_YA_CUBIERTO:.0%}")
     print(f"Intersecciones excluidas como candidatas (<{RADIO_EXCLUSION_M}m de una cámara): {int(excluidos.sum()):,}")
+    print(f"Peso total tras el descuento (denominador de la cobertura): {peso_tramo.sum():.1f}")
 
     # --- cobertura por distancia de calle desde cada intersección candidata ---
     print(f"Calculando cobertura a {RADIO_COBERTURA_M}m de calle desde cada intersección...")
@@ -155,6 +156,9 @@ def main() -> None:
           f"({km:.1f} km de calle)")
     print(res[["ranking", "hex_id", "tramos_cubiertos", "ganancia_marginal"]].head(10).to_string(index=False))
 
+    # el peso total va en el parquet: sin el no se puede reconstruir la curva
+    # de cobertura acumulada desde las ganancias marginales
+    res["peso_total"] = peso_tramo.sum()
     ruta = FEATURES / "modulo_b_camaras_red.parquet"
     res.to_parquet(ruta, index=False)
     print(f"\nGuardado: {ruta.name}")

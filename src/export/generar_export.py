@@ -71,7 +71,20 @@ def exportar_modulo_a() -> None:
 def exportar_modulo_b() -> None:
     df = pd.read_parquet(FEATURES / "modulo_b_camaras.parquet")
     df.to_json(OUT / "modulo_b.json", orient="records", force_ascii=False)
-    print(f"modulo_b.json: {len(df)} cámaras propuestas")
+    print(f"modulo_b.json: {len(df)} zonas priorizadas (versión hexágonos)")
+
+
+def exportar_modulo_b_red() -> None:
+    """Versión sobre la red vial — la que corresponde usar. Son ubicaciones
+    concretas (intersecciones), no zonas de 700m. Se exporta aparte para poder
+    comparar contra la anterior; ver README, 'Módulo B sobre la red vial'."""
+    ruta = FEATURES / "modulo_b_camaras_red.parquet"
+    if not ruta.exists():
+        print("modulo_b_red.json: falta modulo_b_camaras_red.parquet — se omite")
+        return
+    df = pd.read_parquet(ruta)
+    df.to_json(OUT / "modulo_b_red.json", orient="records", force_ascii=False)
+    print(f"modulo_b_red.json: {len(df)} cámaras sobre la red vial")
 
 
 def exportar_modulo_c() -> None:
