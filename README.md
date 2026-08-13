@@ -110,6 +110,82 @@ Datasets ya cruzados con hex_id (`src/etl/assign_hex_puntual.py`, `assign_hex_ca
 
 Pendiente, y son operaciones distintas a point-in-hex (no encajan en `asignar_hex_id`): **espacios_verdes** y **comisarias.parquet** (el de zonas de patrullaje) necesitan overlay de polígono contra la grilla (% de área, no un punto); **población por hex** (denominador per cápita) sale de prorratear `poblacion_comuna`/`poblacion_barrio` por área, aunque ya se puede aproximar sin prorratear porque `hex_maestra` ya tiene `radio_censal_id` — un join directo contra `radios_censales.poblacion_total` alcanza para una primera versión.
 
+## EDA retroactivo (`src/validation/eda_delitos.py`)
+
+Se hizo tarde y conviene decirlo: el proyecto entró directo a construir la grilla y entrenar. La calidad de datos se auditó a fondo, y hay estadística descriptiva desperdigada, pero siempre como justificación de una decisión ya tomada (82,8% de ceros → Tweedie). Nunca se miró el fenómeno por sí mismo. Cinco preguntas, y tres de las respuestas explican resultados que hasta ahora estaban solo observados.
+
+**1. La pandemia no dejó cicatriz de nivel.** 2016-2019 promedia 145.556 delitos/año; 2022-2025, 144.163 (**−1,0%**). El pozo de 2020 (83.609, −42%) y 2021 (106.830, −25%) es profundo pero transitorio. No hay quiebre estructural que invalide entrenar con la serie completa.
+
+**2. Todo el ciclo temporal está en el turno, y el turno ya es una dimensión de la grilla.** Índices sobre 2022-2025 (1,00 = promedio):
+
+| Ciclo | Amplitud (max−min) | Detalle |
+|---|---|---|
+| **Turno** | **1,35** | Tarde 1,66 · Mañana 1,45 · Noche 0,59 · Madrugada 0,31 |
+| Día de semana | 0,21 | viernes 1,07 · domingo 0,86 (el único día que se despega) |
+| Mes | 0,13 | diciembre/marzo 1,06 · febrero 0,93 |
+
+La Tarde tiene **5,4x** los delitos de la Madrugada, mientras que entre el mes más y el menos delictivo hay un 13%. Como el turno es una dimensión del grano, no algo que el modelo tenga que descubrir, **al calendario le queda casi nada por explicar**. Es la razón estructural de que `dia_semana` y `mes` aporten tan poco, y de que sumar clima no moviera nada.
+
+**3. La mezcla de tipos cambió mucho, y el año de test es el más raro.** Hurto pasó del 29,9% del total en 2016 al 40,4% en 2024; Lesiones cayó de 11,7% a 4,9%. Pero lo fuerte está en 2025:
+
+| Tipo | 2024 | 2025 | |
+|---|---|---|---|
+| Robo | 68.304 | 49.938 | **−26,9%** |
+| Hurto | 62.655 | 49.507 | **−21,0%** |
+| Vialidad | 9.597 | 11.346 | +18,2% |
+| Lesiones | 7.614 | 10.134 | **+33,1%** |
+| Amenazas | 6.681 | 9.418 | **+41,0%** |
+| Homicidios | 78 | 78 | 0,0% |
+
+No es una caída pareja: **los delitos contra la propiedad bajan ~25% y los interpersonales suben ~35%**, en un solo año. Si es un cambio real de patrón o un cambio de criterio de registro/clasificación no se puede determinar con estos datos, pero importa: **el año de test tiene una composición distinta a la de los años de train**, y Módulo A y B optimizan sobre superficies dominadas justamente por robo y hurto.
+
+Y conecta con el hallazgo de la desagregación por tipo: **Hurto es el único tipo donde el modelo pierde contra el promedio histórico** (−2,0%) y a la vez es el 38-40% del agregado. El modelo agregado está cada vez más dominado por el tipo que mejor predice un mapa histórico — parte de por qué le gana tan poco al baseline.
+
+**4. La concentración espacial es real, fuerte y estable — ahora medida.** Moran's I sobre la vecindad H3 de contigüidad (k=1), con test de permutación de 999 réplicas:
+
+| | Valor |
+|---|---|
+| I promedio 2016-2025 | **+0,671** |
+| Rango anual | +0,643 (2020) a +0,706 (2018) |
+| Valor esperado bajo azar | −0,0025 |
+| p-valor | <0,001 los diez años |
+
+El proyecto entero se apoya en que el riesgo se concentra espacialmente y esto nunca se había medido con el estadístico que lo cuantifica. **I ≈ 0,67 es alto**, y llamativamente **no se movió durante la pandemia** (2020: +0,643): cayó el volumen a la mitad y la estructura espacial quedó intacta. Se calcula a mano en `morans_i()` en vez de traer pysal — son 401 hexágonos y no justifica la dependencia.
+
+**5. El ranking espacial es casi perfectamente estable, y ese es el techo del proyecto.** Correlación de Spearman entre el ranking de hexágonos de cada año y el del siguiente:
+
+| | Promedio | Mínimo |
+|---|---|---|
+| Spearman año contra año | **0,983** | 0,970 (2017→2018) |
+| Solape del top-20% | **91,0%** | 87,8% (2016→2017) |
+
+Incluso 2019→2020, con la cuarentena en el medio, da 0,989. **Esto explica el resultado central del proyecto.** Si el mapa de riesgo de un año predice el del siguiente con Spearman 0,98, entonces un promedio histórico ya es casi óptimo para rankear, y cualquier modelo solo puede ganar en los márgenes. El "el modelo apenas le gana al baseline" deja de ser un resultado decepcionante y pasa a ser el resultado *esperable*: no es que el modelo sea flojo, es que el problema de priorización espacial está casi saturado a esta resolución. Coincide con los PEI de 95-99,6% medidos por tipo.
+
+Salidas en `data/features/eda/`.
+
+### ¿La ventaja del modelo es priorización o es nivel? (`src/validation/test_nivel_baseline.py`)
+
+Sospecha razonable, y falsa. El modelo le gana al naive 2,0% en MAE pero solo 0,8 puntos en Recall@20%; como el Recall@K es invariante a la escala y el MAE no, la asimetría sugería que parte de la ventaja fuera "el modelo notó que el nivel bajó" y no mejor priorización. 2025 cerró 16% abajo de 2024, así que había de dónde agarrarse.
+
+Se comparó el modelo contra cinco variantes del promedio histórico, todas evaluadas sobre 2025:
+
+| Variante | MAE | Sesgo de nivel | Recall@20% |
+|---|---|---|---|
+| **Modelo** | **0,2923** | 0,997 | **45,5%** |
+| naive_full (el actual) | 0,2983 | **1,026** | 44,7% |
+| naive sin pandemia | 0,3075 | 1,121 | 44,8% |
+| naive últimos 2 años | 0,3067 | 1,120 | 44,9% |
+| naive último año | 0,3119 | 1,174 | 45,0% |
+| naive recalibrado con 2024 | 0,3135 | 1,187 | 44,7% |
+
+**El baseline actual casi no tiene sesgo de nivel (1,026)**, así que el 2% del modelo es ventaja real, no escala. La sospecha estaba mal.
+
+Pero el motivo por el que estaba mal es lo interesante: el promedio de los 8 años de train da ~131.800 delitos/año y 2025 cerró en 128.429. **Las dos distorsiones se cancelan** — la pandemia tira el promedio histórico hacia abajo justo lo suficiente como para coincidir con un 2025 que también está por debajo del nivel reciente. Sacar los años de pandemia *empeora* el baseline (0,2983 → 0,3075), y recalibrarlo con 2024 —un año alto, justo antes de la caída— lo empeora todavía más.
+
+Dos consecuencias prácticas. Primero, **la comparación del README no está inflada**: el baseline contra el que se mide todo resulta ser, para este año de test, el mejor de las cinco variantes. Segundo, **es frágil por casualidad**: si 2026 vuelve al nivel de ~150.000, `naive_full` va a subpredecir ~15% y el modelo va a parecer mucho mejor sin haber mejorado en nada. Al reentrenar hay que mirar esta tabla antes de leer el MAE.
+
+Nota sobre un bug que no era: `leer_columna_achicada` codifica categorías con `dictionary_encode` de arrow, en orden de aparición, mientras que `train_baseline` usó `astype("category")`, que ordena. En `dia_semana` los dos órdenes difieren en el 100% de los códigos (la tabla arranca el 2016-01-01, viernes) y es la 6ª feature por ganancia. Resulta que el `.txt` del modelo guarda un bloque `pandas_categorical` y LightGBM realinea por **valor**, no por código: reordenar cambia todos los códigos y deja las predicciones bit a bit idénticas. Solo sería un problema pasándole un array de códigos crudo en vez de un DataFrame.
+
 ## Estado de Capa 1 v1 (modelo núcleo, sin exógenas)
 
 `src/model_core/build_training_table.py` arma `data/features/training_table.parquet`: grano (hex_id, fecha, turno), 401 hexágonos × 3.653 días (2016-2025) × 4 turnos = 5.859.412 filas (907MB en memoria, 28MB en parquet). Target: conteo total de delitos (los 6 tipos juntos — desagregar por tipo multiplicaría la tabla ~6x, se deja para v2). Features: lags 7/30/365 días y rolling 7/30 días por hex×turno, vecindad espacial (anillos H3 k=1/k=2, sobre el `roll_30d` ya rezagado de cada vecino para no filtrar información futura — usar el conteo contemporáneo del vecino sería fuga de datos), NBI por radio censal, hacinamiento por comuna (no hay a nivel radio), población, cámaras y luminarias por hex, y calendario (día de semana, mes, feriado vía API de ArgentinaDatos).
