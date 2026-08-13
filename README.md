@@ -14,6 +14,7 @@ Arquitectura técnica completa del modelo: [`arquitectura-sige-ba.pdf`](arquitec
 - `src/validation/` — Capa 3: SHAP, backtesting, métricas
 - `src/export/` — genera los JSON/GeoJSON livianos que consume el dashboard
 - `notebooks/` — `01_eda_delitos.ipynb`, el análisis exploratorio con sus figuras ya ejecutadas
+- `presentacion/` — las páginas que se publican (una por módulo + la del EDA) y los scripts que les generan las figuras. HTML autocontenido, sin una sola request externa: el visor corre bajo una CSP que bloquea cualquier host, así que mapas y gráficos se dibujan como SVG inline calculado desde los datos del repo. `paginas/` es la fuente con los marcadores vacíos, `build/` el resultado (no versionado, son ~1,5MB de SVG derivado por página) — ver `presentacion/README.md`
 - `models/`, `api/`, `web/` — carpetas del scaffold original; el plan vigente las reemplaza por `src/*` + `dashboard/` (Next.js, separado) — ver el PDF de arquitectura
 
 ## Fuentes de datos

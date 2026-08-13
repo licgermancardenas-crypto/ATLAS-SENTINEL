@@ -19,6 +19,10 @@ mlruns/
 mlartifacts/
 mlflow.db
 
+# páginas con las figuras ya inyectadas: son ~1,5MB de SVG derivado por página,
+# se regeneran con presentacion/gen_mapas.py y gen_eda_figs.py
+presentacion/build/
+
 # node / web
 web/node_modules/
 web/dist/

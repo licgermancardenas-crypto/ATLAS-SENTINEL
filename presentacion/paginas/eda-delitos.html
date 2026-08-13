@@ -1,0 +1,873 @@
+<title>Análisis exploratorio de delitos en CABA | ATLAS SENTINEL</title>
+
+<style>
+  /* ============ TOKENS ============
+     Mismo sistema que las páginas de los Módulos A, B y C — es el mismo cuerpo
+     de trabajo. Light es el :root pelado; dark se redefine dos veces, una para
+     el ajuste del sistema (protegida para que un stamp explícito de light gane)
+     y otra para el toggle. */
+  :root {
+    color-scheme: light;
+
+    --plane:        #f4f5f3;
+    --surface:      #fdfdfc;
+    --surface-sunk: #eceeea;
+
+    --ink:          #12161c;
+    --ink-2:        #4a5361;
+    --ink-muted:    #7f8896;
+
+    --rule:         #e0e2de;
+    --rule-strong:  #c8ccc6;
+
+    --accent:       #2a78d6;
+    --accent-soft:  rgba(42,120,214,0.10);
+    --signal:       #eb6834;
+    --signal-soft:  rgba(235,104,52,0.10);
+
+    /* LISA: los dos polos salen de los dos acentos de la casa, para no meter
+       hues nuevos. Las "islas" son las versiones desaturadas. */
+    --lisa-caliente: #b4442a;
+    --lisa-frio:     #2a5fd6;
+    --lisa-isla-c:   #e39a5c;
+    --lisa-isla-f:   #8fc4ea;
+    --lisa-nulo:     #e4e6e1;
+
+    /* categórica de 6 para los tipos de delito: recorre de azul profundo a
+       naranja, ordenada por volumen, así el orden de la pila es legible */
+    --c0: #1e3f7a; --c1: #2a78d6; --c2: #74b3e8;
+    --c3: #e0a03e; --c4: #d1622f; --c5: #9aa3ad;
+
+    --serif: "Palatino Linotype", "Iowan Old Style", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: ui-monospace, "Cascadia Mono", Consolas, "DejaVu Sans Mono", monospace;
+
+    --measure: 66ch;
+    --gutter: clamp(1.25rem, 4vw, 2.5rem);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --plane:        #0c0e11;
+      --surface:      #15181d;
+      --surface-sunk: #1c2026;
+      --ink:          #f3f5f6;
+      --ink-2:        #a9b1bc;
+      --ink-muted:    #79828f;
+      --rule:         #262b32;
+      --rule-strong:  #39404a;
+      --accent:       #3987e5;
+      --accent-soft:  rgba(57,135,229,0.16);
+      --signal:       #e5763f;
+      --signal-soft:  rgba(229,118,63,0.16);
+      --lisa-caliente: #d4573a;
+      --lisa-frio:     #4b7fe8;
+      --lisa-isla-c:   #b0763d;
+      --lisa-isla-f:   #5c93bd;
+      --lisa-nulo:     #23272d;
+      --c0: #35569b; --c1: #3987e5; --c2: #7ab6e8;
+      --c3: #d9a04c; --c4: #d46940; --c5: #6b7480;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --plane:        #0c0e11;
+    --surface:      #15181d;
+    --surface-sunk: #1c2026;
+    --ink:          #f3f5f6;
+    --ink-2:        #a9b1bc;
+    --ink-muted:    #79828f;
+    --rule:         #262b32;
+    --rule-strong:  #39404a;
+    --accent:       #3987e5;
+    --accent-soft:  rgba(57,135,229,0.16);
+    --signal:       #e5763f;
+    --signal-soft:  rgba(229,118,63,0.16);
+    --lisa-caliente: #d4573a;
+    --lisa-frio:     #4b7fe8;
+    --lisa-isla-c:   #b0763d;
+    --lisa-isla-f:   #5c93bd;
+    --lisa-nulo:     #23272d;
+    --c0: #35569b; --c1: #3987e5; --c2: #7ab6e8;
+    --c3: #d9a04c; --c4: #d46940; --c5: #6b7480;
+  }
+
+  /* ============ BASE ============ */
+  body {
+    background: var(--plane);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .sheet {
+    max-width: 62rem;
+    margin: 0 auto;
+    padding: clamp(2.5rem, 6vw, 4.5rem) var(--gutter) 4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 3.25rem;
+  }
+
+  p { max-width: var(--measure); }
+
+  /* ============ ENCABEZADO ============ */
+  header { display: flex; flex-direction: column; gap: 1rem; }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.735rem;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+    margin: 0;
+  }
+
+  h1 {
+    font-family: var(--serif);
+    font-size: clamp(2.1rem, 5.2vw, 3.1rem);
+    line-height: 1.1;
+    font-weight: 400;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  .dek {
+    font-size: 1.16rem;
+    line-height: 1.6;
+    color: var(--ink-2);
+    margin: 0;
+  }
+
+  .header-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.5rem;
+    font-family: var(--mono);
+    font-size: 0.775rem;
+    color: var(--ink-muted);
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--rule);
+  }
+
+  /* ============ TIRA DE HALLAZGOS ============ */
+  .tira {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+  }
+
+  .tira-item {
+    background: var(--surface);
+    padding: 1.1rem 1.15rem 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  .tira-n {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    color: var(--ink-muted);
+  }
+
+  .tira-v {
+    font-family: var(--serif);
+    font-size: 1.72rem;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tira-t {
+    font-size: 0.83rem;
+    line-height: 1.4;
+    color: var(--ink-2);
+  }
+
+  /* ============ SECCIONES ============ */
+  .seccion {
+    display: flex;
+    flex-direction: column;
+    gap: 1.2rem;
+    padding-top: 2.25rem;
+    border-top: 2px solid var(--rule-strong);
+  }
+
+  .seccion-cabeza { display: flex; gap: 1.15rem; align-items: baseline; }
+
+  .seccion-n {
+    font-family: var(--mono);
+    font-size: 1.5rem;
+    color: var(--ink-muted);
+    line-height: 1;
+    flex: none;
+    font-variant-numeric: tabular-nums;
+  }
+
+  h2 {
+    font-family: var(--serif);
+    font-size: clamp(1.45rem, 3vw, 1.95rem);
+    line-height: 1.18;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  .pregunta {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    color: var(--accent);
+    margin: 0.15rem 0 0;
+    max-width: var(--measure);
+  }
+
+  .seccion p { margin: 0; }
+
+  /* ============ FIGURAS ============ */
+  .figura {
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    padding: 1.2rem 1.25rem 1.3rem;
+  }
+
+  .figura-titulo {
+    font-size: 0.94rem;
+    font-weight: 600;
+    margin: 0;
+    max-width: none;
+  }
+
+  .figura-sub {
+    font-size: 0.83rem;
+    color: var(--ink-muted);
+    margin: -0.45rem 0 0;
+    max-width: none;
+  }
+
+  .scroll-x { overflow-x: auto; }
+
+  .fig { display: block; width: 100%; min-width: 30rem; height: auto; }
+  .fig.mapa { min-width: 26rem; }
+
+  /* Las figuras van siempre a ancho completo. En dos columnas cada SVG queda a
+     480px y, como el viewBox es de 720, el texto de 11px escala a ~7px: ilegible.
+     Estos gráficos tienen demasiado detalle para media página. */
+  .par { display: grid; gap: 1.15rem; grid-template-columns: 1fr; }
+
+  /* --- primitivas de los gráficos --- */
+  .gr { stroke: var(--rule); stroke-width: 1; }
+  .ref { stroke: var(--ink-muted); stroke-width: 1; stroke-dasharray: 4 3; }
+  .ref-alerta { stroke: var(--signal); stroke-width: 1.2; stroke-dasharray: 4 3; }
+  .banda { fill: var(--signal-soft); }
+
+  .tk {
+    font-family: var(--mono);
+    font-size: 11px;
+    fill: var(--ink-muted);
+  }
+  .tk-mini { font-size: 9.5px; }
+  .tk-fila { font-size: 11.5px; fill: var(--ink-2); }
+
+  .val {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    fill: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .anota { font-family: var(--mono); font-size: 10.5px; fill: var(--ink-muted); }
+  .anota-alerta { font-family: var(--mono); font-size: 10.5px; fill: var(--signal); }
+
+  .sub-t { font-size: 12.5px; font-weight: 600; fill: var(--ink); }
+  .sub-s { font-family: var(--mono); font-size: 10px; fill: var(--ink-muted); }
+
+  .linea { fill: none; stroke: var(--accent); stroke-width: 2.2; stroke-linejoin: round; }
+  .linea-alt { stroke: var(--signal); stroke-width: 1.8; }
+  .area { fill: var(--accent-soft); stroke: none; }
+
+  .pt { fill: var(--accent); }
+  .pt-alt { fill: var(--signal); }
+  .pt-alerta { fill: var(--signal); }
+
+  .barra { fill: var(--accent); }
+  .barra-baja { fill: var(--rule-strong); }
+  .barra-h { fill: var(--accent); }
+  .barra-h-baja { fill: var(--signal); }
+
+  .cap { stroke: var(--surface); stroke-width: 0.75; }
+  .c0 { fill: var(--c0); } .c1 { fill: var(--c1); } .c2 { fill: var(--c2); }
+  .c3 { fill: var(--c3); } .c4 { fill: var(--c4); } .c5 { fill: var(--c5); }
+  .c0-t { fill: var(--c0); } .c1-t { fill: var(--c1); } .c2-t { fill: var(--c2); }
+  .c3-t { fill: var(--c3); } .c4-t { fill: var(--c4); } .c5-t { fill: var(--c5); }
+
+  .leyenda-cap, .leyenda-fig { font-size: 11.5px; fill: var(--ink-2); }
+  .leyenda-fig { font-family: var(--mono); font-size: 10.5px; }
+  .sw-r { rx: 2; }
+  .sw-accent-f { fill: var(--accent); }
+  .sw-signal-f { fill: var(--signal); }
+
+  .nube { fill: var(--ink-muted); opacity: 0.42; }
+  .nube-sig { fill: var(--accent); opacity: 0.72; }
+  .ajuste { stroke: var(--signal); stroke-width: 1.8; }
+
+  /* --- mapa LISA --- */
+  .ciudad { fill: var(--surface-sunk); stroke: none; }
+  .hx { stroke: var(--surface); stroke-width: 0.6; }
+  .q-aa { fill: var(--lisa-caliente); }
+  .q-bb { fill: var(--lisa-frio); }
+  .q-ab { fill: var(--lisa-isla-c); }
+  .q-ba { fill: var(--lisa-isla-f); }
+  .q-no { fill: var(--lisa-nulo); }
+
+  .leyenda-mapa {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.35rem;
+    font-size: 0.815rem;
+    color: var(--ink-2);
+    align-items: center;
+  }
+
+  .lm-item { display: inline-flex; align-items: center; gap: 0.42rem; }
+
+  .lm-sw {
+    width: 0.78rem; height: 0.78rem;
+    border-radius: 2px;
+    flex: none;
+  }
+  .lm-aa { background: var(--lisa-caliente); }
+  .lm-bb { background: var(--lisa-frio); }
+  .lm-ba { background: var(--lisa-isla-f); }
+  .lm-no { background: var(--lisa-nulo); }
+
+  /* ============ HALLAZGO ============ */
+  .hallazgo {
+    border-left: 3px solid var(--accent);
+    background: var(--accent-soft);
+    padding: 1rem 1.15rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .hallazgo.es-alerta { border-left-color: var(--signal); background: var(--signal-soft); }
+
+  .hallazgo-etq {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+  }
+
+  .hallazgo p { margin: 0; font-size: 0.97rem; }
+
+  /* ============ MÉTODO ============ */
+  details {
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    padding: 0.85rem 1.1rem;
+  }
+
+  summary {
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    color: var(--ink-2);
+  }
+
+  summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  details p { margin: 0.85rem 0 0; font-size: 0.92rem; color: var(--ink-2); }
+  details p + p { margin-top: 0.65rem; }
+
+  /* ============ TABLA ============ */
+  .tabla-caja { overflow-x: auto; border: 1px solid var(--rule); background: var(--surface); }
+
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+
+  th, td {
+    text-align: left;
+    padding: 0.62rem 0.9rem;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+
+  th {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+    font-weight: 400;
+    white-space: nowrap;
+  }
+
+  tbody tr:last-child td { border-bottom: none; }
+
+  td.n {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  /* ============ PIE ============ */
+  footer {
+    border-top: 1px solid var(--rule);
+    padding-top: 1.5rem;
+    color: var(--ink-muted);
+    font-size: 0.85rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  footer p { margin: 0; max-width: 78ch; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="sheet">
+
+  <header>
+    <p class="eyebrow">ATLAS SENTINEL · SIGE-BA — Análisis exploratorio</p>
+    <h1>El techo del problema, medido</h1>
+    <p class="dek">
+      Cinco preguntas sobre 1.353.136 delitos georreferenciados de la Ciudad de Buenos Aires
+      entre 2016 y 2025. Tres de las respuestas explican resultados que el proyecto venía
+      observando sin poder explicar — entre ellas, por qué el modelo predictivo le gana tan
+      poco a un simple promedio histórico.
+    </p>
+    <div class="header-meta">
+      <span>1.353.136 delitos</span>
+      <span>2016-2025</span>
+      <span>401 hexágonos H3-8</span>
+      <span>6 tipos de delito</span>
+    </div>
+  </header>
+
+  <section class="hallazgo" aria-label="Nota sobre el momento del análisis">
+    <span class="hallazgo-etq">Por qué esto llega tarde</span>
+    <p>
+      El proyecto entró directo a construir la grilla y entrenar. La calidad de los datos se
+      auditó a fondo —encodings, sistemas de coordenadas, esquemas que cambian entre años— y
+      hay estadística descriptiva desperdigada por todo el repositorio, pero siempre como
+      justificación de una decisión ya tomada: <em>«82,8% de ceros, por eso Tweedie»</em>.
+      Nunca se miró el fenómeno por sí mismo. Este documento hace ese trabajo, con el
+      modelo ya entrenado, y encuentra cosas que habrían cambiado el orden de las prioridades.
+    </p>
+  </section>
+
+  <div class="tira">
+    <div class="tira-item">
+      <span class="tira-n">01 · NIVEL</span>
+      <span class="tira-v">−1,0%</span>
+      <span class="tira-t">entre el promedio prepandemia y el actual: no hubo quiebre</span>
+    </div>
+    <div class="tira-item">
+      <span class="tira-n">02 · CICLOS</span>
+      <span class="tira-v">5,4×</span>
+      <span class="tira-t">más delitos en la Tarde que en la Madrugada</span>
+    </div>
+    <div class="tira-item">
+      <span class="tira-n">03 · MEZCLA</span>
+      <span class="tira-v">−27%</span>
+      <span class="tira-t">cae el robo en 2025 mientras las amenazas suben 41%</span>
+    </div>
+    <div class="tira-item">
+      <span class="tira-n">04 · ESPACIO</span>
+      <span class="tira-v">+0,67</span>
+      <span class="tira-t">Moran's I, estable los diez años, p &lt; 0,001</span>
+    </div>
+    <div class="tira-item">
+      <span class="tira-n">05 · TECHO</span>
+      <span class="tira-v">0,983</span>
+      <span class="tira-t">correlación del ranking de un año con el siguiente</span>
+    </div>
+  </div>
+
+  <!-- ==================== 1 ==================== -->
+  <section class="seccion">
+    <div class="seccion-cabeza">
+      <span class="seccion-n">01</span>
+      <div>
+        <h2>La pandemia está adentro del set de entrenamiento</h2>
+        <p class="pregunta">¿Cómo se mueve el volumen en diez años? ¿Hay un quiebre estructural?</p>
+      </div>
+    </div>
+
+    <p>
+      El modelo entrena con 2016-2023, valida con 2024 y testea con 2025. La cuarentena de
+      2020 —una de las más largas del mundo— cae dentro del período de entrenamiento, y eso
+      nunca se había mirado. Si el nivel no volvió, entrenar con la serie completa estaría
+      contaminando el modelo con un régimen que ya no existe.
+    </p>
+
+    <div class="figura">
+      <p class="figura-titulo">Delitos registrados por año</p>
+      <p class="figura-sub">La banda marca el período de cuarentena. La línea punteada es el promedio 2016-2019.</p>
+      <div class="scroll-x"><!--FIG1:START--><!--FIG1:END--></div>
+    </div>
+
+    <div class="hallazgo">
+      <span class="hallazgo-etq">Hallazgo</span>
+      <p>
+        <strong>El pozo es profundo pero transitorio.</strong> 2020 cae 41,7% y 2021 sigue
+        24,9% abajo, pero el promedio 2022-2025 queda a <strong>1,0% del promedio
+        prepandemia</strong>. No hay quiebre de nivel que invalide entrenar con la serie
+        completa.
+      </p>
+      <p>
+        Vale anotar que 2025 —el año de test— cierra 10,4% por debajo del nivel prepandemia y
+        16% por debajo de 2024, con los doce meses completos. Es una caída real, no datos
+        truncados, y vuelve en el punto 3.
+      </p>
+    </div>
+  </section>
+
+  <!-- ==================== 2 ==================== -->
+  <section class="seccion">
+    <div class="seccion-cabeza">
+      <span class="seccion-n">02</span>
+      <div>
+        <h2>Todo el ciclo temporal está en el turno</h2>
+        <p class="pregunta">¿Qué ciclos hay, y cuánto le queda por explicar al calendario?</p>
+      </div>
+    </div>
+
+    <p>
+      El modelo tiene features de calendario —día de semana, mes, feriado— y se le sumó clima,
+      que no aportó nada. Antes de buscar más variables temporales conviene ver cuánta
+      amplitud tiene realmente cada ciclo. Se mide sobre 2022-2025 para no mezclar el régimen
+      de cuarentena, que tenía un patrón semanal distinto por restricción de circulación.
+    </p>
+
+    <div class="figura">
+      <p class="figura-titulo">Amplitud de cada ciclo temporal</p>
+      <p class="figura-sub">Índice sobre el promedio del período. Las barras grises están por debajo del promedio.</p>
+      <div class="scroll-x"><!--FIG2:START--><!--FIG2:END--></div>
+    </div>
+
+    <div class="hallazgo">
+      <span class="hallazgo-etq">Hallazgo</span>
+      <p>
+        <strong>La Tarde tiene 5,4 veces los delitos de la Madrugada</strong> (índice 1,66
+        contra 0,31). Entre el mes más y el menos delictivo hay 13%, y entre el día más y el
+        menos, 21% — y ese 21% es casi todo el domingo, el único día que se despega.
+      </p>
+      <p>
+        Como el modelo trabaja a grano hexágono × día × turno, <strong>el ciclo dominante ya
+        está codificado en la estructura del problema</strong>: no es algo que el modelo tenga
+        que descubrir. Al calendario le queda por explicar la diferencia entre un martes y un
+        jueves, que es ruido. Es la razón estructural de que el clima —que actúa a escala de
+        día, no de turno— no moviera ninguna métrica.
+      </p>
+    </div>
+  </section>
+
+  <!-- ==================== 3 ==================== -->
+  <section class="seccion">
+    <div class="seccion-cabeza">
+      <span class="seccion-n">03</span>
+      <div>
+        <h2>El año de test tiene otra composición que los de entrenamiento</h2>
+        <p class="pregunta">¿La mezcla de tipos de delito es estable en el tiempo?</p>
+      </div>
+    </div>
+
+    <p>
+      El modelo núcleo suma los seis tipos en un solo target. Eso es válido mientras la mezcla
+      sea estable; si cambia, el modelo entrenado en un régimen está prediciendo otro.
+    </p>
+
+    <div class="par">
+      <div class="figura">
+        <p class="figura-titulo">Composición por tipo, 2016-2025</p>
+        <p class="figura-sub">Porcentaje del total de cada año. Homicidios queda sin etiqueta: con 0,1% del total, su banda no llega a verse.</p>
+        <div class="scroll-x"><!--FIG3:START--><!--FIG3:END--></div>
+      </div>
+      <div class="figura">
+        <p class="figura-titulo">Último año de entrenamiento contra año de test</p>
+        <p class="figura-sub">Cambio de cada tipo entre 2024 y 2025, en conteos absolutos.</p>
+        <div class="scroll-x"><!--FIG4:START--><!--FIG4:END--></div>
+      </div>
+    </div>
+
+    <div class="hallazgo es-alerta">
+      <span class="hallazgo-etq">Hallazgo — salvedad nueva</span>
+      <p>
+        <strong>La deriva lenta:</strong> el hurto pasó del 29,9% del total en 2016 al 40,4%
+        en 2024, mientras las lesiones cayeron de 11,7% a 4,9%. Eso conecta con un hallazgo
+        previo del proyecto — <strong>el hurto es el único tipo donde el modelo pierde contra
+        el promedio histórico</strong> (−2,0%), y es justamente el que más creció dentro del
+        agregado. El modelo agregado está cada vez más dominado por el tipo que mejor predice
+        un mapa histórico.
+      </p>
+      <p>
+        <strong>El salto abrupto:</strong> en 2025 los delitos contra la propiedad bajan ~25%
+        mientras los interpersonales suben ~35%, en un solo año. No es una caída pareja del
+        nivel, es un cambio de composición. Si es un cambio real de patrón o un cambio de
+        criterio de registro <strong>no se puede determinar con estos datos</strong>, y hay que
+        verificarlo: los Módulos A y B optimizan sobre superficies de riesgo dominadas por robo
+        y hurto.
+      </p>
+    </div>
+  </section>
+
+  <!-- ==================== 4 ==================== -->
+  <section class="seccion">
+    <div class="seccion-cabeza">
+      <span class="seccion-n">04</span>
+      <div>
+        <h2>La premisa central del proyecto, por fin medida</h2>
+        <p class="pregunta">¿El riesgo se concentra espacialmente, o solo se concentra?</p>
+      </div>
+    </div>
+
+    <p>
+      Todo el proyecto se apoya en que el riesgo se concentra en el espacio. Eso se venía
+      respaldando con una observación descriptiva —<em>«el 30% del área concentra el 58% de los
+      delitos»</em>— que es cierta pero no distingue concentración <em>estructurada</em> de
+      concentración a secas. Un mapa donde los hexágonos peligrosos estuvieran salpicados al
+      azar daría el mismo número y no serviría para asignar recursos.
+    </p>
+
+    <div class="par">
+      <div class="figura">
+        <p class="figura-titulo">Moran's I global, por año</p>
+        <p class="figura-sub">La banda marca el período de cuarentena.</p>
+        <div class="scroll-x"><!--FIG5:START--><!--FIG5:END--></div>
+      </div>
+      <div class="figura">
+        <p class="figura-titulo">Diagrama de Moran, 2025</p>
+        <p class="figura-sub">Cada punto es un hexágono. En azul intenso, los significativos al 5%.</p>
+        <div class="scroll-x"><!--FIG6:START--><!--FIG6:END--></div>
+      </div>
+    </div>
+
+    <details>
+      <summary>Cómo se calcula Moran's I</summary>
+      <p>
+        Es el estadístico que mide si un hexágono con muchos delitos tiende a estar rodeado de
+        hexágonos con muchos delitos. Se define como <em>I = (z′Wz)/(z′z)</em>, donde <em>z</em>
+        son los conteos centrados y <em>W</em> es la matriz de vecindad — acá, contigüidad H3 de
+        anillo k=1, con mediana de 6 vecinos por hexágono, normalizada por filas.
+      </p>
+      <p>
+        La significancia sale de un <strong>test de permutación de 999 réplicas</strong>: si el
+        riesgo no tuviera estructura espacial, reordenar los valores entre hexágonos no debería
+        cambiar el I. Es preferible al p-valor analítico, que asume normalidad, y estos conteos
+        no la tienen ni de cerca. El valor esperado bajo azar es −1/(n−1) = −0,0025.
+      </p>
+      <p>
+        Se calcula a mano en <span style="font-family:var(--mono)">morans_i()</span> en lugar de
+        traer <span style="font-family:var(--mono)">pysal</span> como dependencia: son 401
+        hexágonos, la matriz entra holgada en memoria y no justifica el peso.
+      </p>
+    </details>
+
+    <div class="hallazgo">
+      <span class="hallazgo-etq">Hallazgo</span>
+      <p>
+        <strong>I ≈ +0,67, con p &lt; 0,001 los diez años.</strong> El riesgo no está repartido
+        al azar: los hexágonos peligrosos están pegados a otros hexágonos peligrosos. La
+        pendiente del diagrama <em>es</em> el estadístico, y se ve directamente que la nube
+        tiene estructura.
+      </p>
+      <p>
+        Lo más llamativo: <strong>la pandemia no lo movió</strong>. En 2020 el volumen cayó a la
+        mitad y el I quedó en +0,643, dentro del rango de todos los demás años. Cambió cuánto
+        pasa, no dónde.
+      </p>
+    </div>
+
+    <p>
+      El I global dice que hay clusters, pero no dónde están. Para eso se descompone en un valor
+      por hexágono (LISA, Anselin 1995), con permutación condicional: se fija el valor del
+      hexágono y se remuestrean sus vecinos.
+    </p>
+
+    <div class="figura">
+      <p class="figura-titulo">Clusters espaciales de delito — CABA, 2025</p>
+      <p class="figura-sub">Solo se colorean los hexágonos significativos al 5%. Pasá el cursor por cualquiera para ver su clasificación.</p>
+      <div class="scroll-x"><!--FIG7:START--><!--FIG7:END--></div>
+      <div class="leyenda-mapa">
+        <span class="lm-item"><span class="lm-sw lm-aa"></span>Núcleo caliente — alto rodeado de alto (58)</span>
+        <span class="lm-item"><span class="lm-sw lm-bb"></span>Zona fría — bajo rodeado de bajo (24)</span>
+        <span class="lm-item"><span class="lm-sw lm-ba"></span>Isla fría — bajo rodeado de alto (2)</span>
+        <span class="lm-item"><span class="lm-sw lm-no"></span>Sin estructura significativa (317)</span>
+      </div>
+    </div>
+
+    <div class="hallazgo">
+      <span class="hallazgo-etq">Hallazgo</span>
+      <p>
+        <strong>58 hexágonos forman el núcleo caliente y 24 la periferia fría</strong>; sobre
+        401, solo 84 tienen un vecindario estadísticamente atípico.
+      </p>
+      <p>
+        Dos lecturas operativas. El núcleo caliente es <strong>contiguo</strong>, no un
+        archipiélago de puntos sueltos — que es lo que hace que asignar patrullas por cobertura
+        de radio tenga sentido geométrico. Y <strong>no hay ni un solo hexágono «isla
+        caliente»</strong> significativo, o sea alto rodeado de bajo: no hay puntos calientes
+        aislados que un esquema de cobertura por zonas se esté perdiendo.
+      </p>
+    </div>
+  </section>
+
+  <!-- ==================== 5 ==================== -->
+  <section class="seccion">
+    <div class="seccion-cabeza">
+      <span class="seccion-n">05</span>
+      <div>
+        <h2>El mapa de un año predice el del siguiente casi perfecto</h2>
+        <p class="pregunta">¿Cuál es el techo real contra el que compite el modelo?</p>
+      </div>
+    </div>
+
+    <p>
+      La pregunta que cierra todo. El baseline contra el que se mide el modelo es un promedio
+      histórico por hexágono y turno — literalmente, «lo que pasó acá antes». Si el mapa de
+      riesgo es estable entre años, ese baseline es muy difícil de superar, y eso define el
+      techo de cualquier modelo, no solo del que se entrenó.
+    </p>
+
+    <div class="par">
+      <div class="figura">
+        <p class="figura-titulo">Estabilidad del ranking entre años consecutivos</p>
+        <p class="figura-sub">Nueve pares de años, de 2016-2017 a 2024-2025.</p>
+        <div class="scroll-x"><!--FIG8:START--><!--FIG8:END--></div>
+      </div>
+      <div class="figura">
+        <p class="figura-titulo">Último año de entrenamiento contra año de test</p>
+        <p class="figura-sub">Cada punto es un hexágono. La diagonal marca «mismo valor los dos años».</p>
+        <div class="scroll-x"><!--FIG9:START--><!--FIG9:END--></div>
+      </div>
+    </div>
+
+    <div class="hallazgo">
+      <span class="hallazgo-etq">Hallazgo — el resultado que explica al proyecto</span>
+      <p>
+        <strong>Spearman 0,983 de promedio y 91,0% de solape en el top-20%.</strong> El mínimo
+        de los nueve pares es 0,970. Incluso 2019→2020, con la cuarentena partiendo la serie al
+        medio, da <strong>0,989</strong>: la ciudad cambió de nivel sin cambiar de forma.
+      </p>
+      <p>
+        En el gráfico de la derecha se ve por qué: la nube se pega a la diagonal a lo largo de
+        tres órdenes de magnitud. Un hexágono con 800 delitos en 2024 tiene ~600 en 2025; uno
+        con 20 tiene ~15. Bajó el nivel, se mantuvo el orden.
+      </p>
+    </div>
+
+    <p>
+      El modelo LightGBM le gana al promedio histórico apenas <strong>2,0% en error absoluto</strong>
+      y <strong>0,8 puntos en Recall@20%</strong>. Eso se venía reportando como un resultado
+      honesto pero decepcionante.
+    </p>
+
+    <p>
+      Con el Spearman a la vista, deja de ser decepcionante y pasa a ser <strong>el resultado
+      esperable</strong>. Si el mapa de un año predice el del siguiente con 0,98, un promedio
+      histórico ya es casi óptimo para rankear, y cualquier modelo —LightGBM, redes, lo que
+      sea— solo puede ganar en los márgenes. No es que el modelo sea flojo: es que
+      <strong>el problema de priorización espacial está casi saturado a esta resolución</strong>.
+      Coincide con los PEI de 95% a 99,6% medidos por tipo de delito, que dicen lo mismo desde
+      otro ángulo.
+    </p>
+  </section>
+
+  <!-- ==================== CIERRE ==================== -->
+  <section class="seccion">
+    <div class="seccion-cabeza">
+      <span class="seccion-n">→</span>
+      <div>
+        <h2>Qué cambia esto</h2>
+        <p class="pregunta">Los cinco hallazgos y lo que habilita cada uno</p>
+      </div>
+    </div>
+
+    <div class="tabla-caja">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">#</th>
+            <th scope="col">Hallazgo</th>
+            <th scope="col">Consecuencia</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="n">01</td>
+            <td>La pandemia no dejó cicatriz de nivel (−1,0%)</td>
+            <td>Entrenar con la serie completa es válido</td>
+          </tr>
+          <tr>
+            <td class="n">02</td>
+            <td>Todo el ciclo temporal está en el turno (amplitud 1,35 contra 0,21 y 0,13)</td>
+            <td>El calendario casi no tiene nada que explicar; da la razón estructural de que el clima no aportara</td>
+          </tr>
+          <tr>
+            <td class="n">03</td>
+            <td>En 2025 la propiedad baja ~25% y lo interpersonal sube ~35%</td>
+            <td><strong>Salvedad nueva</strong>: el año de test tiene otra composición que los de entrenamiento</td>
+          </tr>
+          <tr>
+            <td class="n">04</td>
+            <td>Moran's I ≈ +0,67, p &lt; 0,001, estable los diez años</td>
+            <td>La premisa central del proyecto queda respaldada estadísticamente</td>
+          </tr>
+          <tr>
+            <td class="n">05</td>
+            <td>Spearman 0,983 año contra año, 91,0% de solape en el top-20%</td>
+            <td><strong>Define el techo</strong>: es la razón de que el modelo le gane tan poco al histórico</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>
+      El hallazgo 5 es a la vez el argumento más fuerte para probar un modelo de punto
+      auto-excitante (Hawkes/ETAS) —la familia canónica del pronóstico de delito, que modela
+      explícitamente el contagio <em>near-repeat</em> y es la única hipótesis que el modelo
+      actual no puede representar— y la mejor predicción de que va a aportar poco. Vale correrlo
+      justamente por eso: es la última pregunta abierta del lado del modelado, y responderla
+      cierra el capítulo con evidencia en vez de con una omisión.
+    </p>
+
+    <p>
+      El hallazgo 3 abre trabajo inmediato: hay que verificar si el salto de 2025 es un cambio
+      de criterio de registro antes de que las superficies de riesgo de los módulos se tomen
+      como definitivas.
+    </p>
+  </section>
+
+  <footer>
+    <p>
+      ATLAS SENTINEL — Análisis exploratorio. Fuente: delitos georreferenciados de la Ciudad
+      Autónoma de Buenos Aires (datos abiertos), cruzados contra la grilla H3 de resolución 8.
+      Una fila es un delito, el mismo criterio que usa la tabla de entrenamiento del modelo,
+      para que los números sean directamente comparables.
+    </p>
+    <p>
+      Reproducible: <span style="font-family:var(--mono)">src/validation/eda_delitos.py</span>
+      calcula, <span style="font-family:var(--mono)">notebooks/01_eda_delitos.ipynb</span>
+      explora. Las figuras de esta página se generan desde los mismos datos, sin librería de
+      gráficos ni recursos externos.
+    </p>
+  </footer>
+
+</div>

@@ -1,0 +1,606 @@
+<title>Módulo C — Controles en accesos de autopista | ATLAS SENTINEL</title>
+
+<style>
+  :root {
+    color-scheme: light;
+    --plane:        #f4f5f3;
+    --surface:      #fdfdfc;
+    --surface-sunk: #eceeea;
+    --ink:          #12161c;
+    --ink-2:        #4a5361;
+    --ink-muted:    #7f8896;
+    --rule:         #e0e2de;
+    --rule-strong:  #c8ccc6;
+    --accent:       #2a78d6;
+    --accent-soft:  rgba(42,120,214,0.10);
+    --signal:       #eb6834;
+    --signal-soft:  rgba(235,104,52,0.10);
+    --seq-1: #fde3d3; --seq-2: #f9bd9c; --seq-3: #f2926a; --seq-4: #dd6337; --seq-5: #ad3f14;
+    --map-agua: #ccd9e0; --map-tierra: #f4f2ee;
+    --via-menor: rgba(18,22,28,0.17); --via-media: rgba(18,22,28,0.34); --via-troncal: #8e949c;
+    --barrio-linea: rgba(18,22,28,0.16);
+
+    --serif: "Palatino Linotype", "Iowan Old Style", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: ui-monospace, "Cascadia Mono", Consolas, "DejaVu Sans Mono", monospace;
+    --measure: 66ch;
+    --gutter: clamp(1.25rem, 4vw, 2.5rem);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --plane:        #0c0e11;
+      --surface:      #15181d;
+      --surface-sunk: #1c2026;
+      --ink:          #f3f5f6;
+      --ink-2:        #a9b1bc;
+      --ink-muted:    #79828f;
+      --rule:         #262b32;
+      --rule-strong:  #39404a;
+      --accent:       #3987e5;
+      --accent-soft:  rgba(57,135,229,0.14);
+      --signal:       #d95926;
+      --signal-soft:  rgba(217,89,38,0.14);
+      --seq-1: #2b2119; --seq-2: #4a3020; --seq-3: #74452a; --seq-4: #a85f31; --seq-5: #e08a4a;
+      --map-agua: #0b1016; --map-tierra: #1a1e24;
+      --via-menor: rgba(255,255,255,0.13); --via-media: rgba(255,255,255,0.24); --via-troncal: #6b7480;
+      --barrio-linea: rgba(255,255,255,0.14);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --plane:        #0c0e11;
+    --surface:      #15181d;
+    --surface-sunk: #1c2026;
+    --ink:          #f3f5f6;
+    --ink-2:        #a9b1bc;
+    --ink-muted:    #79828f;
+    --rule:         #262b32;
+    --rule-strong:  #39404a;
+    --accent:       #3987e5;
+    --accent-soft:  rgba(57,135,229,0.14);
+    --signal:       #d95926;
+    --signal-soft:  rgba(217,89,38,0.14);
+    --seq-1: #2b2119; --seq-2: #4a3020; --seq-3: #74452a; --seq-4: #a85f31; --seq-5: #e08a4a;
+    --map-agua: #0b1016; --map-tierra: #1a1e24;
+    --via-menor: rgba(255,255,255,0.13); --via-media: rgba(255,255,255,0.24); --via-troncal: #6b7480;
+    --barrio-linea: rgba(255,255,255,0.14);
+  }
+
+  body {
+    background: var(--plane); color: var(--ink); font-family: var(--sans);
+    font-size: 17px; line-height: 1.65; -webkit-font-smoothing: antialiased;
+  }
+  .sheet {
+    max-width: 60rem; margin: 0 auto;
+    padding: clamp(2rem, 6vw, 4.5rem) var(--gutter) 5rem;
+    display: flex; flex-direction: column; gap: clamp(2.75rem, 6vw, 4rem);
+  }
+  p { max-width: var(--measure); }
+  a { color: var(--accent); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+
+  .eyebrow {
+    font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--ink-muted); margin: 0;
+  }
+  h1 {
+    font-family: var(--serif); font-weight: 600; font-size: clamp(2rem, 5.2vw, 3.1rem);
+    line-height: 1.1; letter-spacing: -0.015em; text-wrap: balance;
+    margin: 0.5rem 0 0; max-width: 20ch;
+  }
+  h2 {
+    font-family: var(--serif); font-weight: 600; font-size: clamp(1.3rem, 2.6vw, 1.65rem);
+    line-height: 1.25; letter-spacing: -0.01em; text-wrap: balance; margin: 0;
+  }
+  h3 { font-size: 0.95rem; font-weight: 650; margin: 0; }
+  .dek {
+    font-size: clamp(1.05rem, 2vw, 1.2rem); line-height: 1.5; color: var(--ink-2);
+    margin: 1.1rem 0 0; max-width: 54ch;
+  }
+  .section { display: flex; flex-direction: column; gap: 1.15rem; }
+  .section > p { margin: 0; }
+  .rule-top { border-top: 1px solid var(--rule); padding-top: 1.6rem; }
+
+  header { display: flex; flex-direction: column; }
+  .header-meta {
+    display: flex; flex-wrap: wrap; gap: 0.4rem 1.4rem; margin-top: 1.6rem;
+    font-family: var(--mono); font-size: 0.72rem; color: var(--ink-muted);
+  }
+  .header-meta span { white-space: nowrap; }
+
+  .hero {
+    background: var(--surface); border: 1px solid var(--rule); border-radius: 3px;
+    padding: clamp(1.5rem, 4vw, 2.25rem);
+    display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.75rem;
+  }
+  @media (min-width: 40rem) {
+    .hero { grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 2.5rem; }
+  }
+  .hero-figure { display: flex; flex-direction: column; gap: 0.25rem; }
+  .hero-value {
+    font-size: clamp(3.25rem, 9vw, 4.5rem); font-weight: 650; line-height: 0.95;
+    letter-spacing: -0.03em; color: var(--accent);
+  }
+  .hero-caption { font-size: 0.9rem; line-height: 1.4; color: var(--ink-2); max-width: 24ch; }
+  .transition { display: flex; align-items: flex-end; gap: clamp(0.75rem, 3vw, 1.75rem); flex-wrap: wrap; }
+  .tile { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
+  .tile-label {
+    font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--ink-muted);
+  }
+  .tile-value { font-size: 2rem; font-weight: 600; line-height: 1; letter-spacing: -0.02em; }
+  .tile-note { font-size: 0.8rem; color: var(--ink-muted); }
+
+  .figure {
+    background: var(--surface); border: 1px solid var(--rule); border-radius: 3px;
+    padding: clamp(1.1rem, 3vw, 1.6rem); display: flex; flex-direction: column; gap: 1rem;
+  }
+  .figure-head { display: flex; flex-direction: column; gap: 0.3rem; }
+  .figure-title { font-size: 0.95rem; font-weight: 650; margin: 0; }
+  .figure-sub { font-size: 0.82rem; color: var(--ink-muted); margin: 0; max-width: 60ch; }
+
+  .scroll-x { overflow-x: auto; }
+  .chart { position: relative; min-width: 480px; }
+  svg { display: block; width: 100%; height: auto; }
+
+  .grid-line { stroke: var(--rule); stroke-width: 1; }
+  .axis-line { stroke: var(--rule-strong); stroke-width: 1; }
+  .tick { font-family: var(--mono); font-size: 11px; fill: var(--ink-muted); font-variant-numeric: tabular-nums; }
+  .axis-name { font-size: 11px; fill: var(--ink-muted); font-family: var(--mono); }
+  .pto { fill: var(--accent); stroke: var(--surface); stroke-width: 2; cursor: pointer; }
+  .pto-hi { fill: var(--signal); stroke: var(--surface); stroke-width: 2.5; cursor: pointer; }
+  .callout { font-size: 12px; fill: var(--ink); font-weight: 600; }
+  .callout-sub { font-size: 11px; fill: var(--ink-muted); font-family: var(--mono); }
+
+  .tip {
+    position: absolute; pointer-events: none; opacity: 0; transform: translate(-50%, -125%);
+    background: var(--surface); border: 1px solid var(--rule-strong); border-radius: 3px;
+    padding: 0.5rem 0.65rem; font-size: 0.78rem; line-height: 1.35; color: var(--ink);
+    white-space: nowrap; box-shadow: 0 2px 10px rgba(0,0,0,0.10);
+    transition: opacity 120ms ease; z-index: 2;
+  }
+  .tip b { font-weight: 650; }
+  .tip .tip-k {
+    font-family: var(--mono); color: var(--ink-muted); display: block;
+    font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase;
+  }
+
+  /* ============ MAPA ============ */
+  .mapa-caja { display: flex; flex-direction: column; gap: 0.85rem; }
+  svg.mapa { border-radius: 3px; }
+
+  .agua { fill: var(--map-agua); }
+  .tierra { fill: var(--map-tierra); }
+  .via { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  .v-menor { stroke: var(--via-menor); stroke-width: 0.5; }
+  .v-media { stroke: var(--via-media); stroke-width: 0.9; }
+  .v-troncal { stroke: var(--via-troncal); stroke-width: 1.8; }
+  .barrio-linea { fill: none; stroke: var(--barrio-linea); stroke-width: 0.8; }
+
+  /* el riesgo va encima de la trama de calles pero semitransparente: es una
+     capa tematica sobre un mapa, no un reemplazo del mapa */
+  .hx { stroke: none; fill-opacity: 0.45; }
+  .hx.b0 { fill: var(--seq-1); }
+  .hx.b1 { fill: var(--seq-2); }
+  .hx.b2 { fill: var(--seq-3); }
+  .hx.b3 { fill: var(--seq-4); }
+  .hx.b4 { fill: var(--seq-5); }
+
+  .corr { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.6; }
+  .capa-pt.c-existente circle { fill: var(--surface); stroke: var(--ink); stroke-width: 1.6; }
+  .capa-pt.c-propuesto circle { fill: var(--accent); stroke: var(--surface); stroke-width: 2; }
+
+  .mapa-leyenda {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1.4rem;
+    font-size: 0.78rem; color: var(--ink-2);
+  }
+  .ml-titulo {
+    font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--ink-muted);
+  }
+  .ml-ramp { display: flex; align-items: center; gap: 3px; }
+  .ml-cap { font-size: 0.72rem; color: var(--ink-muted); }
+  .ml-sw { width: 22px; height: 10px; border-radius: 1px; }
+  .ml-sw.b0 { background: var(--seq-1); }
+  .ml-sw.b1 { background: var(--seq-2); }
+  .ml-sw.b2 { background: var(--seq-3); }
+  .ml-sw.b3 { background: var(--seq-4); }
+  .ml-sw.b4 { background: var(--seq-5); }
+  .ml-item { display: flex; align-items: center; gap: 0.45rem; }
+  .ml-dot { width: 11px; height: 11px; border-radius: 50%; flex: none; }
+  .ml-dot.c-existente { background: var(--surface); border: 1.5px solid var(--ink); }
+  .ml-dot.c-propuesto { background: var(--accent); }
+  .ml-dot.c-corredor { background: var(--accent-soft); border: 1.5px solid var(--accent); border-radius: 2px; }
+  .ml-nota { color: var(--ink-muted); font-size: 0.72rem; }
+
+  .cards {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: 1px; background: var(--rule); border: 1px solid var(--rule);
+    border-radius: 3px; overflow: hidden;
+  }
+  .card { background: var(--surface); padding: 1.2rem 1.25rem; display: flex; flex-direction: column; gap: 0.45rem; }
+  .card p { font-size: 0.86rem; color: var(--ink-2); margin: 0; max-width: none; }
+
+  .facts { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; }
+  .facts li {
+    display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.2rem;
+    padding: 0.85rem 0; border-bottom: 1px solid var(--rule);
+  }
+  @media (min-width: 34rem) {
+    .facts li { grid-template-columns: 13rem minmax(0, 1fr); gap: 1.5rem; align-items: baseline; }
+  }
+  .facts li:last-child { border-bottom: 0; }
+  .fact-key {
+    font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--ink-muted);
+  }
+  .fact-val { font-size: 0.92rem; color: var(--ink-2); }
+  .fact-val strong { color: var(--ink); font-weight: 600; }
+
+  .caveat {
+    border-left: 2px solid var(--signal); padding: 0.15rem 0 0.15rem 1.1rem;
+    display: flex; flex-direction: column; gap: 0.5rem;
+  }
+  .caveat p { margin: 0; font-size: 0.92rem; color: var(--ink-2); }
+
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.85rem; }
+  th, td { padding: 0.55rem 0.9rem; text-align: right; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+  th:nth-child(2), td:nth-child(2), th:nth-child(3), td:nth-child(3) { text-align: left; }
+  thead th {
+    font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--ink-muted); font-weight: 500;
+  }
+  tbody td { font-variant-numeric: tabular-nums; color: var(--ink-2); }
+  tbody tr:last-child td { border-bottom: 0; }
+  tbody tr.top td { color: var(--ink); font-weight: 600; background: var(--accent-soft); }
+  tbody td:first-child { font-family: var(--mono); color: var(--ink-muted); }
+
+  footer {
+    border-top: 1px solid var(--rule); padding-top: 1.5rem; font-size: 0.8rem;
+    color: var(--ink-muted); display: flex; flex-direction: column; gap: 0.4rem;
+  }
+  footer p { margin: 0; max-width: var(--measure); }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="sheet">
+
+  <header>
+    <p class="eyebrow">ATLAS SENTINEL · SIGE-BA — Capa 2, Módulo C</p>
+    <h1>Qué accesos de autopista controlar primero</h1>
+    <p class="dek">
+      Nueve corredores de acceso a la Ciudad, ordenados por siniestros viales ocurridos
+      sobre la traza y riesgo delictivo del corredor. El del Pórtico Independencia
+      encabeza con 53,7 siniestros por kilómetro.
+    </p>
+    <div class="header-meta">
+      <span>9 corredores únicos</span>
+      <span>Corredor = 2.000 m de vía troncal</span>
+      <span>Siniestros a ≤30 m de la traza</span>
+      <span>Siniestros 2019-2025</span>
+      <span>Riesgo estimado 2025</span>
+    </div>
+  </header>
+
+  <section class="hero" aria-label="Resultado principal">
+    <div class="hero-figure">
+      <div class="hero-value">53,7</div>
+      <p class="hero-caption">siniestros por kilómetro sobre la traza del corredor del Pórtico Independencia</p>
+    </div>
+    <div class="transition">
+      <div class="tile">
+        <span class="tile-label">Volumen en 32 km</span>
+        <span class="tile-value">1.721</span>
+        <span class="tile-note">siniestros sobre su traza</span>
+      </div>
+      <div class="tile">
+        <span class="tile-label">Puesto combinado</span>
+        <span class="tile-value">1º</span>
+        <span class="tile-note">en ambos criterios a la vez</span>
+      </div>
+      <div class="tile">
+        <span class="tile-label">Mediana real</span>
+        <span class="tile-value">27%</span>
+        <span class="tile-note">de lo que contaba el hexágono</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="section rule-top">
+    <h2>Los dos criterios, en un solo cuadro</h2>
+    <p>
+      El puesto sale de combinar dos percentiles: accidentalidad y riesgo delictivo. Verlos
+      en dos ejes evita el problema de todo índice compuesto — que un número esconda de cuál
+      de los dos viene. Arriba a la derecha es peor en ambos.
+    </p>
+
+    <div class="figure">
+      <div class="figure-head">
+        <p class="figure-title">Accidentalidad y riesgo delictivo por corredor</p>
+        <p class="figure-sub">Cada punto es un acceso. Pasá el cursor para ver el detalle de cada uno.</p>
+      </div>
+      <div class="scroll-x">
+        <div class="chart" id="chart">
+          <svg viewBox="0 0 720 400" role="img" aria-label="Dispersión de nueve corredores según siniestros por hexágono (eje horizontal) y riesgo delictivo promedio (eje vertical). Alberti queda arriba a la derecha, con 423 siniestros por hexágono y riesgo 0,57. Pórtico Independencia le sigue con 228 y 0,36. El resto se agrupa abajo a la izquierda.">
+            <line class="grid-line" x1="64" y1="24"  x2="604" y2="24" />
+            <line class="grid-line" x1="64" y1="102" x2="604" y2="102" />
+            <line class="grid-line" x1="64" y1="180" x2="604" y2="180" />
+            <line class="grid-line" x1="64" y1="258" x2="604" y2="258" />
+
+            <text class="tick" x="54" y="28"  text-anchor="end">0,60</text>
+            <text class="tick" x="54" y="106" text-anchor="end">0,45</text>
+            <text class="tick" x="54" y="184" text-anchor="end">0,30</text>
+            <text class="tick" x="54" y="262" text-anchor="end">0,15</text>
+            <text class="tick" x="54" y="340" text-anchor="end">0</text>
+
+            <line class="axis-line" x1="64" y1="336" x2="604" y2="336" />
+
+            <text class="tick" x="64"  y="356" text-anchor="middle">0</text>
+            <text class="tick" x="199" y="356" text-anchor="middle">15</text>
+            <text class="tick" x="334" y="356" text-anchor="middle">30</text>
+            <text class="tick" x="469" y="356" text-anchor="middle">45</text>
+            <text class="tick" x="604" y="356" text-anchor="middle">60</text>
+            <text class="axis-name" x="334" y="378" text-anchor="middle">siniestros por kilómetro de corredor</text>
+            <text class="axis-name" x="16" y="180" text-anchor="middle" transform="rotate(-90 16 180)">riesgo delictivo promedio</text>
+
+            <g id="ptos">
+              <circle class="pto-hi" cx="547.5" cy="150.8" r="7" data-n="Pórtico Independencia" data-a="Au Paseo del Bajo" data-s="53.7" data-r="0.356" data-h="32.0" data-p="1" />
+              <circle class="pto-hi" cx="360.6" cy="37.3" r="7" data-n="Alberti" data-a="AU 1 – 25 de Mayo" data-s="33.0" data-r="0.574" data-h="2.2" data-p="2" />
+              <circle class="pto" cx="263.0" cy="238.8" r="6" data-n="Dellepiane II" data-a="AU Dellepiane" data-s="22.1" data-r="0.187" data-h="2.0" data-p="3" />
+              <circle class="pto" cx="288.7" cy="241.8" r="6" data-n="Dellepiane I" data-a="AU Dellepiane" data-s="25.0" data-r="0.181" data-h="2.1" data-p="4" />
+              <circle class="pto" cx="362.4" cy="278.8" r="6" data-n="Sarmiento" data-a="AU Illia" data-s="33.1" data-r="0.110" data-h="15.7" data-p="5" />
+              <circle class="pto" cx="158.9" cy="251.0" r="6" data-n="Retiro II" data-a="AU Illia" data-s="10.6" data-r="0.163" data-h="5.2" data-p="6" />
+              <circle class="pto" cx="225.0" cy="267.8" r="6" data-n="Avellaneda" data-a="AU6 – Perito Moreno" data-s="17.9" data-r="0.131" data-h="2.2" data-p="7" />
+              <circle class="pto" cx="201.7" cy="266.3" r="6" data-n="Illia (3 accesos agrupados)" data-a="AU Illia / Au Paseo del Bajo" data-s="15.3" data-r="0.134" data-h="6.7" data-p="8" />
+              <circle class="pto" cx="238.2" cy="297.1" r="6" data-n="Salguero" data-a="AU Illia" data-s="19.4" data-r="0.075" data-h="13.7" data-p="9" />
+            </g>
+
+            <text class="callout" x="352" y="32" text-anchor="end">Alberti</text>
+            <text class="callout-sub" x="352" y="46" text-anchor="end">riesgo alto, corredor corto</text>
+
+            <text class="callout" x="538" y="140" text-anchor="end">Pórtico Independencia</text>
+            <text class="callout-sub" x="538" y="154" text-anchor="end">1.721 siniestros en 32 km</text>
+
+            <text class="callout-sub" x="168" y="246">Retiro II — la densidad más baja</text>
+          </svg>
+          <div class="tip" id="tip" role="status" aria-live="polite"></div>
+        </div>
+      </div>
+    </div>
+
+    <p>
+      Pórtico Independencia se despega a la derecha por densidad de siniestros; Alberti
+      queda arriba por riesgo delictivo, con un corredor mucho más corto. El resto se
+      apiña abajo a la izquierda: entre el tercero y el noveno la diferencia real es
+      chica, así que el ranking es informativo en la cabeza y poco discriminante en la
+      cola.
+    </p>
+  </section>
+
+  <section class="section rule-top">
+    <h2>Dónde caen los corredores</h2>
+    <p>
+      Cada acceso genera un corredor recorriendo el grafo vial real hasta 2.000 metros,
+      restringido a vías troncales y distribuidoras — las líneas más gruesas del mapa. Los
+      hexágonos remarcados en azul son ese alcance; los círculos, los accesos: cuanto más
+      grande, mejor puesto en el ranking.
+    </p>
+
+    <div class="figure">
+      <div class="figure-head">
+        <p class="figure-title">Corredores de acceso sobre el riesgo de la Ciudad</p>
+        <p class="figure-sub">Los corredores varían mucho de tamaño: es la principal limitación del método, y se ve a simple vista.</p>
+      </div>
+      <div class="mapa-caja">
+        <div class="scroll-x">
+          <!--MAPA:START--><!--MAPA:END-->
+        </div>
+      </div>
+    </div>
+
+    <p>
+      La diferencia de tamaño entre corredores es real y no es un detalle estético: el de
+      Pórtico Independencia alcanza 22 hexágonos y el de Alberti sólo 4. Por eso los dos
+      criterios se miden <strong>por hexágono</strong> y no como total acumulado — si no, el
+      corredor grande ganaría por ser grande.
+    </p>
+  </section>
+
+  <section class="section rule-top">
+    <h2>El ranking completo</h2>
+    <div class="figure">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">#</th>
+              <th scope="col">Acceso</th>
+              <th scope="col">Autopista</th>
+              <th scope="col">En traza</th>
+              <th scope="col">km</th>
+              <th scope="col">Sin./km</th>
+              <th scope="col">Riesgo</th>
+              <th scope="col">Score</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="top"><td>1</td><td>Pórtico Independencia</td><td>Au Paseo del Bajo</td><td>1.721</td><td>32.0</td><td>53.7</td><td>0.356</td><td>0.94</td></tr>
+            <tr class="top"><td>2</td><td>Alberti</td><td>AU 1 – 25 de Mayo</td><td>73</td><td>2.2</td><td>33.0</td><td>0.574</td><td>0.89</td></tr>
+            <tr><td>3</td><td>Dellepiane II</td><td>AU Dellepiane</td><td>44</td><td>2.0</td><td>22.1</td><td>0.187</td><td>0.67</td></tr>
+            <tr><td>4</td><td>Dellepiane I</td><td>AU Dellepiane</td><td>53</td><td>2.1</td><td>25.0</td><td>0.181</td><td>0.67</td></tr>
+            <tr><td>5</td><td>Sarmiento</td><td>AU Illia</td><td>519</td><td>15.7</td><td>33.1</td><td>0.110</td><td>0.56</td></tr>
+            <tr><td>6</td><td>Retiro II</td><td>AU Illia</td><td>55</td><td>5.2</td><td>10.6</td><td>0.163</td><td>0.33</td></tr>
+            <tr><td>7</td><td>Avellaneda</td><td>AU6 – Perito Moreno</td><td>39</td><td>2.2</td><td>17.9</td><td>0.131</td><td>0.33</td></tr>
+            <tr><td>8</td><td>Illia <span style="color:var(--ink-muted)">(3 accesos)</span></td><td>AU Illia / Au Paseo del Bajo</td><td>102</td><td>6.7</td><td>15.3</td><td>0.134</td><td>0.33</td></tr>
+            <tr><td>9</td><td>Salguero</td><td>AU Illia</td><td>266</td><td>13.7</td><td>19.4</td><td>0.075</td><td>0.28</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <p>
+      La fila 8 agrupa tres entradas de la fuente oficial — "Illia", "Pórtico Illia al Sur"
+      y "Pórtico Illia al Norte"— que son el mismo intercambiador: las dos primeras están a
+      8 metros una de otra. Sin agrupar, ocupaban tres de los once puestos con datos
+      idénticos y desplazaban los percentiles del resto.
+    </p>
+  </section>
+
+  <section class="section rule-top">
+    <h2>Cómo se construye el corredor</h2>
+    <div class="cards">
+      <div class="card">
+        <h3>Recorrido real, no un círculo</h3>
+        <p>
+          Desde cada acceso se camina el grafo vial de la Ciudad hasta 2.000 m, restringido a
+          vías troncales y distribuidoras (5.658 nodos de los 17.811 totales). El corredor es
+          por dónde se puede circular, no un radio en el mapa.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Accidentalidad</h3>
+        <p>
+          Siniestros viales 2019-2025 ocurridos <strong>sobre la traza</strong> del corredor
+          —a menos de 30 m de la calzada, margen que cubre el error de geocodificación—
+          divididos por los kilómetros de corredor. Un control se pone sobre una vía, así
+          que la densidad lineal es la unidad natural.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Riesgo delictivo</h3>
+        <p>
+          Promedio del score del modelo de la Capa 1 sobre los mismos hexágonos, promediado a
+          su vez sobre los cuatro turnos. Un control opera todo el día.
+        </p>
+      </div>
+      <div class="card">
+        <h3>Combinación</h3>
+        <p>
+          Cada criterio se convierte en percentil dentro de los nueve corredores y se
+          promedian sin ponderar. Ninguno pesa más que el otro: es una decisión explícita,
+          no un resultado.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section rule-top">
+    <h2>Qué no dice este resultado</h2>
+
+    <div class="caveat">
+      <p>
+        <strong>El tamaño del corredor depende de cómo esté mapeada la red, no sólo de la
+        realidad.</strong> La traza de Alberti mide 2,2 km y la del Pórtico Independencia 32 —
+        casi quince veces más. Parte es real (hay accesos que dan a una traza aislada), pero
+        parte depende de cómo OpenStreetMap clasificó cada tramo. Normalizar por kilómetro
+        corrige el sesgo de tamaño en el puntaje, no la variabilidad de origen.
+      </p>
+    </div>
+
+    <ul class="facts">
+      <li>
+        <span class="fact-key">Nueve casos es poco</span>
+        <span class="fact-val">
+          Con nueve corredores, cada escalón de percentil vale 11 puntos. Diferencias chicas
+          de siniestros mueven puestos enteros. <strong>La cabeza del ranking es sólida</strong>
+          — Alberti y Pórtico Independencia quedan 1º y 2º con cualquier normalización
+          razonable— pero el orden del 3º al 9º no debería tomarse literal.
+        </span>
+      </li>
+      <li>
+        <span class="fact-key">Corregido: antes contaba de más</span>
+        <span class="fact-val">
+          Una versión anterior contaba todos los siniestros del hexágono, incluidos los de
+          calles sin relación con el acceso. Medido: sólo entre el <strong>4% y el 46%</strong>
+          de esos siniestros ocurría sobre la traza. Alberti era 1º con un número que era
+          <strong>96% ruido</strong> —73 de 1.693— y al corregirlo pasó a 2º.
+        </span>
+      </li>
+      <li>
+        <span class="fact-key">Dos períodos distintos</span>
+        <span class="fact-val">
+          Los siniestros son acumulados 2019-2025; el riesgo delictivo es la estimación para
+          2025. Se combinan como percentiles, así que la escala no es el problema, pero
+          <strong>no describen la misma ventana temporal</strong>.
+        </span>
+      </li>
+      <li>
+        <span class="fact-key">Prioriza, no evalúa</span>
+        <span class="fact-val">
+          El ranking dice dónde conviene mirar primero. No estima cuánto bajarían los
+          siniestros ni los delitos si se pone un control: para eso hace falta medir antes y
+          después, con corredores comparables sin intervención.
+        </span>
+      </li>
+    </ul>
+  </section>
+
+  <section class="section rule-top">
+    <h2>Lo que sigue</h2>
+    <ul class="facts">
+      <li>
+        <span class="fact-key">1 · Validar los dos primeros</span>
+        <span class="fact-val">Alberti y Pórtico Independencia son los candidatos claros. Revisar con tránsito y con la fuerza si son operativamente viables antes de discutir el resto.</span>
+      </li>
+      <li>
+        <span class="fact-key">2 · Validar el margen de 30 m</span>
+        <span class="fact-val">El buffer sobre la traza cubre calzada más error de geocodificación. Vale medir la sensibilidad del ranking a ese valor: si cambia mucho entre 20 y 50 m, el orden es más frágil de lo que parece.</span>
+      </li>
+      <li>
+        <span class="fact-key">3 · Ampliar el universo</span>
+        <span class="fact-val">Nueve corredores son pocos para un ranking. Sumar accesos secundarios daría percentiles más finos y un orden más confiable en la cola.</span>
+      </li>
+    </ul>
+  </section>
+
+  <footer>
+    <p>
+      ATLAS SENTINEL — Módulo C, Capa 2. Fuentes: siniestros viales 2019-2025, peajes y
+      pórticos de autopista, callejero de la Ciudad Autónoma de Buenos Aires (datos
+      abiertos), grafo vial de OpenStreetMap. Riesgo delictivo estimado por el modelo de la
+      Capa 1.
+    </p>
+    <p>
+      Corredores calculados por Dijkstra sobre el subgrafo de vías troncales y
+      distribuidoras, con corte a 2.000 metros de distancia real. Siniestros asignados por
+      proximidad a la traza (30 m), no por hexágono.
+    </p>
+  </footer>
+
+</div>
+
+<script>
+  (function () {
+    var chart = document.getElementById('chart');
+    var tip = document.getElementById('tip');
+    var svg = chart.querySelector('svg');
+    var ptos = document.querySelectorAll('#ptos circle');
+
+    function show(c) {
+      var scale = svg.getBoundingClientRect().width / 720;
+      tip.innerHTML =
+        '<span class="tip-k">#' + c.getAttribute('data-p') + ' · ' + c.getAttribute('data-a') + '</span>' +
+        '<b>' + c.getAttribute('data-n') + '</b><br>' +
+        c.getAttribute('data-s') + ' siniestros/km · riesgo ' + c.getAttribute('data-r') + '<br>' +
+        'corredor de ' + c.getAttribute('data-h') + ' km';
+      tip.style.left = (parseFloat(c.getAttribute('cx')) * scale) + 'px';
+      tip.style.top = (parseFloat(c.getAttribute('cy')) * scale) + 'px';
+      tip.style.opacity = '1';
+    }
+
+    function hide() { tip.style.opacity = '0'; }
+
+    ptos.forEach(function (c) {
+      c.setAttribute('tabindex', '0');
+      c.addEventListener('mouseenter', function () { show(c); });
+      c.addEventListener('focus', function () { show(c); });
+    });
+
+    chart.addEventListener('mouseleave', hide);
+    chart.addEventListener('blur', hide, true);
+  })();
+</script>
