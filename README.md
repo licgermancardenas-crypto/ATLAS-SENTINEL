@@ -433,7 +433,7 @@ La lectura de fondo no cambió al pasar a distancia de red, solo se volvió más
 
 **La restricción de equidad es dura, y se nota**: con K=5 el solver devuelve `Infeasible` — no existe forma de ubicar 5 patrullas que deje a las 15 comunas con al menos un hexágono cubierto. Por debajo de ~10 unidades el problema directamente no tiene solución. Es el comportamiento correcto: el modelo no puede "resolver" el trade-off entre eficiencia y cobertura territorial abandonando comunas enteras.
 
-`K_PATRULLAS` y `TURNO` son parámetros al inicio del script (pensados como los sliders de un dashboard futuro). La curva completa de cobertura vs. K se puede regenerar reusando la matriz de cobertura una sola vez — lo caro es el Dijkstra desde los 476 candidatos (~6s), no resolver el MCLP (<1s por valor de K).
+`TURNO` es un parámetro al inicio del script y `K` se pasa por línea de comandos (`--k 75`), pensados como los sliders de un dashboard futuro. El plan de K=40 conserva el nombre de archivo histórico (`modulo_a_patrullas_Tarde.parquet`) porque es el que citan las tablas de arriba; cualquier otro K va a `modulo_a_patrullas_Tarde_k{K}.parquet` para que un escenario no pise al otro. La curva completa de cobertura vs. K se puede regenerar reusando la matriz de cobertura una sola vez — lo caro es el Dijkstra desde los 476 candidatos (~6s), no resolver el MCLP (<1s por valor de K).
 
 ## Módulo B — Ubicación de cámaras nuevas (`src/optimization/modulo_b_camaras.py`)
 

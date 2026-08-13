@@ -8,7 +8,9 @@ Salidas en dashboard/public/data/:
 - hex_riesgo.geojson    — 401 hexágonos, un score_riesgo por turno como
                           propiedad (mananav/tarde/noche/madrugada) para
                           que el mapa cambie de turno sin refetch.
-- modulo_a.json         — ubicaciones de patrullas propuestas (turno Tarde).
+- modulo_a.json         — ubicaciones de patrullas propuestas (turno Tarde, K=40).
+- modulo_a_k75.json     — el mismo plan con K=75 (escenario "mismo presupuesto
+                          que las comisarías actuales").
 - modulo_b.json         — versión vieja sobre hexágonos: zonas priorizadas.
 - modulo_b_red.json     — cámaras propuestas sobre la red vial (ubicaciones
                           concretas), ordenadas por ganancia marginal.
@@ -68,6 +70,19 @@ def exportar_modulo_a() -> None:
     df = pd.read_parquet(FEATURES / "modulo_a_patrullas_Tarde.parquet")
     df.to_json(OUT / "modulo_a.json", orient="records", force_ascii=False)
     print(f"modulo_a.json: {len(df)} ubicaciones")
+
+
+def exportar_modulo_a_k75() -> None:
+    """El escenario de 75 patrullas — el que titula el material de presentación
+    ('mismo presupuesto que las 75 comisarías, 58,7% de cobertura'). Se exporta
+    aparte del K=40 de referencia; ver README, 'Escenario de recursos'."""
+    ruta = FEATURES / "modulo_a_patrullas_Tarde_k75.parquet"
+    if not ruta.exists():
+        print("modulo_a_k75.json: falta el parquet — correr modulo_a_patrullas.py --k 75")
+        return
+    df = pd.read_parquet(ruta)
+    df.to_json(OUT / "modulo_a_k75.json", orient="records", force_ascii=False)
+    print(f"modulo_a_k75.json: {len(df)} ubicaciones (escenario K=75)")
 
 
 def exportar_modulo_b() -> None:
@@ -141,6 +156,7 @@ def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     exportar_hex_riesgo()
     exportar_modulo_a()
+    exportar_modulo_a_k75()
     exportar_modulo_b()
     exportar_modulo_b_red()
     exportar_modulo_c()

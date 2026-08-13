@@ -41,6 +41,7 @@ línea recta hacia cada hex de demanda.
 
 from __future__ import annotations
 
+import argparse
 from pathlib import Path
 
 import networkx as nx
@@ -57,7 +58,7 @@ CRS_GEO = "EPSG:4326"
 CRS_METROS = "EPSG:5347"
 
 TURNO = "Tarde"          # turno a optimizar — el de mayor riesgo promedio (ver predecir_riesgo.py)
-K_PATRULLAS = 40         # presupuesto de móviles — parámetro ajustable ("slider del dashboard")
+K_PATRULLAS = 40         # presupuesto de móviles por defecto — se puede pisar con --k
 RADIO_COBERTURA_M = 800  # cobertura efectiva de una patrulla en zona urbana densa (sección 4.1)
 
 
@@ -162,7 +163,17 @@ def cobertura_lograda(demanda: pd.DataFrame, cobertura: np.ndarray, indices_acti
     return demanda.loc[cubierto, "score_riesgo"].sum() / demanda["score_riesgo"].sum()
 
 
-def main() -> None:
+def ruta_salida(k: int) -> Path:
+    """El plan de K=40 conserva el nombre histórico porque es el que consume
+    el export y el que cita el README; cualquier otro K va a un archivo con
+    sufijo, para poder tener varios escenarios en disco a la vez sin que uno
+    pise al otro."""
+    if k == K_PATRULLAS:
+        return FEATURES / f"modulo_a_patrullas_{TURNO}.parquet"
+    return FEATURES / f"modulo_a_patrullas_{TURNO}_k{k}.parquet"
+
+
+def main(k: int = K_PATRULLAS) -> None:
     demanda = cargar_demanda()
     candidatos = cargar_candidatos(demanda)
     print(f"Demanda: {len(demanda)} hexágonos (turno {TURNO}) | Candidatos: {len(candidatos)} "
@@ -182,10 +193,15 @@ def main() -> None:
     pct_actual = cobertura_lograda(demanda, cobertura, idx_comisarias_actuales)
     print(f"\nCobertura ACTUAL (75 comisarías reales, R={RADIO_COBERTURA_M}m de calle real): {pct_actual:.1%} del riesgo total")
 
-    elegidos = resolver_mclp(demanda, candidatos, cobertura, K_PATRULLAS)
+    elegidos, estado = resolver_mclp(demanda, candidatos, cobertura, k, devolver_estado=True)
+    if estado != "Optimal":
+        # mismo criterio que el barrido: sin solución óptima las variables no
+        # representan un plan, así que no se reporta cobertura ni se guarda nada
+        raise SystemExit(f"El solver devolvió {estado} para K={k}: no hay plan que "
+                         f"satisfaga la restricción de equidad. No se guarda salida.")
     pct_optimo = cobertura_lograda(demanda, cobertura, elegidos)
-    print(f"Cobertura OPTIMIZADA (K={K_PATRULLAS} patrullas, R={RADIO_COBERTURA_M}m): {pct_optimo:.1%} del riesgo total")
-    print(f"\nGanancia: {pct_optimo - pct_actual:+.1%} puntos de riesgo cubierto con {K_PATRULLAS} unidades "
+    print(f"Cobertura OPTIMIZADA (K={k} patrullas, R={RADIO_COBERTURA_M}m): {pct_optimo:.1%} del riesgo total")
+    print(f"\nGanancia: {pct_optimo - pct_actual:+.1%} puntos de riesgo cubierto con {k} unidades "
           f"vs. {len(idx_comisarias_actuales)} comisarías fijas")
 
     resultado = candidatos.iloc[elegidos][["candidato_id", "nombre", "tipo", "comuna", "lat", "lon"]].reset_index(drop=True)
@@ -194,9 +210,13 @@ def main() -> None:
     print(resultado["tipo"].value_counts())
 
     FEATURES.mkdir(parents=True, exist_ok=True)
-    resultado.to_parquet(FEATURES / f"modulo_a_patrullas_{TURNO}.parquet", index=False)
-    print(f"\nGuardado: modulo_a_patrullas_{TURNO}.parquet")
+    ruta = ruta_salida(k)
+    resultado.to_parquet(ruta, index=False)
+    print(f"\nGuardado: {ruta.name}")
 
 
 if __name__ == "__main__":
-    main()
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--k", type=int, default=K_PATRULLAS,
+                    help=f"presupuesto de patrullas (default {K_PATRULLAS})")
+    main(ap.parse_args().k)
