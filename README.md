@@ -13,7 +13,7 @@ Arquitectura técnica completa del modelo: [`arquitectura-sige-ba.pdf`](arquitec
 - `src/optimization/` — Capa 2: módulos A/B/C (asignación de patrullas, cámaras nuevas, controles de acceso)
 - `src/validation/` — Capa 3: SHAP, backtesting, métricas
 - `src/export/` — genera los JSON/GeoJSON livianos que consume el dashboard
-- `notebooks/` — exploración y validación de datos
+- `notebooks/` — `01_eda_delitos.ipynb`, el análisis exploratorio con sus figuras ya ejecutadas
 - `models/`, `api/`, `web/` — carpetas del scaffold original; el plan vigente las reemplaza por `src/*` + `dashboard/` (Next.js, separado) — ver el PDF de arquitectura
 
 ## Fuentes de datos
@@ -161,7 +161,9 @@ El proyecto entero se apoya en que el riesgo se concentra espacialmente y esto n
 
 Incluso 2019→2020, con la cuarentena en el medio, da 0,989. **Esto explica el resultado central del proyecto.** Si el mapa de riesgo de un año predice el del siguiente con Spearman 0,98, entonces un promedio histórico ya es casi óptimo para rankear, y cualquier modelo solo puede ganar en los márgenes. El "el modelo apenas le gana al baseline" deja de ser un resultado decepcionante y pasa a ser el resultado *esperable*: no es que el modelo sea flojo, es que el problema de priorización espacial está casi saturado a esta resolución. Coincide con los PEI de 95-99,6% medidos por tipo.
 
-Salidas en `data/features/eda/`.
+**Moran's I local (LISA, Anselin 1995).** El I global dice que hay clusters pero no dónde. Descomponerlo por hexágono, con permutación condicional (se fija el valor del hexágono y se remuestrean sus vecinos), da sobre 2025: **58 hexágonos de núcleo caliente, 24 de zona fría, 2 islas frías y ninguna isla caliente**; los 317 restantes no se distinguen del azar. Dos lecturas operativas: el núcleo caliente es **contiguo**, no un archipiélago —que es lo que hace que asignar patrullas por cobertura de radio tenga sentido geométrico—, y **no hay puntos calientes aislados** que un esquema de cobertura por zonas se esté perdiendo.
+
+Salidas en `data/features/eda/`. El notebook `notebooks/01_eda_delitos.ipynb` tiene las seis figuras ya ejecutadas; importa el cálculo pesado de `eda_delitos.py` en vez de duplicarlo, así no se desincroniza del script.
 
 ### ¿La ventaja del modelo es priorización o es nivel? (`src/validation/test_nivel_baseline.py`)
 
