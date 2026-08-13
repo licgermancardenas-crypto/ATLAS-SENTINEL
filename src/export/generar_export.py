@@ -9,7 +9,9 @@ Salidas en dashboard/public/data/:
                           propiedad (mananav/tarde/noche/madrugada) para
                           que el mapa cambie de turno sin refetch.
 - modulo_a.json         — ubicaciones de patrullas propuestas (turno Tarde).
-- modulo_b.json         — cámaras nuevas propuestas, ordenadas por ranking.
+- modulo_b.json         — versión vieja sobre hexágonos: zonas priorizadas.
+- modulo_b_red.json     — cámaras propuestas sobre la red vial (ubicaciones
+                          concretas), ordenadas por ganancia marginal.
 - modulo_c.json         — ranking de accesos/controles.
 - comisarias.geojson    — 75 comisarías reales (contexto en el mapa).
 - camaras.geojson       — 224 cámaras reales (contexto en el mapa).
@@ -140,6 +142,7 @@ def main() -> None:
     exportar_hex_riesgo()
     exportar_modulo_a()
     exportar_modulo_b()
+    exportar_modulo_b_red()
     exportar_modulo_c()
 
     comisarias = pd.read_parquet(PROCESSED / "comisarias_policia.parquet")
