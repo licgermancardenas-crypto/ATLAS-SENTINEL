@@ -190,6 +190,49 @@ def morans_i(valores: np.ndarray, W: np.ndarray, n_perm: int = 999,
     return obs, esperado, float(p)
 
 
+def morans_local(valores: np.ndarray, W: np.ndarray, n_perm: int = 999,
+                 semilla: int = 42) -> pd.DataFrame:
+    """Moran's I local (LISA, Anselin 1995) — descompone el I global en un valor
+    por hexágono, para poder ver DÓNDE están los clusters en vez de solo saber
+    que existen.
+
+    I_i = z_i * Σ_j w_ij z_j, con z estandarizado. El signo del par (z_i, lag_i)
+    define el cuadrante:
+      alto-alto / bajo-bajo   cluster (el hexágono se parece a sus vecinos)
+      alto-bajo / bajo-alto   outlier espacial (se despega de su entorno)
+
+    La significancia sale de permutar condicionalmente: se fija z_i y se
+    reordenan los vecinos, que es la versión correcta para el estadístico local
+    (permutar todo, como en el global, sobreestima la significancia).
+    """
+    z = (valores - valores.mean()) / valores.std()
+    lag = W @ z
+    ii = z * lag
+
+    rng = np.random.default_rng(semilla)
+    n = len(z)
+    extremos = np.zeros(n)
+    for i in range(n):
+        vecinos = np.flatnonzero(W[i])
+        if len(vecinos) == 0:
+            extremos[i] = n_perm
+            continue
+        pesos = W[i, vecinos]
+        # z_i fijo, vecinos remuestreados del resto de la ciudad
+        otros = np.delete(z, i)
+        muestras = rng.choice(otros, size=(n_perm, len(vecinos)), replace=True)
+        nulos = z[i] * (muestras * pesos).sum(axis=1)
+        extremos[i] = (np.abs(nulos) >= abs(ii[i])).sum()
+    p = (extremos + 1) / (n_perm + 1)
+
+    alto_z, alto_lag = z > 0, lag > 0
+    cuadrante = np.where(alto_z & alto_lag, "alto-alto",
+                np.where(~alto_z & ~alto_lag, "bajo-bajo",
+                np.where(alto_z & ~alto_lag, "alto-bajo", "bajo-alto")))
+    return pd.DataFrame({"z": z, "lag": lag, "i_local": ii,
+                         "p_valor": p, "cuadrante": cuadrante})
+
+
 def autocorrelacion_espacial(d: pd.DataFrame) -> pd.DataFrame:
     hex_maestra = pd.read_parquet(FEATURES / "hex_maestra.parquet")
     hexes = sorted(hex_maestra.dropna(subset=["barrio_id"])["hex_id"].unique())
