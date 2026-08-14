@@ -1,7 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import type { ComunaResumen, CurvaK, FilaSerie, SensibilidadRadio, Turno } from "@/lib/types";
+import { useMemo } from "react";
+import type {
+  ComunaResumen, CurvaK, FilaSerie, SensibilidadRadio, TipoDelito, Turno,
+} from "@/lib/types";
+import { claveRiesgo, TIPOS, tipoInfo } from "@/lib/types";
 import { MESES, num, num1, pct, pp } from "@/lib/formato";
 
 /* Gráficos en SVG a mano, sin librería. Son tres formas simples y una
@@ -91,12 +94,12 @@ export function CurvaCobertura({
 /* -------------------------------------------------------- barras por comuna */
 
 export function BarrasComuna({
-  comunas, turno, seleccion, onSeleccion,
+  comunas, turno, tipo, seleccion, onSeleccion,
 }: {
-  comunas: ComunaResumen[]; turno: Turno;
+  comunas: ComunaResumen[]; turno: Turno; tipo: TipoDelito;
   seleccion: number | null; onSeleccion: (c: number | null) => void;
 }) {
-  const clave = `riesgo_${turno}` as keyof ComunaResumen;
+  const clave = claveRiesgo(turno, tipo);
   const orden = useMemo(
     () => [...comunas].sort((a, b) => (b[clave] as number) - (a[clave] as number)),
     [comunas, clave],
@@ -224,20 +227,29 @@ export function SensibilidadAlRadio({ datos }: { datos: SensibilidadRadio }) {
 
 /* ------------------------------------------------------------ serie de tipos */
 
-const TIPOS_ORDEN = ["Robo", "Hurto", "Lesiones", "Amenazas", "Vialidad"];
-const COLOR_TIPO: Record<string, string> = {
-  Robo: "var(--risk-5)", Hurto: "var(--risk-4)", Lesiones: "var(--risk-3)",
-  Amenazas: "var(--risk-2)", Vialidad: "var(--brand-soft)",
+const COLOR_TIPO: Record<TipoDelito, string> = {
+  todos: "var(--brand)", robo: "var(--risk-5)", hurto: "var(--risk-4)",
+  lesiones: "var(--risk-3)", amenazas: "var(--risk-2)",
+  vialidad: "var(--brand-soft)", homicidios: "var(--bad)",
 };
 
-export function SerieAnual({ serie }: { serie: FilaSerie[] }) {
-  const [tipo, setTipo] = useState<string>("Robo");
+/* Las solapas de acá son el mismo estado que el selector del encabezado, no una
+   copia local. Antes eran independientes, y con un filtro global de tipo eso
+   deja el tablero diciendo "Robo" arriba y "Hurto" abajo en la misma pantalla. */
+
+export function SerieAnual({
+  serie, tipo, onTipo,
+}: { serie: FilaSerie[]; tipo: TipoDelito; onTipo: (t: TipoDelito) => void }) {
   const w = 420, h = 170;
 
   const porMes = useMemo(() => {
     const m = new Map<string, number>();
-    serie.filter((f) => f.tipo === tipo && f.anio >= 2024)
-      .forEach((f) => m.set(`${f.anio}-${f.mes}`, f.n));
+    const etiqueta = tipo === "todos" ? null : tipoInfo(tipo).label;
+    serie.filter((f) => f.anio >= 2024 && (etiqueta === null || f.tipo === etiqueta))
+      .forEach((f) => {
+        const k = `${f.anio}-${f.mes}`;
+        m.set(k, (m.get(k) ?? 0) + f.n);   // con "todos" hay una fila por tipo: se suman
+      });
     const filas: { etiqueta: string; anio: number; n: number }[] = [];
     for (const anio of [2024, 2025])
       for (let mes = 1; mes <= 12; mes++)
@@ -250,23 +262,27 @@ export function SerieAnual({ serie }: { serie: FilaSerie[] }) {
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex gap-1 flex-wrap">
-        {TIPOS_ORDEN.map((t) => (
+      <div className="flex gap-1 flex-wrap" role="group" aria-label="Tipo de delito">
+        {TIPOS.map((t) => (
           <button
-            key={t}
-            onClick={() => setTipo(t)}
+            key={t.key}
+            onClick={() => onTipo(t.key)}
+            aria-pressed={t.key === tipo}
+            title={t.nota}
             className={`px-2 py-0.5 text-[10.5px] rounded cursor-pointer border transition-colors duration-150 ${
-              t === tipo
+              t.key === tipo
                 ? "border-transparent text-white"
                 : "border-line text-ink-2 hover:border-line-strong"
             }`}
-            style={t === tipo ? { background: COLOR_TIPO[t] } : undefined}
+            style={t.key === tipo ? { background: COLOR_TIPO[t.key] } : undefined}
           >
-            {t}
+            {t.key === "todos" ? "Todos" : t.label}
           </button>
         ))}
       </div>
-      <Marco w={w} h={h} etiqueta={`Serie mensual de ${tipo} en 2024 y 2025.`}>
+      <Marco w={w} h={h} etiqueta={
+        `Serie mensual de ${tipo === "todos" ? "delitos de todos los tipos" : tipoInfo(tipo).label.toLowerCase()} ` +
+        `en 2024 y 2025.`}>
         {[0, 0.5, 1].map((f) => {
           const yy = M.arr + (1 - f) * (h - M.arr - M.aba);
           return (
@@ -282,7 +298,7 @@ export function SerieAnual({ serie }: { serie: FilaSerie[] }) {
           return (
             <rect key={i} x={M.izq + i * bw + 1} y={h - M.aba - alto} width={bw - 2} height={alto}
                   fill={f.anio === 2025 ? COLOR_TIPO[tipo] : "var(--border-strong)"} rx="1">
-              <title>{`${f.etiqueta}: ${num(f.n)} ${tipo.toLowerCase()}`}</title>
+              <title>{`${f.etiqueta}: ${num(f.n)} ${tipo === "todos" ? "delitos" : tipoInfo(tipo).label.toLowerCase()}`}</title>
             </rect>
           );
         })}

@@ -1,7 +1,7 @@
 "use client";
 
-import type { Capa, ComunaResumen, Turno } from "@/lib/types";
-import { CAPAS, TURNOS } from "@/lib/types";
+import type { Capa, ComunaResumen, TipoDelito, Turno } from "@/lib/types";
+import { CAPAS, TIPOS, TURNOS } from "@/lib/types";
 import { num } from "@/lib/formato";
 
 /* Los filtros van todos arriba y siempre visibles: en un tablero, esconder un
@@ -61,6 +61,40 @@ export function SelectorComuna({
             Comuna {c.comuna} — {num(c.delitos_2025)} delitos
           </option>
         ))}
+      </select>
+    </div>
+  );
+}
+
+/* Los dos tipos sin superficie de riesgo van en un optgroup aparte y con el
+   texto "(sin superficie)" en la opción. Si estuvieran mezclados con el resto,
+   elegir Vialidad y ver el mapa quieto se leería como un bug del tablero. */
+export function SelectorTipo({
+  valor, onChange,
+}: { valor: TipoDelito; onChange: (t: TipoDelito) => void }) {
+  const conSuperficie = TIPOS.filter((t) => t.superficie && t.key !== "todos");
+  const sinSuperficie = TIPOS.filter((t) => !t.superficie);
+  return (
+    <div className="flex flex-col gap-1">
+      <label htmlFor="f-tipo" className="text-[10px] uppercase tracking-[0.08em] text-ink-muted font-medium">
+        Tipo de delito
+      </label>
+      <select
+        id="f-tipo"
+        value={valor}
+        onChange={(e) => onChange(e.target.value as TipoDelito)}
+        className="h-[34px] px-2 text-xs bg-surface-2 border border-line rounded text-ink cursor-pointer
+                   hover:border-line-strong transition-colors duration-150 min-w-[10.5rem]"
+      >
+        <option value="todos">Todos los tipos</option>
+        <optgroup label="Con superficie de riesgo propia">
+          {conSuperficie.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
+        </optgroup>
+        <optgroup label="Solo delitos registrados">
+          {sinSuperficie.map((t) => (
+            <option key={t.key} value={t.key}>{t.label} (sin superficie)</option>
+          ))}
+        </optgroup>
       </select>
     </div>
   );
@@ -155,14 +189,17 @@ function Chip({ texto, onQuitar }: { texto: string; onQuitar: () => void }) {
 /** Muestra los filtros activos y permite limpiarlos de a uno. Sin esto, alguien
  *  que vuelve al tablero después de un rato no sabe qué está viendo. */
 export function ChipsActivos({
-  comuna, barrio, onLimpiarComuna, onLimpiarBarrio,
+  comuna, barrio, tipo, onLimpiarComuna, onLimpiarBarrio, onLimpiarTipo,
 }: {
-  comuna: number | null; barrio: string | null;
-  onLimpiarComuna: () => void; onLimpiarBarrio: () => void;
+  comuna: number | null; barrio: string | null; tipo: TipoDelito;
+  onLimpiarComuna: () => void; onLimpiarBarrio: () => void; onLimpiarTipo: () => void;
 }) {
-  if (comuna === null && !barrio) return null;
+  if (comuna === null && !barrio && tipo === "todos") return null;
   return (
     <div className="flex items-center gap-1.5 flex-wrap">
+      {tipo !== "todos" && (
+        <Chip texto={TIPOS.find((t) => t.key === tipo)!.label} onQuitar={onLimpiarTipo} />
+      )}
       {comuna !== null && <Chip texto={`Comuna ${comuna}`} onQuitar={onLimpiarComuna} />}
       {barrio && <Chip texto={barrio} onQuitar={onLimpiarBarrio} />}
     </div>

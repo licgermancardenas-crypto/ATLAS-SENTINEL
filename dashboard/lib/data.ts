@@ -4,8 +4,16 @@ import type {
   PuntoModuloA, PuntoModuloB, PuntoModuloC, Resumen, SensibilidadRadio,
 } from "./types";
 
+/* `no-cache` y no `force-cache`: revalida contra el servidor antes de usar la
+   copia local. Los archivos tienen nombre fijo, sin hash, así que con
+   `force-cache` el navegador se queda con la versión vieja para siempre — cada
+   vez que se regenera el export, quien ya había abierto el tablero sigue viendo
+   los números anteriores. Pasó de verdad al agregar el filtro por tipo: los
+   campos nuevos no estaban en la copia cacheada y el tablero mostraba NaN.
+   El costo es una petición condicional por archivo, que si nada cambió termina
+   en un 304 sin cuerpo. */
 async function traer<T>(ruta: string): Promise<T> {
-  const res = await fetch(ruta, { cache: "force-cache" });
+  const res = await fetch(ruta, { cache: "no-cache" });
   if (!res.ok) throw new Error(`No se pudo cargar ${ruta} (HTTP ${res.status})`);
   return res.json() as Promise<T>;
 }

@@ -1,29 +1,36 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { BarrioProps, Turno } from "@/lib/types";
-import { claveRiesgo } from "@/lib/types";
+import type { BarrioProps, TipoDelito, Turno } from "@/lib/types";
+import { claveDelitos, claveRiesgo, riesgoEsDelTipo, tipoInfo } from "@/lib/types";
 import { num, num3 } from "@/lib/formato";
 import { claseDe, cortesPorCuantil, ETIQUETAS_CLASE, VAR_RIESGO } from "@/lib/escala";
 
-type Columna = "nombre" | "comuna" | "riesgo" | "delitos_2025" | "n_hex";
-
-const COLUMNAS: { key: Columna; label: string; numerica: boolean }[] = [
-  { key: "nombre", label: "Barrio", numerica: false },
-  { key: "comuna", label: "Comuna", numerica: true },
-  { key: "riesgo", label: "Riesgo", numerica: true },
-  { key: "delitos_2025", label: "Delitos 2025", numerica: true },
-  { key: "n_hex", label: "Celdas", numerica: true },
-];
+type Columna = "nombre" | "comuna" | "riesgo" | "delitos" | "n_hex";
 
 export default function TablaBarrios({
-  barrios, turno, comuna, barrioActivo, onBarrio,
+  barrios, turno, tipo, comuna, barrioActivo, onBarrio,
 }: {
-  barrios: BarrioProps[]; turno: Turno; comuna: number | null;
+  barrios: BarrioProps[]; turno: Turno; tipo: TipoDelito; comuna: number | null;
   barrioActivo: string | null; onBarrio: (n: string | null) => void;
 }) {
   const [orden, setOrden] = useState<{ col: Columna; desc: boolean }>({ col: "riesgo", desc: true });
-  const clave = claveRiesgo(turno);
+  const clave = claveRiesgo(turno, tipo);
+  const claveD = claveDelitos(tipo);
+
+  // los encabezados dicen de qué tipo son las dos columnas que cambian; si
+  // dijeran siempre "Riesgo" y "Delitos 2025", una tabla filtrada por hurto
+  // sería indistinguible de una sin filtrar en una captura de pantalla
+  const columnas: { key: Columna; label: string; numerica: boolean }[] = [
+    { key: "nombre", label: "Barrio", numerica: false },
+    { key: "comuna", label: "Comuna", numerica: true },
+    { key: "riesgo", label: riesgoEsDelTipo(tipo) ? `Riesgo ${tipoInfo(tipo).label.toLowerCase()}`
+                                                  : tipo === "todos" ? "Riesgo" : "Riesgo agregado",
+      numerica: true },
+    { key: "delitos", label: tipo === "todos" ? "Delitos 2025" : `${tipoInfo(tipo).label} 2025`,
+      numerica: true },
+    { key: "n_hex", label: "Celdas", numerica: true },
+  ];
 
   const cortes = useMemo(
     () => cortesPorCuantil(barrios.map((b) => b[clave] as number)),
@@ -32,14 +39,14 @@ export default function TablaBarrios({
 
   const filas = useMemo(() => {
     const base = comuna === null ? barrios : barrios.filter((b) => b.comuna === comuna);
-    const valor = (b: BarrioProps) =>
-      orden.col === "riesgo" ? (b[clave] as number) : (b[orden.col] as string | number);
+    const campo = (c: Columna) => (c === "riesgo" ? clave : c === "delitos" ? claveD : c);
+    const valor = (b: BarrioProps) => b[campo(orden.col)] as string | number;
     return [...base].sort((a, b) => {
       const va = valor(a), vb = valor(b);
       const cmp = typeof va === "string" ? va.localeCompare(vb as string, "es") : (va as number) - (vb as number);
       return orden.desc ? -cmp : cmp;
     });
-  }, [barrios, comuna, orden, clave]);
+  }, [barrios, comuna, orden, clave, claveD]);
 
   const alternar = (col: Columna) =>
     setOrden((o) => (o.col === col ? { col, desc: !o.desc } : { col, desc: col !== "nombre" }));
@@ -59,7 +66,7 @@ export default function TablaBarrios({
         <table className="w-full text-xs border-collapse">
           <thead className="sticky top-0 bg-surface-2 z-10">
             <tr>
-              {COLUMNAS.map((c) => {
+              {columnas.map((c) => {
                 const activa = orden.col === c.key;
                 return (
                   <th
@@ -111,14 +118,14 @@ export default function TablaBarrios({
                   </td>
                   <td className="border-b border-line px-3 py-1.5 text-right tabular text-ink-2">{b.comuna ?? "—"}</td>
                   <td className="border-b border-line px-3 py-1.5 text-right tabular font-medium">{num3(v)}</td>
-                  <td className="border-b border-line px-3 py-1.5 text-right tabular text-ink-2">{num(b.delitos_2025)}</td>
+                  <td className="border-b border-line px-3 py-1.5 text-right tabular text-ink-2">{num(b[claveD] as number)}</td>
                   <td className="border-b border-line px-3 py-1.5 text-right tabular text-ink-muted">{b.n_hex}</td>
                 </tr>
               );
             })}
             {filas.length === 0 && (
               <tr>
-                <td colSpan={COLUMNAS.length} className="px-3 py-8 text-center text-ink-muted">
+                <td colSpan={columnas.length} className="px-3 py-8 text-center text-ink-muted">
                   No hay barrios para este filtro.
                 </td>
               </tr>

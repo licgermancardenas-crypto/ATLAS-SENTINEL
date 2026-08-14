@@ -4,9 +4,9 @@ import { useEffect, useRef } from "react";
 import L from "leaflet";
 import type { Feature } from "geojson";
 import type {
-  BarrioProps, BarriosGeoJSON, Capa, DatosDashboard, Turno,
+  BarrioProps, BarriosGeoJSON, Capa, DatosDashboard, TipoDelito, Turno,
 } from "@/lib/types";
-import { claveRiesgo } from "@/lib/types";
+import { claveDelitos, claveRiesgo, riesgoEsDelTipo, tipoInfo } from "@/lib/types";
 import { claseDe, cortesPorCuantil, leerToken, paletaRiesgo } from "@/lib/escala";
 import { num, num2, num3 } from "@/lib/formato";
 
@@ -36,6 +36,7 @@ interface Props {
   datos: DatosDashboard;
   turno: Turno;
   capa: Capa;
+  tipo: TipoDelito;
   comuna: number | null;
   barrioActivo: string | null;
   kPatrullas: number;
@@ -44,7 +45,7 @@ interface Props {
 }
 
 export default function Mapa({
-  datos, turno, capa, comuna, barrioActivo, kPatrullas, tema, onBarrio,
+  datos, turno, capa, tipo, comuna, barrioActivo, kPatrullas, tema, onBarrio,
 }: Props) {
   const nodo = useRef<HTMLDivElement>(null);
   const mapa = useRef<L.Map | null>(null);
@@ -122,7 +123,8 @@ export default function Mapa({
     const m = mapa.current;
     if (!m) return;
 
-    const clave = claveRiesgo(turno);
+    const clave = claveRiesgo(turno, tipo);
+    const claveD = claveDelitos(tipo);
     const valores = datos.barrios.features.map((f) => f.properties[clave] as number);
     const cortes = cortesPorCuantil(valores);
     const paleta = paletaRiesgo();
@@ -147,11 +149,18 @@ export default function Mapa({
       style: estilo,
       onEachFeature: (f, layer) => {
         const p = f.properties as BarrioProps;
+        // el tooltip nombra la superficie que está dibujando, no solo el valor:
+        // con el filtro en Vialidad el número es el agregado y hay que decirlo
+        const etiquetaRiesgo = riesgoEsDelTipo(tipo)
+          ? `Riesgo ${tipoInfo(tipo).label.toLowerCase()} ${TURNO_LABEL[turno]}`
+          : `Riesgo ${TURNO_LABEL[turno]}${tipo === "todos" ? "" : " (agregado)"}`;
+        const etiquetaDelitos =
+          tipo === "todos" ? "Delitos 2025" : `${tipoInfo(tipo).label} 2025`;
         layer.bindTooltip(
           `<strong>${p.nombre}</strong><br/>` +
             `<span style="color:var(--text-secondary)">Comuna ${p.comuna ?? "—"} · ${p.n_hex} celdas</span><br/>` +
-            `Riesgo ${TURNO_LABEL[turno]}: <strong class="tabular">${num3(p[clave] as number)}</strong><br/>` +
-            `Delitos 2025: <strong class="tabular">${num(p.delitos_2025)}</strong>`,
+            `${etiquetaRiesgo}: <strong class="tabular">${num3(p[clave] as number)}</strong><br/>` +
+            `${etiquetaDelitos}: <strong class="tabular">${num(p[claveD] as number)}</strong>`,
           { className: "sige-tip", sticky: true, direction: "top" },
         );
         layer.on({
@@ -163,7 +172,7 @@ export default function Mapa({
     }).addTo(m);
     capaBarrios.current.bringToBack();
     capaBase.current?.bringToBack();
-  }, [datos, turno, comuna, barrioActivo]);
+  }, [datos, turno, tipo, comuna, barrioActivo]);
 
   /* --- capa operativa --- */
   useEffect(() => {

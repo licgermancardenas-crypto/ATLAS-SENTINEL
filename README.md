@@ -811,7 +811,19 @@ Tres salidas se dejaron de exportar cuando se reescribió el tablero, porque ya 
 
 `dashboard/` es un proyecto Next.js 16 + React 19 + TypeScript + Tailwind v4, en el mismo repo (no separado — ver decisión más arriba).
 
-**El primer dashboard se descartó y se reescribió entero.** Dibujaba los 401 hexágonos crudos, con un panel lateral de toggles y paneles de métricas por módulo. Funcionaba, pero nadie fuera del proyecto piensa en hexágonos: la unidad con la que se asignan recursos es el barrio y la comuna. La segunda versión agrega el riesgo a esas unidades y usa una sola selección (turno, comuna, barrio) que filtra el tablero completo a la vez, en lugar de N paneles independientes.
+**El primer dashboard se descartó y se reescribió entero.** Dibujaba los 401 hexágonos crudos, con un panel lateral de toggles y paneles de métricas por módulo. Funcionaba, pero nadie fuera del proyecto piensa en hexágonos: la unidad con la que se asignan recursos es el barrio y la comuna. La segunda versión agrega el riesgo a esas unidades y usa una sola selección (turno, **tipo de delito**, comuna, barrio) que filtra el tablero completo a la vez, en lugar de N paneles independientes.
+
+### Filtro por tipo de delito
+
+Pone en el tablero la superficie por tipo de `riesgo_predicho_por_tipo.parquet`, que hasta ahora solo existía como parquet y como la sección "Riesgo por tipo en los módulos" de este README. Al elegir un tipo cambian a la vez la coropleta, las barras por comuna, las dos columnas de la tabla, los KPI y la serie mensual.
+
+Lo que hace no trivial la interfaz es que **la asimetría del análisis tiene que sobrevivir a la pantalla**. Hay seis tipos con delitos registrados y solo cuatro con superficie de riesgo propia, y ese recorte fue una decisión medida, no un olvido. El tablero la respeta en tres lugares:
+
+- Los dos tipos sin superficie (Vialidad, Homicidios) van en un `optgroup` aparte y con el texto "(sin superficie)" en la opción. Al elegirlos, los delitos se filtran pero el mapa sigue dibujando el riesgo agregado y lo dice: el KPI de riesgo cambia la nota a "superficie agregada — Vialidad no tiene una propia" en ámbar, y bajo el mapa aparece el motivo del recorte.
+- Con un tipo que **sí** tiene superficie y una capa operativa activa, aparece la advertencia inversa: el mapa muestra la superficie del tipo, pero las ubicaciones de los Módulos A/B/C se optimizan sobre el modelo agregado. Sin ese cartel, filtrar por hurto y ver las patrullas quietas se lee como "este es el plan óptimo para hurto", y las tablas de superposición de más arriba dicen que no: hurto y lesiones comparten apenas el 60% de las ubicaciones.
+- El nivel de riesgo **no es comparable entre tipos** — cada superficie está normalizada por separado, así que la media de amenazas (0,014) y la de robo (0,086) no se pueden poner una al lado de la otra. Lo comparable es el ranking entre barrios. Eso va en la ayuda del KPI y no en las salvedades generales, porque es sobre ese número exacto donde se cometería el error.
+
+El fallback al agregado vive en una sola función (`claveRiesgo` en `lib/types.ts`), no repartido por los componentes: si cada uno lo dedujera por su cuenta, alcanzaría con que uno se olvidara para que el mapa dibujara ceros y pareciera "sin riesgo".
 
 Decisiones de la versión actual:
 
@@ -827,6 +839,7 @@ Decisiones de la versión actual:
 - **Leaflet encuadra solo con zooms enteros.** `fitBounds` sobre la Ciudad calculaba ~12,6, redondeaba a 12, y CABA terminaba ocupando un cuarto del lienzo con el conurbano de relleno. Se arregla con `zoomSnap: 0.25`.
 - **`fitBounds` no puede correr en el efecto de creación**: en ese momento el contenedor todavía mide 0 de alto (el grid no resolvió) y el cálculo devuelve el zoom mínimo. Se espera al primer `ResizeObserver` con alto real.
 - **La rueda del mouse.** Un mapa dentro de un tablero que scrollea se traga el scroll de la página y hace zoom: bajar con el cursor encima del mapa te deja a nivel de calle sin haberlo pedido. Se desactiva `scrollWheelZoom` y se habilita recién al hacer clic en el mapa.
+- **`fetch(..., { cache: "force-cache" })` en los datos era una bomba de tiempo.** Los archivos de `public/data/` tienen nombre fijo, sin hash, así que `force-cache` hacía que el navegador se quedara con la copia vieja para siempre: al regenerar el export, quien ya había abierto el tablero seguía viendo los números anteriores. Apareció al agregar el filtro por tipo — los campos nuevos no estaban en la copia cacheada y el tablero mostraba `NaN`. Se cambió a `no-cache`, que revalida y termina en un 304 sin cuerpo si nada cambió.
 - El export de Capa 4 tiraba `ArrayMemoryError` en esta máquina de 3,4GB releyendo `delitos_hex.parquet` por función (1,35M filas). Se carga una sola vez, con la fecha convertida a año/mes enteros y las columnas de texto a categóricas.
 - La primera versión no se pudo verificar con la automatización de navegador (la extensión no llegaba a `localhost:3000`); esta sí — se verificó a ojo, con `npm run build` y `npx eslint` limpios.
 

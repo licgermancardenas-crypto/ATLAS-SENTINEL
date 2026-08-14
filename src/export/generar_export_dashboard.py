@@ -11,7 +11,9 @@ Salidas en dashboard/public/data/:
 - barrios_riesgo.geojson   48 polígonos con riesgo por turno (promedio de sus
                            hexágonos, que es lo comparable entre barrios de
                            distinto tamaño), riesgo total, delitos 2025 y
-                           cantidad de hexágonos.
+                           cantidad de hexágonos. Además el riesgo por turno de
+                           cada superficie por tipo y los delitos 2025 por tipo,
+                           para el filtro de tipo de delito del tablero.
 - comunas_resumen.json     lo mismo agregado a las 15 comunas, para los filtros
                            y la tabla de detalle.
 - curva_k.json             cobertura del Módulo A para cada K — lo que hace que
@@ -43,6 +45,18 @@ TURNOS = ["Mañana", "Tarde", "Noche", "Madrugada"]
 TURNO_KEY = {"Mañana": "manana", "Tarde": "tarde", "Noche": "noche", "Madrugada": "madrugada"}
 ANIO_ULTIMO = 2025
 
+# Los cuatro tipos que tienen superficie de riesgo propia en
+# riesgo_predicho_por_tipo.parquet. Vialidad y Homicidios quedaron afuera de esa
+# superficie por decisión medida, no por olvido (ver README, "Riesgo por tipo en
+# los módulos"): vialidad son siniestros viales y no delitos de seguridad, y
+# homicidios tiene 78 hechos en el año de test. Igual se cuentan sus delitos:
+# el tablero los ofrece en el filtro y avisa que ahí dibuja el riesgo agregado.
+TIPOS_CON_SUPERFICIE = ["robo", "hurto", "lesiones", "amenazas"]
+
+# Como aparecen escritos en la columna `tipo` de delitos_hex.
+TIPOS_DELITO = ["Robo", "Hurto", "Lesiones", "Amenazas", "Vialidad", "Homicidios"]
+TIPO_KEY = {t: t.lower() for t in TIPOS_DELITO}
+
 
 def _riesgo_por_hex() -> pd.DataFrame:
     """hex_id × turno -> score, más el barrio y la comuna de cada hexágono."""
@@ -57,6 +71,39 @@ def _riesgo_por_hex() -> pd.DataFrame:
     hexes["hex_id"] = hexes["hex_id"].astype(str)
     hexes["barrio_id"] = hexes["barrio_id"].astype(str)
     return hexes.merge(pivot, left_on="hex_id", right_index=True, how="left").fillna(0)
+
+
+def _riesgo_por_tipo_por_hex() -> pd.DataFrame:
+    """hex_id × turno -> un score por tipo, en columnas `{tipo}__{turno}`.
+
+    Mismo pivot que `_riesgo_por_hex` pero sobre las cuatro superficies por
+    tipo. Se aplana a una columna por combinación en vez de dejar un MultiIndex
+    porque después hay que hacer un `groupby(...).agg()` por barrio, y nombrar
+    agregaciones sobre columnas de tuplas es una fuente de errores silenciosos.
+    """
+    riesgo = pd.read_parquet(FEATURES / "riesgo_predicho_por_tipo.parquet")
+    riesgo["hex_id"] = riesgo["hex_id"].astype(str)
+    riesgo["turno"] = riesgo["turno"].astype(str)
+
+    salida = pd.DataFrame(index=pd.Index(riesgo["hex_id"].unique(), name="hex_id"))
+    for tipo in TIPOS_CON_SUPERFICIE:
+        pivot = riesgo.pivot(index="hex_id", columns="turno", values=f"score_{tipo}")
+        pivot.columns = [f"{tipo}__{c}" for c in pivot.columns]
+        salida = salida.join(pivot)
+
+    hexes = (pd.read_parquet(FEATURES / "hex_maestra.parquet")
+             .dropna(subset=["barrio_id"])[["hex_id", "barrio_id", "comuna_id"]])
+    hexes["hex_id"] = hexes["hex_id"].astype(str)
+    hexes["barrio_id"] = hexes["barrio_id"].astype(str)
+    return hexes.merge(salida, left_on="hex_id", right_index=True, how="left").fillna(0)
+
+
+def _delitos_por_barrio_y_tipo() -> pd.DataFrame:
+    """barrio × tipo -> conteo del último año. Las columnas son los tipos."""
+    d = delitos()
+    tabla = (d.loc[d["anio"] == ANIO_ULTIMO]
+             .groupby(["barrio", "tipo"], observed=True).size().unstack(fill_value=0))
+    return tabla.reindex(columns=TIPOS_DELITO, fill_value=0)
 
 
 # Único desajuste de nombres entre el polígono y el campo `barrio` de delitos.
@@ -106,7 +153,9 @@ def _delitos_de(nombre: str, conteo: pd.Series) -> int:
 def exportar_barrios() -> None:
     barrios = pd.read_parquet(PROCESSED / "barrios.parquet")
     por_hex = _riesgo_por_hex()
+    por_tipo = _riesgo_por_tipo_por_hex()
     por_barrio = _delitos_por_barrio()   # ojo: no llamarlo `delitos`, tapa a la función
+    delitos_tipo = _delitos_por_barrio_y_tipo()
 
     # promedio por hexágono, no suma: los barrios varían mucho en superficie y
     # sumar convierte el mapa en un mapa de tamaños. El total se guarda aparte
@@ -116,11 +165,15 @@ def exportar_barrios() -> None:
         **{f"m_{t}": (t, "mean") for t in TURNOS if t in por_hex.columns},
         **{f"s_{t}": (t, "sum") for t in TURNOS if t in por_hex.columns},
     )
+    cols_tipo = [f"{tp}__{t}" for tp in TIPOS_CON_SUPERFICIE for t in TURNOS
+                 if f"{tp}__{t}" in por_tipo.columns]
+    agg_tipo = por_tipo.groupby("barrio_id")[cols_tipo].mean()
 
     features = []
     for _, b in barrios.iterrows():
         nombre = str(b["nombre"]).strip()
         fila = agg.loc[nombre] if nombre in agg.index else None
+        fila_tipo = agg_tipo.loc[nombre] if nombre in agg_tipo.index else None
         props = {
             "nombre": nombre,
             "comuna": int(fila["comuna"]) if fila is not None else None,
@@ -131,6 +184,15 @@ def exportar_barrios() -> None:
             k = TURNO_KEY[t]
             props[f"riesgo_{k}"] = round(float(fila[f"m_{t}"]), 5) if fila is not None else 0.0
             props[f"riesgo_total_{k}"] = round(float(fila[f"s_{t}"]), 4) if fila is not None else 0.0
+            for tp in TIPOS_CON_SUPERFICIE:
+                col = f"{tp}__{t}"
+                props[f"riesgo_{tp}_{k}"] = (
+                    round(float(fila_tipo[col]), 5)
+                    if fila_tipo is not None and col in agg_tipo.columns else 0.0)
+        clave = ALIAS_BARRIO.get(nombre.upper(), nombre.upper())
+        for tp in TIPOS_DELITO:
+            props[f"delitos_{TIPO_KEY[tp]}"] = (
+                int(delitos_tipo.loc[clave, tp]) if clave in delitos_tipo.index else 0)
         # los polígonos del portal traen muchísimos vértices (716KB para 48
         # barrios); 5e-5 grados son ~5m, invisible a escala de ciudad y baja el
         # archivo a un cuarto. preserve_topology evita que se rompan los bordes
@@ -146,18 +208,31 @@ def exportar_barrios() -> None:
 
 def exportar_comunas() -> None:
     por_hex = _riesgo_por_hex()
+    por_tipo = _riesgo_por_tipo_por_hex().set_index("hex_id")
     d = delitos()
-    por_comuna = (d.loc[(d["anio"] == ANIO_ULTIMO) & d["comuna"].notna(), "comuna"]
-                  .astype(int).value_counts())
+    dd = d.loc[(d["anio"] == ANIO_ULTIMO) & d["comuna"].notna()].copy()
+    dd["comuna"] = dd["comuna"].astype(int)
+    por_comuna = dd["comuna"].value_counts()
+    por_comuna_tipo = (dd.groupby(["comuna", "tipo"], observed=True).size()
+                       .unstack(fill_value=0).reindex(columns=TIPOS_DELITO, fill_value=0))
 
     filas = []
     for comuna, g in por_hex.groupby("comuna_id"):
+        gt = por_tipo.loc[por_tipo.index.intersection(g["hex_id"])]
         fila = {"comuna": int(comuna), "n_hex": int(len(g)),
                 "n_barrios": int(g["barrio_id"].nunique()),
                 "delitos_2025": int(por_comuna.get(int(comuna), 0))}
         for t in TURNOS:
             if t in g.columns:
                 fila[f"riesgo_{TURNO_KEY[t]}"] = round(float(g[t].mean()), 5)
+            for tp in TIPOS_CON_SUPERFICIE:
+                col = f"{tp}__{t}"
+                if col in gt.columns:
+                    fila[f"riesgo_{tp}_{TURNO_KEY[t]}"] = round(float(gt[col].mean()), 5)
+        for tp in TIPOS_DELITO:
+            fila[f"delitos_{TIPO_KEY[tp]}"] = (
+                int(por_comuna_tipo.loc[int(comuna), tp])
+                if int(comuna) in por_comuna_tipo.index else 0)
         filas.append(fila)
     (OUT / "comunas_resumen.json").write_text(
         json.dumps(filas, ensure_ascii=False), encoding="utf-8")

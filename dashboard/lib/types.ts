@@ -9,6 +9,38 @@ export const TURNOS: { key: Turno; label: string; corto: string }[] = [
   { key: "madrugada", label: "Madrugada", corto: "Mad" },
 ];
 
+/* ------------------------------------------------------------ tipo de delito
+ *
+ *  El filtro por tipo tiene una asimetría que hay que respetar en la interfaz:
+ *  los seis tipos tienen delitos registrados, pero solo cuatro tienen una
+ *  superficie de riesgo propia. Vialidad y Homicidios quedaron fuera de esa
+ *  superficie por decisión medida (son siniestros viales; y 78 hechos en el año
+ *  de test), no por olvido — ver README, "Riesgo por tipo en los módulos".
+ *
+ *  Para esos dos, el tablero filtra los delitos pero sigue dibujando el riesgo
+ *  agregado, y lo dice en pantalla. Por eso `superficie` es explícito acá y no
+ *  algo que cada componente deduzca por su cuenta.
+ */
+
+export type TipoDelito =
+  | "todos" | "robo" | "hurto" | "lesiones" | "amenazas" | "vialidad" | "homicidios";
+
+export const TIPOS: {
+  key: TipoDelito; label: string; superficie: boolean; nota?: string;
+}[] = [
+  { key: "todos", label: "Todos los tipos", superficie: true },
+  { key: "robo", label: "Robo", superficie: true },
+  { key: "hurto", label: "Hurto", superficie: true },
+  { key: "lesiones", label: "Lesiones", superficie: true },
+  { key: "amenazas", label: "Amenazas", superficie: true },
+  { key: "vialidad", label: "Vialidad", superficie: false,
+    nota: "Son siniestros viales, no delitos de seguridad: quedaron excluidos de la superficie de riesgo." },
+  { key: "homicidios", label: "Homicidios", superficie: false,
+    nota: "78 hechos en el año de test y PEI 54%: muy pocos casos para una superficie de riesgo propia." },
+];
+
+export const tipoInfo = (t: TipoDelito) => TIPOS.find((x) => x.key === t)!;
+
 /** Capa operativa que se superpone al mapa. Solo una a la vez: son propuestas
  *  de módulos distintos y mezclarlas en pantalla no significa nada. */
 export type Capa = "ninguna" | "patrullas" | "camaras" | "controles";
@@ -20,6 +52,10 @@ export const CAPAS: { key: Capa; label: string; descripcion: string }[] = [
   { key: "controles", label: "Módulo C · Controles", descripcion: "Accesos de autopista rankeados" },
 ];
 
+/** Las claves por tipo son `riesgo_{tipo}_{turno}` y `delitos_{tipo}`. Se
+ *  declaran como índice y no una por una porque son 16 + 6 campos: enumerarlas
+ *  no agrega seguridad de tipos real, solo ruido. Los accesos pasan siempre por
+ *  `claveRiesgo`/`claveDelitos`, que son las que garantizan el nombre. */
 export interface BarrioProps {
   nombre: string;
   comuna: number | null;
@@ -33,6 +69,7 @@ export interface BarrioProps {
   riesgo_total_tarde: number;
   riesgo_total_noche: number;
   riesgo_total_madrugada: number;
+  [clave: string]: string | number | null;
 }
 
 export type BarriosGeoJSON = FeatureCollection<Polygon | MultiPolygon, BarrioProps>;
@@ -46,6 +83,7 @@ export interface ComunaResumen {
   riesgo_tarde: number;
   riesgo_noche: number;
   riesgo_madrugada: number;
+  [clave: string]: number;
 }
 
 export interface PuntoModuloA {
@@ -156,8 +194,19 @@ export interface DatosDashboard {
   resumen: Resumen;
 }
 
-export const claveRiesgo = (t: Turno) =>
-  `riesgo_${t}` as keyof Pick<
-    BarrioProps,
-    "riesgo_manana" | "riesgo_tarde" | "riesgo_noche" | "riesgo_madrugada"
-  >;
+/** Nombre del campo de riesgo a leer. Un solo lugar decide el fallback: si el
+ *  tipo elegido no tiene superficie propia, se devuelve la clave del agregado.
+ *  Si esto viviera repartido por los componentes, alcanzaría con que uno se
+ *  olvidara para que el mapa dibujara ceros y pareciera "sin riesgo". */
+export const claveRiesgo = (t: Turno, tipo: TipoDelito = "todos") =>
+  tipo === "todos" || !tipoInfo(tipo).superficie ? `riesgo_${t}` : `riesgo_${tipo}_${t}`;
+
+/** Nombre del campo de delitos registrados. Acá no hay fallback: los seis tipos
+ *  tienen conteo propio, incluidos los dos que no tienen superficie. */
+export const claveDelitos = (tipo: TipoDelito = "todos") =>
+  tipo === "todos" ? "delitos_2025" : `delitos_${tipo}`;
+
+/** Si el riesgo que se está dibujando corresponde al tipo elegido o al
+ *  agregado. Lo consultan el encabezado del mapa y el KPI para decirlo. */
+export const riesgoEsDelTipo = (tipo: TipoDelito) =>
+  tipo !== "todos" && tipoInfo(tipo).superficie;

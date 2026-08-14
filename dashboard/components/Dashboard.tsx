@@ -2,14 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
-import type { BarrioProps, Capa, DatosDashboard, Turno } from "@/lib/types";
-import { CAPAS, claveRiesgo } from "@/lib/types";
+import type { BarrioProps, Capa, DatosDashboard, TipoDelito, Turno } from "@/lib/types";
+import { CAPAS, claveDelitos, claveRiesgo, riesgoEsDelTipo, tipoInfo } from "@/lib/types";
 import { cargarDatos } from "@/lib/data";
 import { delta, num, num3, pct, pp } from "@/lib/formato";
 import { cortesPorCuantil, ETIQUETAS_CLASE, VAR_RIESGO } from "@/lib/escala";
 import { KpiRow } from "./Kpi";
 import {
-  ChipsActivos, ControlK, SelectorCapa, SelectorComuna, SelectorTurno, ToggleTema,
+  ChipsActivos, ControlK, SelectorCapa, SelectorComuna, SelectorTipo, SelectorTurno, ToggleTema,
 } from "./Controles";
 import { BarrasComuna, CurvaCobertura, SensibilidadAlRadio, SerieAnual } from "./Graficos";
 import TablaBarrios from "./TablaBarrios";
@@ -32,6 +32,7 @@ export default function Dashboard() {
   const [turno, setTurno] = useState<Turno>("tarde");
   const [comuna, setComuna] = useState<number | null>(null);
   const [capa, setCapa] = useState<Capa>("patrullas");
+  const [tipo, setTipo] = useState<TipoDelito>("todos");
   const [kPatrullas, setKPatrullas] = useState(75);
   const [barrio, setBarrio] = useState<string | null>(null);
   const [tema, setTema] = useState<"light" | "dark">("light");
@@ -67,11 +68,13 @@ export default function Dashboard() {
   const kpis = useMemo(() => {
     if (!datos) return [];
     const r = datos.resumen;
-    const clave = claveRiesgo(turno);
+    const clave = claveRiesgo(turno, tipo);
+    const claveD = claveDelitos(tipo);
+    const propio = riesgoEsDelTipo(tipo);
     const sel = comuna === null ? props : props.filter((b) => b.comuna === comuna);
     const foco = barrio ? props.filter((b) => b.nombre === barrio) : sel;
 
-    const delitos = foco.reduce((s, b) => s + b.delitos_2025, 0);
+    const delitos = foco.reduce((s, b) => s + (b[claveD] as number), 0);
     const riesgoMedio = foco.length ? foco.reduce((s, b) => s + (b[clave] as number), 0) / foco.length : 0;
 
     const punto = datos.curvaK.curva.find((p) => p.k === kPatrullas);
@@ -84,20 +87,35 @@ export default function Dashboard() {
 
     return [
       {
-        etiqueta: barrio ? "Delitos · barrio" : comuna !== null ? "Delitos · comuna" : "Delitos registrados",
+        etiqueta: tipo !== "todos" ? `${tipoInfo(tipo).label} registrados`
+                : barrio ? "Delitos · barrio" : comuna !== null ? "Delitos · comuna" : "Delitos registrados",
         valor: num(delitos),
         nota: <>en {r.periodo.hasta}{barrio ? ` · ${barrio}` : comuna !== null ? ` · Comuna ${comuna}` : " · toda la Ciudad"}</>,
-        delta: comuna === null && !barrio
+        // el delta compara contra el año previo del total, así que solo tiene
+        // sentido cuando no hay ningún filtro puesto
+        delta: comuna === null && !barrio && tipo === "todos"
           ? { texto: delta(r.delitos_ultimo_anio / r.delitos_anio_previo - 1), tono: "alerta" as const }
           : undefined,
-        chispa: comuna === null && !barrio ? serieAnual : undefined,
+        chispa: comuna === null && !barrio && tipo === "todos" ? serieAnual : undefined,
         ayuda: "Delitos georreferenciados del último año cerrado. El nivel de 2025 está bajo revisión — ver salvedades.",
       },
       {
-        etiqueta: "Riesgo medio por celda",
+        etiqueta: propio ? `Riesgo medio · ${tipoInfo(tipo).label.toLowerCase()}` : "Riesgo medio por celda",
         valor: num3(riesgoMedio),
-        nota: <>turno {turno === "manana" ? "mañana" : turno} · {foco.length} barrio{foco.length === 1 ? "" : "s"}</>,
-        ayuda: "Predicción del modelo, promediada sobre las celdas de la selección.",
+        nota: propio
+          ? <>turno {turno === "manana" ? "mañana" : turno} · superficie propia</>
+          : tipo === "todos"
+          ? <>turno {turno === "manana" ? "mañana" : turno} · {foco.length} barrio{foco.length === 1 ? "" : "s"}</>
+          : <span className="text-[var(--warn)]">superficie agregada — {tipoInfo(tipo).label} no tiene una propia</span>,
+        // las superficies por tipo están normalizadas por separado: la media de
+        // amenazas (0,014) y la de robo (0,086) no se pueden comparar entre sí,
+        // solo dentro del mismo tipo. Se dice acá y no en las salvedades porque
+        // es sobre este número exacto donde se cometería el error.
+        ayuda: propio
+          ? `Predicción del modelo por tipo, promediada sobre las celdas de la selección. El nivel no es comparable contra otros tipos: cada superficie está normalizada por separado. Lo comparable es el ranking entre barrios.`
+          : tipo === "todos"
+          ? "Predicción del modelo agregado, promediada sobre las celdas de la selección."
+          : `${tipoInfo(tipo).nota} El mapa sigue dibujando el riesgo agregado.`,
       },
       {
         etiqueta: "Cobertura actual",
@@ -121,7 +139,7 @@ export default function Dashboard() {
         ayuda: "Lo que el modelo hace bien: priorizar. PAI 2,77 y PEI 99,5% sobre el 10% del área.",
       },
     ];
-  }, [datos, turno, comuna, barrio, kPatrullas, props]);
+  }, [datos, turno, tipo, comuna, barrio, kPatrullas, props]);
 
   if (error) {
     return (
@@ -151,9 +169,10 @@ export default function Dashboard() {
     );
   }
 
-  const clave = claveRiesgo(turno);
+  const clave = claveRiesgo(turno, tipo);
   const cortes = cortesPorCuantil(props.map((b) => b[clave] as number));
   const capaInfo = CAPAS.find((c) => c.key === capa)!;
+  const superficiePropia = riesgoEsDelTipo(tipo);
 
   return (
     <main className="h-full flex flex-col overflow-hidden">
@@ -169,13 +188,15 @@ export default function Dashboard() {
             </span>
           </div>
           <ChipsActivos
-            comuna={comuna} barrio={barrio}
+            comuna={comuna} barrio={barrio} tipo={tipo}
             onLimpiarComuna={() => { setComuna(null); setBarrio(null); }}
             onLimpiarBarrio={() => setBarrio(null)}
+            onLimpiarTipo={() => setTipo("todos")}
           />
         </div>
         <div className="px-4 pb-2.5 flex items-end gap-3 flex-wrap">
           <SelectorTurno valor={turno} onChange={setTurno} />
+          <SelectorTipo valor={tipo} onChange={setTipo} />
           <SelectorComuna valor={comuna} onChange={(c) => { setComuna(c); setBarrio(null); }} comunas={datos.comunas} />
           <SelectorCapa valor={capa} onChange={setCapa} />
           {capa === "patrullas" && <ControlK valor={kPatrullas} onChange={setKPatrullas} disponibles={ks} />}
@@ -197,7 +218,7 @@ export default function Dashboard() {
             <div className="px-3 py-2 border-b border-line flex items-center justify-between gap-3 flex-wrap">
               <div className="min-w-0">
                 <h2 className="text-xs font-semibold uppercase tracking-[0.07em] text-ink-2">
-                  Riesgo por barrio
+                  {superficiePropia ? `Riesgo de ${tipoInfo(tipo).label.toLowerCase()} por barrio` : "Riesgo por barrio"}
                 </h2>
                 <p className="text-[11px] text-ink-muted truncate">{capaInfo.descripcion}</p>
               </div>
@@ -205,11 +226,12 @@ export default function Dashboard() {
             </div>
             <div className="flex-1 min-h-0">
               <Mapa
-                datos={datos} turno={turno} capa={capa} comuna={comuna}
+                datos={datos} turno={turno} capa={capa} tipo={tipo} comuna={comuna}
                 barrioActivo={barrio} kPatrullas={kPatrullas} tema={tema}
                 onBarrio={elegirBarrio}
               />
             </div>
+            <AvisoSuperficie tipo={tipo} capa={capa} />
             {capa !== "ninguna" && <LeyendaPuntos capa={capa} k={kPatrullas} />}
           </section>
 
@@ -232,7 +254,7 @@ export default function Dashboard() {
               <p className="text-[11px] text-ink-muted mb-2">
                 Turno {turno === "manana" ? "mañana" : turno}, ×100. Clic para filtrar todo el tablero.
               </p>
-              <BarrasComuna comunas={datos.comunas} turno={turno} seleccion={comuna}
+              <BarrasComuna comunas={datos.comunas} turno={turno} tipo={tipo} seleccion={comuna}
                             onSeleccion={(c) => { setComuna(c); setBarrio(null); }} />
             </section>
           </div>
@@ -240,7 +262,7 @@ export default function Dashboard() {
 
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
           <section className="card overflow-hidden max-h-[30rem] flex flex-col">
-            <TablaBarrios barrios={props} turno={turno} comuna={comuna}
+            <TablaBarrios barrios={props} turno={turno} tipo={tipo} comuna={comuna}
                           barrioActivo={barrio} onBarrio={elegirBarrio} />
           </section>
           <div className="flex flex-col gap-3 min-w-0">
@@ -248,7 +270,7 @@ export default function Dashboard() {
               <h2 className="text-xs font-semibold uppercase tracking-[0.07em] text-ink-2 mb-1">
                 Delitos por mes y tipo
               </h2>
-              <SerieAnual serie={datos.serie} />
+              <SerieAnual serie={datos.serie} tipo={tipo} onTipo={setTipo} />
             </section>
 
             {/* va acá, pegado a las salvedades y no al Módulo A: es lo que hay
@@ -285,6 +307,33 @@ function Leyenda({ cortes }: { cortes: number[] }) {
       </div>
       <span className="text-[10px] text-ink-muted">alto</span>
     </div>
+  );
+}
+
+/* Las dos cosas que el filtro por tipo NO cambia, dichas donde se las puede
+   leer mal. Sin esto, alguien filtra por hurto, ve moverse la coropleta y las
+   patrullas quietas, y concluye que ese es el plan óptimo para hurto — cuando
+   los Módulos A/B/C se resuelven sobre el modelo agregado. El README lo tiene
+   medido: hurto y lesiones comparten solo el 60% de las ubicaciones. */
+
+function AvisoSuperficie({ tipo, capa }: { tipo: TipoDelito; capa: Capa }) {
+  if (tipo === "todos") return null;
+  const info = tipoInfo(tipo);
+  const mensaje = !info.superficie
+    ? `${info.label}: los delitos del tablero son de este tipo, pero el mapa dibuja el riesgo agregado. ${info.nota}`
+    : capa !== "ninguna"
+    ? `El mapa muestra la superficie de ${info.label.toLowerCase()}, pero las ubicaciones propuestas se optimizan sobre el modelo agregado — no son el plan óptimo para ${info.label.toLowerCase()}.`
+    : null;
+  if (!mensaje) return null;
+  return (
+    <p className="px-3 py-1.5 border-t border-line text-[11px] leading-snug text-ink-2
+                  flex items-start gap-1.5 bg-[var(--warn-wash,transparent)]">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--warn)" strokeWidth="2.2"
+           strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-[2px]" aria-hidden="true">
+        <circle cx="12" cy="12" r="10" /><path d="M12 8v5M12 16h.01" />
+      </svg>
+      <span>{mensaje}</span>
+    </p>
   );
 }
 
