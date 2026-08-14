@@ -325,6 +325,52 @@ Nota de configuración: el backtest corre con 200 árboles × 31 hojas en vez de
 
 Resultados por semana en `backtest_pronostico.parquet`; la corrida queda en MLflow como `backtest-pronostico-1sem`.
 
+### Proceso auto-excitante: el near-repeat, probado (`hawkes_autoexcitante.py`)
+
+La única familia de modelos que el proyecto nunca había tocado. Los catorce modelos entrenados son LightGBM — un solo algoritmo. La ausencia que pesaba no era "no probamos random forest", que daría lo mismo, sino los **procesos de punto auto-excitantes** (Hawkes/ETAS), canónicos en pronóstico de delito desde Mohler et al. 2011 y base de PredPol. La diferencia es conceptual: LightGBM ve lags y rollings y tiene que aprender la forma del efecto desde features elegidas a mano; un Hawkes **impone** la estructura de contagio y estima su decaimiento. Es la hipótesis near-repeat, y es la única que el modelo actual no puede representar.
+
+Formulación en tiempo discreto sobre hexágono × día, con núcleo geométrico normalizado:
+
+```
+λ_i(t) = μ_i + θ0·A_i(t) + θ1·Σ_{anillo1} A_j(t) + θ2·Σ_{anillo2} A_j(t)
+A_i(t) = φ·A_i(t-1) + (1-φ)·N_i(t-1),   φ = exp(-1/τ)
+```
+
+Como el peso temporal total por delito pasado es 1, θ_k se lee directo como "delitos hijos por delito, en cada hexágono a distancia k", y el cociente de ramificación **n = θ0 + 6·θ1 + 12·θ2** es la fracción atribuida a contagio. λ es lineal en (μ, θ) dado τ y la verosimilitud de Poisson es cóncava ahí, así que los 404 parámetros se ajustan por optimización convexa (L-BFGS-B con gradiente analítico); τ se recorre por grilla y se elige en validación.
+
+**1. El decaimiento óptimo es de 60 días, y eso no es near-repeat.** La verosimilitud en validación mejora monótonamente de medio día hasta 60 y recién ahí da vuelta:
+
+| τ | 0,5 d | 2 d | 7 d | 30 d | **60 d** | 90 d | 365 d |
+|---|---|---|---|---|---|---|---|
+| NLL(val) | 0,70813 | 0,70545 | 0,70017 | 0,69497 | **0,69480** | 0,69563 | 0,71076 |
+| n | 0,355 | 0,511 | 0,658 | 0,741 | 0,688 | 0,626 | 0,135 |
+
+τ=60 días es una constante de tiempo (semivida ≈ 42 días), un orden de magnitud más larga que el near-repeat de la literatura, que decae en días. **El término "auto-excitante" no está capturando contagio: está funcionando como un estimador adaptativo del nivel local**, un promedio móvil con otro nombre. Leer el n=0,688 como "el 69% de los delitos de CABA son contagio" sería exactamente el error que este barrido detecta.
+
+**2. Pero sí hay señal near-repeat, y es espacial y corta.** La columna que lo delata es θ1, el derrame al anillo de vecinos inmediatos: vale 0,025 a medio día, **llega a 0,045 a los 5 días** y se apaga a exactamente 0 a partir de los 90. θ2 (segundo anillo) es 0 desde los 5 días. O sea: hay contagio al hexágono de al lado en la escala de días, no más lejos y no más tarde. Es la firma del near-repeat, medida por primera vez en estos datos.
+
+**3. Separar contagio de deriva no mejora nada.** Con un término lento fijo de 180 días absorbiendo la deriva del nivel, el término rápido **no se apaga** (n_rápido=0,359 contra n_lento=0,315 con τ_rápido=1 día), o sea que la estructura de contagio es real y no un artefacto de la deriva. Pero el modelo de dos escalas ajusta **peor** en validación (0,69800) que una sola escala de 60 días (0,69480): los datos prefieren una única memoria intermedia antes que una descomposición en contagio + fondo.
+
+**4. En test, no le gana a nada.** Todo sobre 2025, mismo grano, mismas celdas:
+
+| Modelo | MAE | RMSE | Sesgo de nivel | Recall@20% | PEI@10% |
+|---|---|---|---|---|---|
+| Hawkes, 1 escala | 0,7346 | 1,0933 | 1,045 | **0,4552** | **0,9959** |
+| Hawkes, 2 escalas | 0,7400 | 1,0944 | 1,055 | 0,4530 | 0,9935 |
+| Hawkes, solo lento | 0,7422 | 1,1015 | 1,080 | 0,4526 | 0,9938 |
+| Promedio histórico | 0,7359 | 1,1067 | 1,027 | 0,4467 | 0,9854 |
+| **LightGBM (producción)** | **0,7200** | **1,0825** | 0,996 | 0,4547 | 0,9950 |
+
+El Hawkes le gana al promedio histórico por 0,85 puntos de Recall@20% y **pierde contra LightGBM en MAE y RMSE**. En Recall@20% le saca 0,05 puntos, que es ruido. Los tres PEI están arriba de 0,985: todos contra el techo.
+
+Vale reconocer lo que sí muestra la tabla: **404 parámetros y ninguna variable exógena empatan en ranking a un LightGBM con 27 features** (socioeconómicas, POIs, flujo peatonal, calendario, clima) y cientos de árboles. No es que el Hawkes sea malo — es que a esta resolución no queda nada que ganar, que es justo lo que había predicho el EDA con el Spearman de 0,983 entre años.
+
+**Error propio, atrapado a tiempo.** La primera versión evaluaba el modelo "sin término rápido" poniendo θ_rápido=0 sobre el ajuste ya hecho, sin reajustar μ. Eso deja el fondo compensando una excitación que ya no está: el modelo subpredecía el nivel un 29% y, como a grano hexágono×día el 82% de las celdas es cero, **subpredecir baja el MAE**. Aparecía con MAE 0,7149 — el mejor de toda la tabla, mejor que LightGBM — mientras su RMSE era el peor de todos. Reajustando μ da 0,7422, el peor. Es la cuarta vez en el proyecto que una métrica mal leída dice lo contrario de lo que pasa, y la primera que se detecta antes de escribirla en el README: el chequeo que lo cazó fue mirar la columna `sesgo_nivel`, que estaba en 0,71.
+
+Salida en `hawkes_resultados.parquet`.
+
+**Conclusión de la fase de modelado.** Con esto se cierra la pregunta abierta: se probaron gradient boosting agregado, desagregado por tipo, a grano semanal, con exógenas, como pronóstico con origen deslizante, y ahora un proceso auto-excitante. Ninguno le saca al promedio histórico más de unos pocos puntos de Recall. La razón está medida y es estructural, no algorítmica: el mapa de riesgo de un año predice el del siguiente con Spearman 0,983.
+
 ## Auditoría técnica externa y remediación P0
 
 Un panel externo (ver artefacto publicado en la conversación) revisó las 16 dimensiones del proyecto contra el estado del arte de crime analytics/urban computing/investigación operativa. Dos hallazgos se marcaron **P0** (antes que cualquier otra mejora) y ya se resolvieron:
