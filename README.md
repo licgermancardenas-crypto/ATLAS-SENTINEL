@@ -800,14 +800,31 @@ Esto es más vendible que el resultado de Capa 1 solo: aunque el modelo apenas l
 
 ## Export + Dashboard (`src/export/`, `dashboard/`)
 
-Última etapa del roadmap. `src/export/generar_export.py` convierte los parquet de Capa 0-3 en JSON/GeoJSON livianos (~290KB en total) en `dashboard/public/data/`: `hex_riesgo.geojson` (459 hexágonos con riesgo por turno), `modulo_a/b/c.json`, `comisarias.geojson`, `camaras.geojson`, `metricas.json`. El dashboard nunca lee los parquet directo — todo pasa por este export para no acoplar el frontend al esquema de Python.
+Última etapa del roadmap. El dashboard nunca lee los parquet directo — todo pasa por un export para no acoplar el frontend al esquema de Python. Son dos scripts:
 
-`dashboard/` es un proyecto Next.js 16 + React 19 + TypeScript + Tailwind v4, en el mismo repo (no separado — ver decisión más arriba). Mapa con **MapLibre GL** (sin API key, basemap oscuro de CARTO) coloreado por una rampa secuencial azul validada con la skill de dataviz (cuantiles, no escala lineal — el riesgo está muy sesgado). Panel lateral con toggles de capas (Módulo A/B/C, comisarías/cámaras reales) y panel de métricas (calibración, evolución mensual, cobertura de Módulo A) con gráficos SVG hechos a mano siguiendo los mark specs de la skill (líneas finas, tooltips on-hover, un eje por gráfico).
+- `src/export/generar_export.py` — las salidas por hexágono: `hex_riesgo.geojson` (401 hexágonos con riesgo por turno), `modulo_a/b/c.json`, `comisarias.geojson`, `camaras.geojson`, `metricas.json`.
+- `src/export/generar_export_dashboard.py` — las salidas por unidad administrativa, que son las que consume el tablero actual: `barrios_riesgo.geojson`, `comunas_resumen.json`, `curva_k.json`, `sensibilidad_radio.json`, `serie_delitos.json` y `resumen.json`.
+
+`dashboard/` es un proyecto Next.js 16 + React 19 + TypeScript + Tailwind v4, en el mismo repo (no separado — ver decisión más arriba).
+
+**El primer dashboard se descartó y se reescribió entero.** Dibujaba los 401 hexágonos crudos, con un panel lateral de toggles y paneles de métricas por módulo. Funcionaba, pero nadie fuera del proyecto piensa en hexágonos: la unidad con la que se asignan recursos es el barrio y la comuna. La segunda versión agrega el riesgo a esas unidades y usa una sola selección (turno, comuna, barrio) que filtra el tablero completo a la vez, en lugar de N paneles independientes.
+
+Decisiones de la versión actual:
+
+- **Agregación por promedio de hexágonos, no por suma.** Los barrios varían mucho en superficie; sumar convierte el mapa de riesgo en un mapa de tamaños. El total se guarda aparte porque para asignar recursos el volumen sí importa.
+- **Leaflet en vez de MapLibre GL.** MapLibre renderiza por WebGL y en esta máquina el proceso GPU de Chrome venía crasheando (`0xC0000005`), con `querySourceFeatures` devolviendo 0 features incluso en un repro mínimo. Leaflet dibuja en Canvas/DOM y no toca WebGL.
+- **Leaflet directo, sin react-leaflet.** El mapa se repinta decenas de veces por cambio de filtro; manejar las capas a mano evita reconstruir el árbol de React en cada cambio, y esquiva el problema conocido de react-leaflet con StrictMode montando dos veces.
+- **Cuantiles y no escala lineal** para el color, igual que en la primera versión: el riesgo está muy sesgado a la derecha y una rampa lineal deja 40 barrios del mismo color.
+- **Las salvedades van dentro del tablero**, colapsadas pero con el número visible en el título. Un tablero que muestra números sin decir de qué no responden invita a leerlos como si respondieran de todo.
+- **Los KPIs salen de `resumen.json`**, no hardcodeados en el front: un solo lugar donde corregirlos.
 
 **Gotchas de esta etapa**:
-- MapLibre GL v6 cambió a exports nombrados únicamente (`import { Map, NavigationControl, Popup } from "maplibre-gl"`) — el patrón viejo `import maplibregl from "maplibre-gl"` con default export ya no existe.
 - `create-next-app` no scaffoldea sobre un directorio con archivos (el `public/data/` ya generado por el export) — hubo que crear en un directorio temporal y mergear.
-- No se pudo verificar visualmente con la herramienta de automatización de navegador (el Chrome que controla la extensión no llega a `localhost:3000` aunque el servidor responde bien por `curl`/PowerShell en esta misma máquina — aislamiento de red entre la extensión y este entorno). Se verificó con `npm run build` + `npm run lint` (ambos limpios) y **a ojo por el usuario en su propio navegador — confirmado, el mapa renderiza bien**.
+- **Leaflet encuadra solo con zooms enteros.** `fitBounds` sobre la Ciudad calculaba ~12,6, redondeaba a 12, y CABA terminaba ocupando un cuarto del lienzo con el conurbano de relleno. Se arregla con `zoomSnap: 0.25`.
+- **`fitBounds` no puede correr en el efecto de creación**: en ese momento el contenedor todavía mide 0 de alto (el grid no resolvió) y el cálculo devuelve el zoom mínimo. Se espera al primer `ResizeObserver` con alto real.
+- **La rueda del mouse.** Un mapa dentro de un tablero que scrollea se traga el scroll de la página y hace zoom: bajar con el cursor encima del mapa te deja a nivel de calle sin haberlo pedido. Se desactiva `scrollWheelZoom` y se habilita recién al hacer clic en el mapa.
+- El export de Capa 4 tiraba `ArrayMemoryError` en esta máquina de 3,4GB releyendo `delitos_hex.parquet` por función (1,35M filas). Se carga una sola vez, con la fecha convertida a año/mes enteros y las columnas de texto a categóricas.
+- La primera versión no se pudo verificar con la automatización de navegador (la extensión no llegaba a `localhost:3000`); esta sí — se verificó a ojo, con `npm run build` y `npx eslint` limpios.
 
 Gotchas encontrados: `siniestros_hechos` guarda lat/lon como texto, no float (se castea en `hex_utils.asignar_hex_id`); `hora_siniestro` viene como "HH:MM:SS" mientras que `franja` de delitos ya es un número 0-23 (se resuelve en `hex_utils.turno_desde_hora`, detecta el formato).
 
