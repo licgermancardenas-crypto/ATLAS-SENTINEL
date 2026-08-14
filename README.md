@@ -369,6 +369,51 @@ Vale reconocer lo que sí muestra la tabla: **404 parámetros y ninguna variable
 
 Salida en `hawkes_resultados.parquet`.
 
+### El quiebre de 2025, resuelto (`src/validation/quiebre_2025.py`)
+
+El EDA dejó abierta la salvedad más incómoda del proyecto: en 2025 —el año de test— los delitos contra la propiedad caen ~25% y los interpersonales suben ~35%. Como los tres módulos de Capa 2 optimizan sobre superficies dominadas por robo y hurto, había que saber si el salto es del delito o del registro.
+
+**Hay dos fenómenos distintos, no uno.** La forma en el tiempo los separa: se mira el cociente contra el mismo mes del año anterior, que es plano si hubo un escalón y tiene deriva si hubo tendencia.
+
+| Tipo | Cociente medio 2025/2024 | Pendiente por mes | Control 2024/2023 | Forma |
+|---|---|---|---|---|
+| Robo | 0,73 | **−0,0012** | −0,0372 | escalón |
+| Hurto | 0,79 | **−0,0023** | −0,0089 | escalón |
+| Lesiones | 1,31 | **+0,0458** | +0,0017 | rampa |
+| Amenazas | 1,40 | **+0,0501** | +0,0068 | rampa |
+| Vialidad | 1,20 | −0,0198 | +0,0204 | caída progresiva |
+
+Robo y hurto caen de golpe y se quedan ahí los doce meses, con una planitud que ni siquiera tienen los años normales (el control 2024/2023 deriva 30 veces más). Lesiones y amenazas hacen lo contrario: **suben en rampa monótona todo el año**, de 1,09 en enero a 1,69 en diciembre, sin nada parecido en el control.
+
+**Cuatro firmas internas más, todas en la misma dirección:**
+
+1. **Uniformidad espacial.** Las 15 comunas se mueven en la misma dirección, con dispersión de 2,6 a 3,2 veces el ruido de muestreo. Hay algo de textura geográfica, pero está dominado por un componente común a toda la ciudad.
+2. **El hurto automotor no se movió: 0,976, contra 0,775 del hurto total.** Es el subtipo más resistente a un cambio de registro, porque la denuncia policial es requisito del seguro y se hace igual. Que sea justo el único que aguanta es difícil de explicar con una caída genuina del hurto.
+3. **La composición interna del robo casi no cambió**: `uso_arma` va de 12,3% a 11,1%. No parece un cambio de definición.
+4. **`uso_moto` sube de 8,4% a 11,2%.** Si el total de robos cae 27% y los robos en moto casi no bajan, la proporción tiene que subir — y sube exactamente lo que corresponde.
+
+**Evidencia externa** (consultada el 2026-08-14). La caída del 27% es la **cifra oficial**: el GCBA presentó el Mapa del Delito 2025 con 50.069 robos contra 68.392, el nivel más bajo en 25 años sin contar la pandemia, y coincide con este parquet (−26,9%) — o sea que estos datos son los oficiales, no una versión parcial. Pero las [encuestas de victimización de la UTDT](https://www.iciudad.org.ar/12092-delitos-y-violencia-una-lectura-critica-de-los-datos-preliminares-de-seguridad-en-caba/) se mantienen estables en el mismo período (promedio 24,3% entre 2022 y 2025; 23% declara haber sufrido un delito entre enero de 2025 y enero de 2026), y son independientes del registro policial. El [informe nacional](https://www.infobae.com/sociedad/policiales/2026/02/24/bajaron-todos-los-delitos-en-caba-y-es-la-segunda-ciudad-con-menor-tasa-de-homicidios-en-america/) advierte que parte del movimiento se explica por "mejoras en los sistemas de registro" y pide cautela. También hay reportes de dificultades para radicar denuncias por problemas técnicos del sistema interno en algunas dependencias. El mismo análisis independiente señala que los robos en moto bajaron apenas 3% y los homicidios en ocasión de robo subieron 13% — dos cosas que no acompañan una caída general del 27%.
+
+**Qué se puede afirmar y qué no.** No se puede probar desde estos datos que el cambio sea de registro, y la posición oficial es que la baja es real. Lo que sí está medido es que **las firmas internas no son las que produciría una caída puramente genuina**, y que ninguna fuente independiente del registro policial la acompaña. La lectura prudente es tratar el **nivel** de 2025 como no confiable.
+
+**Y ahora lo que decide si hay que cambiar algo.** Los módulos no consumen el nivel de delito, consumen el **orden** de los hexágonos. Se reponderaron los tipos de 2025 para devolverles la mezcla de 2024 (pesos: robo ×1,151, hurto ×1,065, lesiones ×0,632, amenazas ×0,597, vialidad ×0,712) y se comparó el mapa resultante:
+
+| Comparación | Spearman | Top-20% en común |
+|---|---|---|
+| 2024 contra 2025 crudo | 0,9747 | 90,0% |
+| 2024 contra 2025 reponderado | 0,9744 | 91,2% |
+| **2025 crudo contra reponderado** | **0,9989** | **98,8%** |
+
+La última fila aísla el efecto del quiebre de composición del simple paso del tiempo. **El mapa no se mueve**: 0,9989 de correlación y 98,8% del top-20% idéntico. Los seis tipos tienen patrones espaciales muy correlacionados entre sí (Spearman 0,84 a 0,92, ya medido al desagregar), así que reponderarlos entre ellos no reordena nada.
+
+**Consecuencia operativa, en tres líneas:**
+
+- **Los módulos A, B y C no hay que rehacerlos.** Optimizan sobre el orden, y el orden aguanta.
+- **Las métricas de ranking del modelo siguen siendo válidas** — Recall@K, PAI, PEI son invariantes a la escala y casi invariantes a esta reponderación.
+- **Cualquier afirmación sobre niveles queda inhabilitada**: no se puede decir "el riesgo bajó 16%" ni proyectar delitos evitados contra la base de 2025. Y al reentrenar con 2026 hay que volver a mirar esto antes de leer el MAE.
+
+Salidas en `quiebre_2025.parquet` y sus dos archivos hermanos.
+
 **Conclusión de la fase de modelado.** Con esto se cierra la pregunta abierta: se probaron gradient boosting agregado, desagregado por tipo, a grano semanal, con exógenas, como pronóstico con origen deslizante, y ahora un proceso auto-excitante. Ninguno le saca al promedio histórico más de unos pocos puntos de Recall. La razón está medida y es estructural, no algorítmica: el mapa de riesgo de un año predice el del siguiente con Spearman 0,983.
 
 ## Auditoría técnica externa y remediación P0
