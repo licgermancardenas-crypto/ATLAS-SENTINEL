@@ -1,53 +1,33 @@
 import type { FeatureCollection } from "geojson";
-import type { ModuloA, ModuloB, ModuloC, Metricas } from "./types";
+import type {
+  BarriosGeoJSON, ComunaResumen, CurvaK, DatosDashboard, FilaSerie,
+  PuntoModuloA, PuntoModuloB, PuntoModuloC, Resumen, SensibilidadRadio,
+} from "./types";
 
-async function cargarJSON<T>(ruta: string): Promise<T> {
-  const res = await fetch(ruta);
-  if (!res.ok) throw new Error(`No se pudo cargar ${ruta}: ${res.status}`);
-  return res.json();
+async function traer<T>(ruta: string): Promise<T> {
+  const res = await fetch(ruta, { cache: "force-cache" });
+  if (!res.ok) throw new Error(`No se pudo cargar ${ruta} (HTTP ${res.status})`);
+  return res.json() as Promise<T>;
 }
 
-export interface DatosDashboard {
-  hexRiesgo: FeatureCollection;
-  moduloA: ModuloA[];
-  moduloB: ModuloB[];
-  moduloC: ModuloC[];
-  comisarias: FeatureCollection;
-  camaras: FeatureCollection;
-  metricas: Metricas;
-}
-
-export async function cargarDatosDashboard(): Promise<DatosDashboard> {
-  const [hexRiesgo, moduloA, moduloB, moduloC, comisarias, camaras, metricas] = await Promise.all([
-    cargarJSON<FeatureCollection>("/data/hex_riesgo.geojson"),
-    cargarJSON<ModuloA[]>("/data/modulo_a.json"),
-    cargarJSON<ModuloB[]>("/data/modulo_b.json"),
-    cargarJSON<ModuloC[]>("/data/modulo_c.json"),
-    cargarJSON<FeatureCollection>("/data/comisarias.geojson"),
-    cargarJSON<FeatureCollection>("/data/camaras.geojson"),
-    cargarJSON<Metricas>("/data/metricas.json"),
+/** Todo el tablero se sirve de archivos estáticos: no hay backend ni base. Es
+ *  suficiente porque el modelo se reentrena por lote, no en vivo. */
+export async function cargarDatos(): Promise<DatosDashboard> {
+  const [
+    barrios, comunas, moduloA, moduloB, moduloC,
+    comisarias, camaras, curvaK, radio, serie, resumen,
+  ] = await Promise.all([
+    traer<BarriosGeoJSON>("/data/barrios_riesgo.geojson"),
+    traer<ComunaResumen[]>("/data/comunas_resumen.json"),
+    traer<PuntoModuloA[]>("/data/modulo_a_k75.json"),
+    traer<PuntoModuloB[]>("/data/modulo_b_red.json"),
+    traer<PuntoModuloC[]>("/data/modulo_c.json"),
+    traer<FeatureCollection>("/data/comisarias.geojson"),
+    traer<FeatureCollection>("/data/camaras.geojson"),
+    traer<CurvaK>("/data/curva_k.json"),
+    traer<SensibilidadRadio>("/data/sensibilidad_radio.json"),
+    traer<FilaSerie[]>("/data/serie_delitos.json"),
+    traer<Resumen>("/data/resumen.json"),
   ]);
-  return { hexRiesgo, moduloA, moduloB, moduloC, comisarias, camaras, metricas };
-}
-
-export function moduloAaGeojson(datos: ModuloA[]): FeatureCollection {
-  return {
-    type: "FeatureCollection",
-    features: datos.map((d) => ({
-      type: "Feature",
-      geometry: { type: "Point", coordinates: [d.lon, d.lat] },
-      properties: { ...d },
-    })),
-  };
-}
-
-export function moduloBaGeojson(datos: ModuloB[]): FeatureCollection {
-  return {
-    type: "FeatureCollection",
-    features: datos.map((d) => ({
-      type: "Feature",
-      geometry: { type: "Point", coordinates: [d.lon, d.lat] },
-      properties: { ...d },
-    })),
-  };
+  return { barrios, comunas, moduloA, moduloB, moduloC, comisarias, camaras, curvaK, radio, serie, resumen };
 }

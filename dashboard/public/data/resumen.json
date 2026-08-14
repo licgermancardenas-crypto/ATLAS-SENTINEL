@@ -1,0 +1,43 @@
+{
+ "periodo": {
+  "desde": 2016,
+  "hasta": 2025
+ },
+ "delitos_ultimo_anio": 130421,
+ "delitos_anio_previo": 154929,
+ "n_hexagonos": 401,
+ "n_barrios": 48,
+ "n_comunas": 15,
+ "modelo": {
+  "mae": 0.2902,
+  "mae_naive": 0.2961,
+  "recall_20": 0.454,
+  "recall_20_naive": 0.4467,
+  "pai_10": 2.77,
+  "pei_10": 0.995,
+  "concentracion_30pct_area": 0.585
+ },
+ "modulo_a": {
+  "cobertura_actual": 0.35092838880283334,
+  "n_comisarias": 75,
+  "radio_m": 800,
+  "turno": "Tarde"
+ },
+ "modulo_b": {
+  "n_camaras_existentes": 224,
+  "cobertura_30_camaras": 0.0703,
+  "km_cubiertos_30": 86.4,
+  "km_red": 3927
+ },
+ "modulo_c": {
+  "n_corredores": 9,
+  "primero": "Pórtico Independencia",
+  "siniestros_km_primero": 53.7
+ },
+ "salvedades": [
+  "El nivel de delitos de 2025 no es confiable: robo y hurto caen de golpe y de forma uniforme, el hurto automotor no se mueve, y las encuestas de victimización no acompañan. El ranking espacial sí aguanta (Spearman 0,9989 al reponderar).",
+  "El modelo le gana al promedio histórico apenas 2% en error. Lo que hace bien es concentrar: el 30% del área reúne el 58,5% de los delitos.",
+  "Las ubicaciones del Módulo A dependen del radio de cobertura: con 1.000 m en vez de 800, solo el 28% de las posiciones coincide. El tamaño de la ganancia sí es robusto.",
+  "Cobertura no es delito evitado. Medirlo requiere un piloto con zonas de control."
+ ]
+}

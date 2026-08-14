@@ -1,0 +1,514 @@
+{
+ "turno": "Tarde",
+ "k_titular": 75,
+ "radios": [
+  {
+   "radio_m": 300,
+   "densidad_matriz": 0.002237054422766613,
+   "cobertura_actual": 0.0536686558110013,
+   "por_k": [
+    {
+     "k": 10,
+     "estado": "Infeasible",
+     "cobertura": null
+    },
+    {
+     "k": 15,
+     "estado": "Optimal",
+     "cobertura": 0.1021990494232444,
+     "reusa_comisaria": 1
+    },
+    {
+     "k": 20,
+     "estado": "Optimal",
+     "cobertura": 0.1546475064151691,
+     "reusa_comisaria": 1
+    },
+    {
+     "k": 25,
+     "estado": "Optimal",
+     "cobertura": 0.1949768153668166,
+     "reusa_comisaria": 1
+    },
+    {
+     "k": 30,
+     "estado": "Optimal",
+     "cobertura": 0.23026925084245556,
+     "reusa_comisaria": 1
+    },
+    {
+     "k": 35,
+     "estado": "Optimal",
+     "cobertura": 0.2617989030286103,
+     "reusa_comisaria": 1
+    },
+    {
+     "k": 40,
+     "estado": "Optimal",
+     "cobertura": 0.2912018698649819,
+     "reusa_comisaria": 3
+    },
+    {
+     "k": 50,
+     "estado": "Optimal",
+     "cobertura": 0.3446018149893706,
+     "reusa_comisaria": 3
+    },
+    {
+     "k": 60,
+     "estado": "Optimal",
+     "cobertura": 0.3916465449854172,
+     "reusa_comisaria": 3
+    },
+    {
+     "k": 75,
+     "estado": "Optimal",
+     "cobertura": 0.45272266734725236,
+     "reusa_comisaria": 4
+    }
+   ],
+   "cruce_k": 15,
+   "cobertura_k_titular": 0.45272266734725236,
+   "reusa_comisaria_k_titular": 4,
+   "ganancia_pp": 0.3990540115362511,
+   "ganancia_relativa": 7.4355134390090445,
+   "solape_plan_vs_800": 0.5333333333333333
+  },
+  {
+   "radio_m": 500,
+   "densidad_matriz": 0.0023994635260588025,
+   "cobertura_actual": 0.11532662408200471,
+   "por_k": [
+    {
+     "k": 10,
+     "estado": "Infeasible",
+     "cobertura": null
+    },
+    {
+     "k": 15,
+     "estado": "Optimal",
+     "cobertura": 0.1021990494232444,
+     "reusa_comisaria": 1
+    },
+    {
+     "k": 20,
+     "estado": "Optimal",
+     "cobertura": 0.1546475064151691,
+     "reusa_comisaria": 2
+    },
+    {
+     "k": 25,
+     "estado": "Optimal",
+     "cobertura": 0.1949768153668166,
+     "reusa_comisaria": 2
+    },
+    {
+     "k": 30,
+     "estado": "Optimal",
+     "cobertura": 0.23026925084245556,
+     "reusa_comisaria": 2
+    },
+    {
+     "k": 35,
+     "estado": "Optimal",
+     "cobertura": 0.2617989030286103,
+     "reusa_comisaria": 2
+    },
+    {
+     "k": 40,
+     "estado": "Optimal",
+     "cobertura": 0.2912018698649819,
+     "reusa_comisaria": 2
+    },
+    {
+     "k": 50,
+     "estado": "Optimal",
+     "cobertura": 0.3446018149893706,
+     "reusa_comisaria": 3
+    },
+    {
+     "k": 60,
+     "estado": "Optimal",
+     "cobertura": 0.3916465449854172,
+     "reusa_comisaria": 3
+    },
+    {
+     "k": 75,
+     "estado": "Optimal",
+     "cobertura": 0.45272266734725236,
+     "reusa_comisaria": 4
+    }
+   ],
+   "cruce_k": 20,
+   "cobertura_k_titular": 0.45272266734725236,
+   "reusa_comisaria_k_titular": 4,
+   "ganancia_pp": 0.33739604326524764,
+   "ganancia_relativa": 2.925569407332492,
+   "solape_plan_vs_800": 0.5333333333333333
+  },
+  {
+   "radio_m": 650,
+   "densidad_matriz": 0.0027452377459712064,
+   "cobertura_actual": 0.24629667724912574,
+   "por_k": [
+    {
+     "k": 10,
+     "estado": "Infeasible",
+     "cobertura": null
+    },
+    {
+     "k": 15,
+     "estado": "Optimal",
+     "cobertura": 0.1349413660997427,
+     "reusa_comisaria": 9
+    },
+    {
+     "k": 20,
+     "estado": "Optimal",
+     "cobertura": 0.18827827699899904,
+     "reusa_comisaria": 12
+    },
+    {
+     "k": 25,
+     "estado": "Optimal",
+     "cobertura": 0.2323599601485223,
+     "reusa_comisaria": 13
+    },
+    {
+     "k": 30,
+     "estado": "Optimal",
+     "cobertura": 0.2697013332840318,
+     "reusa_comisaria": 13
+    },
+    {
+     "k": 35,
+     "estado": "Optimal",
+     "cobertura": 0.30150855679906774,
+     "reusa_comisaria": 14
+    },
+    {
+     "k": 40,
+     "estado": "Optimal",
+     "cobertura": 0.33149362340632554,
+     "reusa_comisaria": 16
+    },
+    {
+     "k": 50,
+     "estado": "Optimal",
+     "cobertura": 0.3867492268528273,
+     "reusa_comisaria": 19
+    },
+    {
+     "k": 60,
+     "estado": "Optimal",
+     "cobertura": 0.434057782304354,
+     "reusa_comisaria": 19
+    },
+    {
+     "k": 75,
+     "estado": "Optimal",
+     "cobertura": 0.49514446431239234,
+     "reusa_comisaria": 22
+    }
+   ],
+   "cruce_k": 30,
+   "cobertura_k_titular": 0.49514446431239234,
+   "reusa_comisaria_k_titular": 22,
+   "ganancia_pp": 0.2488477870632666,
+   "ganancia_relativa": 1.010357873450158,
+   "solape_plan_vs_800": 0.68
+  },
+  {
+   "radio_m": 800,
+   "densidad_matriz": 0.0035310882457721244,
+   "cobertura_actual": 0.35092838880283334,
+   "por_k": [
+    {
+     "k": 10,
+     "estado": "Optimal",
+     "cobertura": 0.12533786480847778,
+     "reusa_comisaria": 4
+    },
+    {
+     "k": 15,
+     "estado": "Optimal",
+     "cobertura": 0.20654767785285713,
+     "reusa_comisaria": 6
+    },
+    {
+     "k": 20,
+     "estado": "Optimal",
+     "cobertura": 0.2704248332046236,
+     "reusa_comisaria": 10
+    },
+    {
+     "k": 25,
+     "estado": "Optimal",
+     "cobertura": 0.3160198757768386,
+     "reusa_comisaria": 13
+    },
+    {
+     "k": 30,
+     "estado": "Optimal",
+     "cobertura": 0.35587082302396,
+     "reusa_comisaria": 14
+    },
+    {
+     "k": 35,
+     "estado": "Optimal",
+     "cobertura": 0.38780600206354016,
+     "reusa_comisaria": 17
+    },
+    {
+     "k": 40,
+     "estado": "Optimal",
+     "cobertura": 0.4181120877662446,
+     "reusa_comisaria": 18
+    },
+    {
+     "k": 50,
+     "estado": "Optimal",
+     "cobertura": 0.47490207423130704,
+     "reusa_comisaria": 18
+    },
+    {
+     "k": 60,
+     "estado": "Optimal",
+     "cobertura": 0.5243317249533771,
+     "reusa_comisaria": 19
+    },
+    {
+     "k": 75,
+     "estado": "Optimal",
+     "cobertura": 0.5865493453820925,
+     "reusa_comisaria": 22
+    }
+   ],
+   "cruce_k": 30,
+   "cobertura_k_titular": 0.5865493453820925,
+   "reusa_comisaria_k_titular": 22,
+   "ganancia_pp": 0.23562095657925913,
+   "ganancia_relativa": 0.6714217603855388,
+   "solape_plan_vs_800": 1.0
+  },
+  {
+   "radio_m": 1000,
+   "densidad_matriz": 0.006836899348267985,
+   "cobertura_actual": 0.536901238654372,
+   "por_k": [
+    {
+     "k": 10,
+     "estado": "Optimal",
+     "cobertura": 0.20422110710757047,
+     "reusa_comisaria": 3
+    },
+    {
+     "k": 15,
+     "estado": "Optimal",
+     "cobertura": 0.30767628148684106,
+     "reusa_comisaria": 5
+    },
+    {
+     "k": 20,
+     "estado": "Optimal",
+     "cobertura": 0.3809057544413436,
+     "reusa_comisaria": 4
+    },
+    {
+     "k": 25,
+     "estado": "Optimal",
+     "cobertura": 0.4458440140849106,
+     "reusa_comisaria": 6
+    },
+    {
+     "k": 30,
+     "estado": "Optimal",
+     "cobertura": 0.5047870978084499,
+     "reusa_comisaria": 5
+    },
+    {
+     "k": 35,
+     "estado": "Optimal",
+     "cobertura": 0.5560926933299484,
+     "reusa_comisaria": 6
+    },
+    {
+     "k": 40,
+     "estado": "Optimal",
+     "cobertura": 0.6021846043326557,
+     "reusa_comisaria": 5
+    },
+    {
+     "k": 50,
+     "estado": "Optimal",
+     "cobertura": 0.6843292709320168,
+     "reusa_comisaria": 8
+    },
+    {
+     "k": 60,
+     "estado": "Optimal",
+     "cobertura": 0.7506212723333561,
+     "reusa_comisaria": 10
+    },
+    {
+     "k": 75,
+     "estado": "Optimal",
+     "cobertura": 0.8308924081236481,
+     "reusa_comisaria": 12
+    }
+   ],
+   "cruce_k": 35,
+   "cobertura_k_titular": 0.8308924081236481,
+   "reusa_comisaria_k_titular": 12,
+   "ganancia_pp": 0.29399116946927606,
+   "ganancia_relativa": 0.5475702946897683,
+   "solape_plan_vs_800": 0.28
+  },
+  {
+   "radio_m": 1200,
+   "densidad_matriz": 0.010954755967224795,
+   "cobertura_actual": 0.6647288179204962,
+   "por_k": [
+    {
+     "k": 10,
+     "estado": "Optimal",
+     "cobertura": 0.3009178215396931,
+     "reusa_comisaria": 0
+    },
+    {
+     "k": 15,
+     "estado": "Optimal",
+     "cobertura": 0.42987457051648803,
+     "reusa_comisaria": 2
+    },
+    {
+     "k": 20,
+     "estado": "Optimal",
+     "cobertura": 0.5243132435057356,
+     "reusa_comisaria": 3
+    },
+    {
+     "k": 25,
+     "estado": "Optimal",
+     "cobertura": 0.6012925400298215,
+     "reusa_comisaria": 2
+    },
+    {
+     "k": 30,
+     "estado": "Optimal",
+     "cobertura": 0.6657490064641118,
+     "reusa_comisaria": 2
+    },
+    {
+     "k": 35,
+     "estado": "Optimal",
+     "cobertura": 0.724347197732659,
+     "reusa_comisaria": 3
+    },
+    {
+     "k": 40,
+     "estado": "Optimal",
+     "cobertura": 0.77700446802018,
+     "reusa_comisaria": 4
+    },
+    {
+     "k": 50,
+     "estado": "Optimal",
+     "cobertura": 0.8677072343375212,
+     "reusa_comisaria": 6
+    },
+    {
+     "k": 60,
+     "estado": "Optimal",
+     "cobertura": 0.9284032362380477,
+     "reusa_comisaria": 3
+    },
+    {
+     "k": 75,
+     "estado": "Optimal",
+     "cobertura": 0.976765187801034,
+     "reusa_comisaria": 9
+    }
+   ],
+   "cruce_k": 30,
+   "cobertura_k_titular": 0.976765187801034,
+   "reusa_comisaria_k_titular": 9,
+   "ganancia_pp": 0.31203636988053784,
+   "ganancia_relativa": 0.469419049495547,
+   "solape_plan_vs_800": 0.18666666666666668
+  },
+  {
+   "radio_m": 1500,
+   "densidad_matriz": 0.01611517424925082,
+   "cobertura_actual": 0.7913429373163184,
+   "por_k": [
+    {
+     "k": 10,
+     "estado": "Optimal",
+     "cobertura": 0.42322575837431364,
+     "reusa_comisaria": 2
+    },
+    {
+     "k": 15,
+     "estado": "Optimal",
+     "cobertura": 0.557662987670612,
+     "reusa_comisaria": 3
+    },
+    {
+     "k": 20,
+     "estado": "Optimal",
+     "cobertura": 0.6574108152174976,
+     "reusa_comisaria": 6
+    },
+    {
+     "k": 25,
+     "estado": "Optimal",
+     "cobertura": 0.7400744766885363,
+     "reusa_comisaria": 7
+    },
+    {
+     "k": 30,
+     "estado": "Optimal",
+     "cobertura": 0.8129172095697972,
+     "reusa_comisaria": 4
+    },
+    {
+     "k": 35,
+     "estado": "Optimal",
+     "cobertura": 0.8710897840306074,
+     "reusa_comisaria": 5
+    },
+    {
+     "k": 40,
+     "estado": "Optimal",
+     "cobertura": 0.9155797349065483,
+     "reusa_comisaria": 6
+    },
+    {
+     "k": 50,
+     "estado": "Optimal",
+     "cobertura": 0.9709331218289055,
+     "reusa_comisaria": 7
+    },
+    {
+     "k": 60,
+     "estado": "Optimal",
+     "cobertura": 0.9927895682587405,
+     "reusa_comisaria": 7
+    },
+    {
+     "k": 75,
+     "estado": "Optimal",
+     "cobertura": 1.0,
+     "reusa_comisaria": 9
+    }
+   ],
+   "cruce_k": 30,
+   "cobertura_k_titular": 1.0,
+   "reusa_comisaria_k_titular": 9,
+   "ganancia_pp": 0.20865706268368156,
+   "ganancia_relativa": 0.2636746381932722,
+   "solape_plan_vs_800": 0.17333333333333334
+  }
+ ]
+}

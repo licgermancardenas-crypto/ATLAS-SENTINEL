@@ -1,0 +1,86 @@
+{
+ "turno": "Tarde",
+ "radio_m": 800,
+ "n_demanda": 401,
+ "n_candidatos": 476,
+ "n_comisarias": 75,
+ "n_comunas": 15,
+ "cobertura_actual": 0.35092838880283334,
+ "curva": [
+  {
+   "k": 5,
+   "estado": "Infeasible",
+   "cobertura": null
+  },
+  {
+   "k": 10,
+   "estado": "Optimal",
+   "cobertura": 0.12533786480847778,
+   "reusa_comisaria": 4,
+   "puestos_nuevos": 6
+  },
+  {
+   "k": 15,
+   "estado": "Optimal",
+   "cobertura": 0.20654767785285713,
+   "reusa_comisaria": 6,
+   "puestos_nuevos": 9
+  },
+  {
+   "k": 20,
+   "estado": "Optimal",
+   "cobertura": 0.2704248332046236,
+   "reusa_comisaria": 10,
+   "puestos_nuevos": 10
+  },
+  {
+   "k": 30,
+   "estado": "Optimal",
+   "cobertura": 0.35587082302396,
+   "reusa_comisaria": 14,
+   "puestos_nuevos": 16
+  },
+  {
+   "k": 40,
+   "estado": "Optimal",
+   "cobertura": 0.4181120877662446,
+   "reusa_comisaria": 18,
+   "puestos_nuevos": 22
+  },
+  {
+   "k": 50,
+   "estado": "Optimal",
+   "cobertura": 0.47490207423130704,
+   "reusa_comisaria": 18,
+   "puestos_nuevos": 32
+  },
+  {
+   "k": 60,
+   "estado": "Optimal",
+   "cobertura": 0.5243317249533771,
+   "reusa_comisaria": 19,
+   "puestos_nuevos": 41
+  },
+  {
+   "k": 75,
+   "estado": "Optimal",
+   "cobertura": 0.5865493453820925,
+   "reusa_comisaria": 22,
+   "puestos_nuevos": 53
+  },
+  {
+   "k": 90,
+   "estado": "Optimal",
+   "cobertura": 0.641853216831065,
+   "reusa_comisaria": 24,
+   "puestos_nuevos": 66
+  },
+  {
+   "k": 110,
+   "estado": "Optimal",
+   "cobertura": 0.7081793645081319,
+   "reusa_comisaria": 28,
+   "puestos_nuevos": 82
+  }
+ ]
+}

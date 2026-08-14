@@ -1,91 +1,164 @@
 @import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
 
-/* Dark es la estética por default (herramienta de operaciones/seguridad),
-   pero se respeta prefers-color-scheme:light y un toggle futuro (data-theme). */
+/* ============================================================================
+   SIGE-BA — sistema de tokens
+   Estilo "Data-Dense Dashboard": densidad alta, padding chico, grilla, la
+   información manda sobre la decoración.
+
+   Light es el default (es el registro de una herramienta analítica de gestión);
+   dark está completo y se activa por preferencia del sistema o por el toggle.
+   Todo color se define acá y se consume por token — ningún hex suelto en
+   componentes.
+   ========================================================================= */
+
 :root {
-  color-scheme: dark;
-  --surface-0: #101012;
-  --surface-1: #1a1a19;
-  --surface-2: #232322;
-  --text-primary: #ffffff;
-  --text-secondary: #c3c2b7;
-  --border: #34342f;
+  color-scheme: light;
 
-  /* secuencial azul (riesgo), 100 = bajo, 700 = alto — validado dataviz skill (paso dark) */
-  --risk-100: #cde2fb;
-  --risk-200: #9ec5f4;
-  --risk-300: #6da7ec;
-  --risk-400: #3987e5;
-  --risk-500: #256abf;
-  --risk-600: #184f95;
-  --risk-700: #0d366b;
+  /* superficies: 0 es el fondo de la app, 2 el de las tarjetas elevadas */
+  --surface-0: #eef2f7;
+  --surface-1: #f8fafc;
+  --surface-2: #ffffff;
+  --surface-sunk: #e4eaf2;
 
-  --status-good: #0ca30c;
-  --status-warning: #fab219;
-  --status-serious: #ec835a;
-  --status-critical: #e66767;
+  --text-primary: #0f1b2d;
+  --text-secondary: #4a5568;
+  --text-muted: #718096;
 
+  --border: #d7e0ec;
+  --border-strong: #b9c7da;
+
+  /* marca / UI. El azul es cromo de interfaz y "escenario optimizado", NO es
+     la escala de riesgo: mezclarlos hace que el mapa compita con los controles. */
+  --brand: #1e40af;
+  --brand-soft: #3b82f6;
+  --brand-wash: rgba(30, 64, 175, 0.09);
   --accent: #d97706;
+  --accent-wash: rgba(217, 119, 6, 0.12);
 
-  /* mapa SVG (ver components/MapaSVG.tsx) — el fondo es la ciudad real
-     dibujada desde datos, no un basemap de tiles */
-  --mapa-agua: #0b1016;
-  --mapa-tierra: #1a1e24;
-  --via-menor: rgba(255, 255, 255, 0.13);
-  --via-media: rgba(255, 255, 255, 0.24);
-  --via-troncal: #6b7480;
-  --barrio-linea: rgba(255, 255, 255, 0.14);
+  /* semánticos: separados de la marca, como pide la guía de color */
+  --good: #15803d;
+  --warn: #b45309;
+  --bad: #b91c1c;
+
+  /* Escala secuencial de riesgo, 5 clases, cálida. Va aparte del azul de marca
+     a propósito: el calor se lee como intensidad sin explicación previa, y deja
+     el azul libre para las capas de puntos, que son la recomendación. */
+  --risk-1: #fef3c7;
+  --risk-2: #fcd34d;
+  --risk-3: #f59e0b;
+  --risk-4: #dc6803;
+  --risk-5: #9a3412;
+  --risk-nulo: #e2e8f0;
+
+  /* capas operativas del mapa */
+  --pt-existente: #64748b;
+  --pt-propuesto: #1e40af;
+  --pt-alerta: #b91c1c;
+
+  --ring: #1e40af;
+  --shadow-card: 0 1px 2px rgba(15, 27, 45, 0.06), 0 1px 3px rgba(15, 27, 45, 0.05);
+  --shadow-pop: 0 10px 30px rgba(15, 27, 45, 0.16);
+
+  --radius: 6px;
 }
 
-@media (prefers-color-scheme: light) {
-  :root:where(:not([data-theme="dark"])) {
-    color-scheme: light;
-    --surface-0: #f8fafc;
-    --surface-1: #fcfcfb;
-    --surface-2: #ffffff;
-    --text-primary: #0b0b0b;
-    --text-secondary: #52514e;
-    --border: #e2e8f0;
-    --status-critical: #d03b3b;
-    --mapa-agua: #ccd9e0;
-    --mapa-tierra: #f4f2ee;
-    --via-menor: rgba(18, 22, 28, 0.17);
-    --via-media: rgba(18, 22, 28, 0.34);
-    --via-troncal: #8e949c;
-    --barrio-linea: rgba(18, 22, 28, 0.16);
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface-0: #0b1017;
+    --surface-1: #121924;
+    --surface-2: #18212e;
+    --surface-sunk: #0f1620;
+
+    --text-primary: #eef3f9;
+    --text-secondary: #a7b4c6;
+    --text-muted: #7c8a9e;
+
+    --border: #24303f;
+    --border-strong: #35455a;
+
+    --brand: #4f86f7;
+    --brand-soft: #6ea1ff;
+    --brand-wash: rgba(79, 134, 247, 0.16);
+    --accent: #f0a13a;
+    --accent-wash: rgba(240, 161, 58, 0.16);
+
+    --good: #34d399;
+    --warn: #fbbf24;
+    --bad: #f87171;
+
+    --risk-1: #3a2f1a;
+    --risk-2: #6b4a17;
+    --risk-3: #a06a1c;
+    --risk-4: #d0822c;
+    --risk-5: #f0a659;
+    --risk-nulo: #1c2634;
+
+    --pt-existente: #93a3b8;
+    --pt-propuesto: #6ea1ff;
+    --pt-alerta: #f87171;
+
+    --ring: #6ea1ff;
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-pop: 0 10px 30px rgba(0, 0, 0, 0.55);
   }
 }
 
-:root[data-theme="light"] {
-  color-scheme: light;
-  --surface-0: #f8fafc;
-  --surface-1: #fcfcfb;
-  --surface-2: #ffffff;
-  --text-primary: #0b0b0b;
-  --text-secondary: #52514e;
-  --border: #e2e8f0;
-  --status-critical: #d03b3b;
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-0: #0b1017;
+  --surface-1: #121924;
+  --surface-2: #18212e;
+  --surface-sunk: #0f1620;
+  --text-primary: #eef3f9;
+  --text-secondary: #a7b4c6;
+  --text-muted: #7c8a9e;
+  --border: #24303f;
+  --border-strong: #35455a;
+  --brand: #4f86f7;
+  --brand-soft: #6ea1ff;
+  --brand-wash: rgba(79, 134, 247, 0.16);
+  --accent: #f0a13a;
+  --accent-wash: rgba(240, 161, 58, 0.16);
+  --good: #34d399;
+  --warn: #fbbf24;
+  --bad: #f87171;
+  --risk-1: #3a2f1a;
+  --risk-2: #6b4a17;
+  --risk-3: #a06a1c;
+  --risk-4: #d0822c;
+  --risk-5: #f0a659;
+  --risk-nulo: #1c2634;
+  --pt-existente: #93a3b8;
+  --pt-propuesto: #6ea1ff;
+  --pt-alerta: #f87171;
+  --ring: #6ea1ff;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-pop: 0 10px 30px rgba(0, 0, 0, 0.55);
 }
 
 @theme inline {
   --color-surface-0: var(--surface-0);
   --color-surface-1: var(--surface-1);
   --color-surface-2: var(--surface-2);
-  --color-text-primary: var(--text-primary);
-  --color-text-secondary: var(--text-secondary);
-  --color-border: var(--border);
+  --color-surface-sunk: var(--surface-sunk);
+  --color-ink: var(--text-primary);
+  --color-ink-2: var(--text-secondary);
+  --color-ink-muted: var(--text-muted);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-brand: var(--brand);
+  --color-brand-soft: var(--brand-soft);
   --color-accent: var(--accent);
-  --color-status-good: var(--status-good);
-  --color-status-warning: var(--status-warning);
-  --color-status-serious: var(--status-serious);
-  --color-status-critical: var(--status-critical);
-  --color-risk-100: var(--risk-100);
-  --color-risk-200: var(--risk-200);
-  --color-risk-300: var(--risk-300);
-  --color-risk-400: var(--risk-400);
-  --color-risk-500: var(--risk-500);
-  --color-risk-600: var(--risk-600);
-  --color-risk-700: var(--risk-700);
+  --color-good: var(--good);
+  --color-warn: var(--warn);
+  --color-bad: var(--bad);
+  --color-risk-1: var(--risk-1);
+  --color-risk-2: var(--risk-2);
+  --color-risk-3: var(--risk-3);
+  --color-risk-4: var(--risk-4);
+  --color-risk-5: var(--risk-5);
   --font-sans: var(--font-fira-sans);
   --font-mono: var(--font-fira-code);
 }
@@ -94,16 +167,71 @@ body {
   background: var(--surface-0);
   color: var(--text-primary);
   font-family: var(--font-fira-sans), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
-.maplibregl-popup-content {
+/* Cifras alineadas en columnas: obligatorio en tablas y KPIs, si no los
+   números bailan al cambiar de filtro. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* foco visible y consistente en todo lo interactivo */
+:where(button, a, input, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+.card {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+}
+
+.scroll-fino::-webkit-scrollbar { width: 8px; height: 8px; }
+.scroll-fino::-webkit-scrollbar-track { background: transparent; }
+.scroll-fino::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 4px;
+}
+
+/* ---- Leaflet, alineado al tema ---- */
+.leaflet-container {
+  background: var(--surface-sunk);
+  font-family: var(--font-fira-sans), sans-serif;
+  outline: none;
+}
+.leaflet-control-attribution {
+  background: color-mix(in srgb, var(--surface-2) 88%, transparent) !important;
+  color: var(--text-muted) !important;
+  font-size: 10px !important;
+}
+.leaflet-control-attribution a { color: var(--text-secondary) !important; }
+.leaflet-bar a {
   background: var(--surface-2) !important;
   color: var(--text-primary) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: 8px !important;
-  font-family: var(--font-fira-sans), sans-serif !important;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35) !important;
+  border-color: var(--border) !important;
 }
-.maplibregl-popup-tip {
-  border-top-color: var(--surface-2) !important;
+.leaflet-bar a:hover { background: var(--surface-1) !important; }
+
+.leaflet-tooltip.sige-tip {
+  background: var(--surface-2);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-pop);
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.leaflet-tooltip.sige-tip::before { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

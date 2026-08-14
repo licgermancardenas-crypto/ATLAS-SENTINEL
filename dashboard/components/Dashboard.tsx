@@ -1,153 +1,310 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import type { FeatureCollection } from "geojson";
-import { TURNOS, Turno } from "@/lib/types";
-import { cargarDatosDashboard, moduloAaGeojson, moduloBaGeojson, type DatosDashboard } from "@/lib/data";
-import { cargarMapaBase, type MapaBase } from "@/lib/mapa";
-import MapaSVG from "./MapaSVG";
-import ModulePanel from "./ModulePanel";
-import MetricsPanel from "./MetricsPanel";
-import LimitsPanel from "./LimitsPanel";
-import { RISK_RAMP } from "@/lib/color";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
+import type { BarrioProps, Capa, DatosDashboard, Turno } from "@/lib/types";
+import { CAPAS, claveRiesgo } from "@/lib/types";
+import { cargarDatos } from "@/lib/data";
+import { delta, num, num3, pct, pp } from "@/lib/formato";
+import { cortesPorCuantil, ETIQUETAS_CLASE, VAR_RIESGO } from "@/lib/escala";
+import { KpiRow } from "./Kpi";
+import {
+  ChipsActivos, ControlK, SelectorCapa, SelectorComuna, SelectorTurno, ToggleTema,
+} from "./Controles";
+import { BarrasComuna, CurvaCobertura, SensibilidadAlRadio, SerieAnual } from "./Graficos";
+import TablaBarrios from "./TablaBarrios";
+import Salvedades from "./Salvedades";
 
-type Tab = "capas" | "metricas" | "limites";
+// Leaflet toca `window` al importarse, así que no puede renderizar en el servidor
+const Mapa = dynamic(() => import("./Mapa"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-full w-full grid place-items-center bg-surface-sunk">
+      <span className="text-xs text-ink-muted">Cargando mapa…</span>
+    </div>
+  ),
+});
 
 export default function Dashboard() {
   const [datos, setDatos] = useState<DatosDashboard | null>(null);
-  const [mapa, setMapa] = useState<MapaBase | null>(null);
   const [error, setError] = useState<string | null>(null);
+
   const [turno, setTurno] = useState<Turno>("tarde");
-  const [tab, setTab] = useState<Tab>("capas");
-  const [toggles, setToggles] = useState({
-    moduloA: true,
-    moduloB: false,
-    comisarias: false,
-    camaras: false,
-  });
+  const [comuna, setComuna] = useState<number | null>(null);
+  const [capa, setCapa] = useState<Capa>("patrullas");
+  const [kPatrullas, setKPatrullas] = useState(75);
+  const [barrio, setBarrio] = useState<string | null>(null);
+  const [tema, setTema] = useState<"light" | "dark">("light");
 
   useEffect(() => {
-    cargarDatosDashboard()
-      .then(setDatos)
-      .catch((e) => setError(String(e)));
-    cargarMapaBase()
-      .then(setMapa)
-      .catch((e) => setError(String(e)));
+    cargarDatos().then(setDatos).catch((e: Error) => setError(e.message));
   }, []);
 
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", tema);
+  }, [tema]);
+
+  // al elegir un barrio conviene fijar también su comuna: si no, el mapa
+  // resalta un polígono y la tabla sigue mostrando los otros 47. Va en el
+  // handler y no en un efecto: derivarlo después del render hace que el tablero
+  // se pinte una vez con la selección a medias.
+  const elegirBarrio = useCallback((nombre: string | null) => {
+    setBarrio(nombre);
+    if (!nombre || !datos) return;
+    const b = datos.barrios.features.find((f) => f.properties.nombre === nombre);
+    if (b?.properties.comuna != null) setComuna(b.properties.comuna);
+  }, [datos]);
+
+  const props: BarrioProps[] = useMemo(
+    () => datos?.barrios.features.map((f) => f.properties) ?? [], [datos],
+  );
+
+  const ks = useMemo(
+    () => datos?.curvaK.curva.filter((p) => p.cobertura !== null).map((p) => p.k) ?? [],
+    [datos],
+  );
+
+  const kpis = useMemo(() => {
+    if (!datos) return [];
+    const r = datos.resumen;
+    const clave = claveRiesgo(turno);
+    const sel = comuna === null ? props : props.filter((b) => b.comuna === comuna);
+    const foco = barrio ? props.filter((b) => b.nombre === barrio) : sel;
+
+    const delitos = foco.reduce((s, b) => s + b.delitos_2025, 0);
+    const riesgoMedio = foco.length ? foco.reduce((s, b) => s + (b[clave] as number), 0) / foco.length : 0;
+
+    const punto = datos.curvaK.curva.find((p) => p.k === kPatrullas);
+    const cob = punto?.cobertura ?? null;
+    const actual = datos.curvaK.cobertura_actual;
+
+    const serieAnual = [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025].map((a) =>
+      datos.serie.filter((f) => f.anio === a).reduce((s, f) => s + f.n, 0),
+    );
+
+    return [
+      {
+        etiqueta: barrio ? "Delitos · barrio" : comuna !== null ? "Delitos · comuna" : "Delitos registrados",
+        valor: num(delitos),
+        nota: <>en {r.periodo.hasta}{barrio ? ` · ${barrio}` : comuna !== null ? ` · Comuna ${comuna}` : " · toda la Ciudad"}</>,
+        delta: comuna === null && !barrio
+          ? { texto: delta(r.delitos_ultimo_anio / r.delitos_anio_previo - 1), tono: "alerta" as const }
+          : undefined,
+        chispa: comuna === null && !barrio ? serieAnual : undefined,
+        ayuda: "Delitos georreferenciados del último año cerrado. El nivel de 2025 está bajo revisión — ver salvedades.",
+      },
+      {
+        etiqueta: "Riesgo medio por celda",
+        valor: num3(riesgoMedio),
+        nota: <>turno {turno === "manana" ? "mañana" : turno} · {foco.length} barrio{foco.length === 1 ? "" : "s"}</>,
+        ayuda: "Predicción del modelo, promediada sobre las celdas de la selección.",
+      },
+      {
+        etiqueta: "Cobertura actual",
+        valor: pct(actual),
+        nota: <>{datos.curvaK.n_comisarias} comisarías, donde están hoy</>,
+        ayuda: `Riesgo que queda a ${datos.curvaK.radio_m} m de calle de alguna comisaría.`,
+      },
+      {
+        etiqueta: `Cobertura con ${kPatrullas}`,
+        valor: cob === null ? "—" : pct(cob),
+        nota: cob === null
+          ? <span className="text-[var(--bad)]">Sin solución: la equidad no se puede cumplir</span>
+          : <>{punto?.reusa_comisaria ?? 0} reutilizan comisaría</>,
+        delta: cob === null ? undefined : { texto: pp(cob - actual), tono: cob >= actual ? "bueno" as const : "malo" as const },
+        ayuda: "Resultado del optimizador para ese presupuesto de patrullas.",
+      },
+      {
+        etiqueta: "Concentración",
+        valor: pct(r.modelo.concentracion_30pct_area),
+        nota: <>de los delitos en el 30% del área</>,
+        ayuda: "Lo que el modelo hace bien: priorizar. PAI 2,77 y PEI 99,5% sobre el 10% del área.",
+      },
+    ];
+  }, [datos, turno, comuna, barrio, kPatrullas, props]);
+
   if (error) {
-    return <div className="p-6 text-status-critical text-sm">Error cargando datos: {error}</div>;
-  }
-  if (!datos || !mapa) {
     return (
-      <div className="flex-1 flex items-center justify-center text-text-secondary text-sm">
-        Cargando SIGE-BA…
-      </div>
+      <main className="h-full grid place-items-center p-6">
+        <div className="card p-5 max-w-md flex flex-col gap-2">
+          <h1 className="text-sm font-semibold text-[var(--bad)]">No se pudieron cargar los datos</h1>
+          <p className="text-xs text-ink-2">{error}</p>
+          <button onClick={() => location.reload()}
+                  className="mt-2 self-start px-3 py-1.5 text-xs rounded bg-brand text-white cursor-pointer">
+            Reintentar
+          </button>
+        </div>
+      </main>
     );
   }
 
-  const moduloAGeojson: FeatureCollection = moduloAaGeojson(datos.moduloA);
-  const moduloBGeojson: FeatureCollection = moduloBaGeojson(datos.moduloB);
+  if (!datos) {
+    return (
+      <main className="h-full grid place-items-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-1 w-40 bg-surface-sunk rounded overflow-hidden">
+            <div className="h-full w-1/3 bg-brand animate-pulse" />
+          </div>
+          <span className="text-xs text-ink-muted">Cargando SIGE-BA…</span>
+        </div>
+      </main>
+    );
+  }
+
+  const clave = claveRiesgo(turno);
+  const cortes = cortesPorCuantil(props.map((b) => b[clave] as number));
+  const capaInfo = CAPAS.find((c) => c.key === capa)!;
 
   return (
-    <div className="flex-1 flex flex-col min-h-0">
-      <header className="flex items-center justify-between px-5 py-3 border-b border-border bg-surface-1">
-        <div>
-          <h1 className="text-base font-semibold">SIGE-BA</h1>
-          <p className="text-xs text-text-secondary">Riesgo de seguridad urbana — CABA</p>
+    <main className="h-full flex flex-col overflow-hidden">
+      {/* ---------- encabezado ---------- */}
+      <header className="shrink-0 border-b border-line bg-surface-2">
+        <div className="px-4 py-2.5 flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-baseline gap-3 min-w-0">
+            <h1 className="text-[15px] font-semibold tracking-tight whitespace-nowrap">
+              SIGE-BA <span className="text-ink-muted font-normal">· Riesgo urbano</span>
+            </h1>
+            <span className="text-[11px] text-ink-muted whitespace-nowrap hidden sm:block">
+              Ciudad de Buenos Aires · {datos.resumen.periodo.desde}–{datos.resumen.periodo.hasta}
+            </span>
+          </div>
+          <ChipsActivos
+            comuna={comuna} barrio={barrio}
+            onLimpiarComuna={() => { setComuna(null); setBarrio(null); }}
+            onLimpiarBarrio={() => setBarrio(null)}
+          />
         </div>
-        <div className="flex gap-1 bg-surface-2 rounded-lg p-1">
-          {TURNOS.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setTurno(t.key)}
-              className={`px-3 py-1.5 text-sm rounded-md cursor-pointer transition-colors duration-150 ${
-                turno === t.key
-                  ? "bg-[var(--risk-500)] text-white"
-                  : "text-text-secondary hover:text-text-primary"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
+        <div className="px-4 pb-2.5 flex items-end gap-3 flex-wrap">
+          <SelectorTurno valor={turno} onChange={setTurno} />
+          <SelectorComuna valor={comuna} onChange={(c) => { setComuna(c); setBarrio(null); }} comunas={datos.comunas} />
+          <SelectorCapa valor={capa} onChange={setCapa} />
+          {capa === "patrullas" && <ControlK valor={kPatrullas} onChange={setKPatrullas} disponibles={ks} />}
+          <div className="ml-auto flex items-end gap-2">
+            <ToggleTema tema={tema} onChange={() => setTema((t) => (t === "light" ? "dark" : "light"))} />
+          </div>
         </div>
       </header>
 
-      <div className="flex-1 flex min-h-0">
-        <div className="flex-1 relative">
-          <MapaSVG
-            turno={turno}
-            base={mapa}
-            capas={[
-              { id: "comisarias", datos: datos.comisarias, visible: toggles.comisarias,
-                color: "#ffffff", r: 3.5, nombre: "Comisaría" },
-              { id: "camaras", datos: datos.camaras, visible: toggles.camaras,
-                color: "#e66767", r: 3, nombre: "Cámara" },
-              { id: "moduloB", datos: moduloBGeojson, visible: toggles.moduloB,
-                color: "#0ca30c", r: 5, nombre: "Zona prioritaria" },
-              { id: "moduloA", datos: moduloAGeojson, visible: toggles.moduloA,
-                color: "#d97706", r: 5, nombre: "Patrulla propuesta" },
-            ]}
-          />
-          <RiskLegend />
+      {/* ---------- cuerpo ---------- */}
+      <div className="flex-1 min-h-0 overflow-auto scroll-fino p-3 flex flex-col gap-3">
+        <KpiRow items={kpis} />
+
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
+          {/* mapa */}
+          {/* alto atado al viewport: con un min-height fijo, en una pantalla de
+              portátil el mapa empuja los KPIs fuera de la primera vista */}
+          <section className="card overflow-hidden flex flex-col h-[clamp(24rem,58vh,36rem)]">
+            <div className="px-3 py-2 border-b border-line flex items-center justify-between gap-3 flex-wrap">
+              <div className="min-w-0">
+                <h2 className="text-xs font-semibold uppercase tracking-[0.07em] text-ink-2">
+                  Riesgo por barrio
+                </h2>
+                <p className="text-[11px] text-ink-muted truncate">{capaInfo.descripcion}</p>
+              </div>
+              <Leyenda cortes={cortes} />
+            </div>
+            <div className="flex-1 min-h-0">
+              <Mapa
+                datos={datos} turno={turno} capa={capa} comuna={comuna}
+                barrioActivo={barrio} kPatrullas={kPatrullas} tema={tema}
+                onBarrio={elegirBarrio}
+              />
+            </div>
+            {capa !== "ninguna" && <LeyendaPuntos capa={capa} k={kPatrullas} />}
+          </section>
+
+          {/* panel derecho */}
+          <div className="flex flex-col gap-3 min-w-0">
+            <section className="card p-3">
+              <h2 className="text-xs font-semibold uppercase tracking-[0.07em] text-ink-2 mb-1">
+                Cobertura según cantidad de patrullas
+              </h2>
+              <p className="text-[11px] text-ink-muted mb-2">
+                Cada punto es una optimización completa, no una interpolación. Clic para fijar el escenario.
+              </p>
+              <CurvaCobertura curva={datos.curvaK} kActual={kPatrullas} onK={setKPatrullas} />
+            </section>
+
+            <section className="card p-3">
+              <h2 className="text-xs font-semibold uppercase tracking-[0.07em] text-ink-2 mb-1">
+                Riesgo medio por comuna
+              </h2>
+              <p className="text-[11px] text-ink-muted mb-2">
+                Turno {turno === "manana" ? "mañana" : turno}, ×100. Clic para filtrar todo el tablero.
+              </p>
+              <BarrasComuna comunas={datos.comunas} turno={turno} seleccion={comuna}
+                            onSeleccion={(c) => { setComuna(c); setBarrio(null); }} />
+            </section>
+          </div>
         </div>
 
-        <aside className="w-80 shrink-0 border-l border-border bg-surface-1 flex flex-col min-h-0">
-          <div className="flex border-b border-border">
-            <TabButton active={tab === "capas"} onClick={() => setTab("capas")}>Capas</TabButton>
-            <TabButton active={tab === "metricas"} onClick={() => setTab("metricas")}>Métricas</TabButton>
-            <TabButton active={tab === "limites"} onClick={() => setTab("limites")}>Límites</TabButton>
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
+          <section className="card overflow-hidden max-h-[30rem] flex flex-col">
+            <TablaBarrios barrios={props} turno={turno} comuna={comuna}
+                          barrioActivo={barrio} onBarrio={elegirBarrio} />
+          </section>
+          <div className="flex flex-col gap-3 min-w-0">
+            <section className="card p-3">
+              <h2 className="text-xs font-semibold uppercase tracking-[0.07em] text-ink-2 mb-1">
+                Delitos por mes y tipo
+              </h2>
+              <SerieAnual serie={datos.serie} />
+            </section>
+
+            {/* va acá, pegado a las salvedades y no al Módulo A: es lo que hay
+                que leer antes de tomar las ubicaciones del mapa como un plan */}
+            <section className="card p-3">
+              <h2 className="text-xs font-semibold uppercase tracking-[0.07em] text-ink-2 mb-1">
+                Si el radio no fuera {datos.curvaK.radio_m} m
+              </h2>
+              <p className="text-[11px] text-ink-muted mb-2">
+                La ganancia aguanta en todo el barrido. Las ubicaciones no: fuera
+                de {datos.curvaK.radio_m} m, casi ninguna se repite.
+              </p>
+              <SensibilidadAlRadio datos={datos.radio} />
+            </section>
+
+            <Salvedades items={datos.resumen.salvedades} />
           </div>
-          <div className="flex-1 overflow-y-auto p-4">
-            {tab === "limites" ? (
-              <LimitsPanel />
-            ) : tab === "capas" ? (
-              <ModulePanel
-                moduloC={datos.moduloC}
-                toggles={[
-                  { key: "moduloA", label: "Módulo A — patrullas propuestas", color: "#d97706", checked: toggles.moduloA },
-                  { key: "moduloB", label: "Módulo B — zonas prioritarias", color: "#0ca30c", checked: toggles.moduloB },
-                  { key: "comisarias", label: "Comisarías reales", color: "#ffffff", checked: toggles.comisarias },
-                  { key: "camaras", label: "Cámaras reales", color: "#e66767", checked: toggles.camaras },
-                ]}
-                onToggle={(key) => setToggles((s) => ({ ...s, [key]: !s[key as keyof typeof s] }))}
-              />
-            ) : (
-              <MetricsPanel metricas={datos.metricas} />
-            )}
-          </div>
-        </aside>
+        </div>
       </div>
+    </main>
+  );
+}
+
+function Leyenda({ cortes }: { cortes: number[] }) {
+  return (
+    <div className="flex items-center gap-2 shrink-0">
+      <span className="text-[10px] text-ink-muted">bajo</span>
+      <div className="flex" role="img" aria-label="Escala de riesgo en cinco clases por quintiles">
+        {VAR_RIESGO.map((v, i) => (
+          <span key={v} className="w-6 h-3 first:rounded-l-sm last:rounded-r-sm"
+                style={{ background: `var(${v})` }}
+                title={`${ETIQUETAS_CLASE[i]}${cortes[i] !== undefined ? ` · hasta ${num3(cortes[i])}` : ""}`} />
+        ))}
+      </div>
+      <span className="text-[10px] text-ink-muted">alto</span>
     </div>
   );
 }
 
-function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+function LeyendaPuntos({ capa, k }: { capa: Capa; k: number }) {
+  const items =
+    capa === "patrullas"
+      ? [{ c: "var(--pt-existente)", t: "Comisarías actuales (75)" },
+         { c: "var(--pt-propuesto)", t: `Patrullas propuestas (${k})` }]
+      : capa === "camaras"
+      ? [{ c: "var(--pt-existente)", t: "Cámaras existentes (224)" },
+         { c: "var(--pt-propuesto)", t: "Cámaras propuestas (30)" }]
+      : [{ c: "var(--pt-alerta)", t: "Accesos rankeados (9) — el tamaño es el puesto" }];
   return (
-    <button
-      onClick={onClick}
-      className={`flex-1 px-3 py-2.5 text-xs font-medium cursor-pointer transition-colors duration-150 border-b-2 ${
-        active ? "border-[var(--risk-400)] text-text-primary" : "border-transparent text-text-secondary hover:text-text-primary"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
-
-function RiskLegend() {
-  return (
-    <div className="absolute bottom-4 left-4 bg-surface-2/95 backdrop-blur border border-border rounded-lg px-3 py-2 text-xs">
-      <div className="text-text-secondary mb-1.5">Riesgo relativo (por cuantil)</div>
-      <div className="flex items-center gap-0.5">
-        {RISK_RAMP.map((c) => (
-          <span key={c} className="w-6 h-3 first:rounded-l last:rounded-r" style={{ background: c }} />
-        ))}
-      </div>
-      <div className="flex justify-between text-text-secondary mt-0.5">
-        <span>bajo</span>
-        <span>alto</span>
-      </div>
+    <div className="px-3 py-1.5 border-t border-line flex items-center gap-4 flex-wrap">
+      {items.map((i) => (
+        <span key={i.t} className="inline-flex items-center gap-1.5 text-[11px] text-ink-2">
+          <span className="w-2.5 h-2.5 rounded-full" style={{ background: i.c }} />
+          {i.t}
+        </span>
+      ))}
     </div>
   );
 }
