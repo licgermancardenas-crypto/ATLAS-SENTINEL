@@ -7,19 +7,28 @@ Capa 0-3.
 Salidas en dashboard/public/data/:
 - hex_riesgo.geojson    — 401 hexágonos, un score_riesgo por turno como
                           propiedad (mananav/tarde/noche/madrugada) para
-                          que el mapa cambie de turno sin refetch.
-- modulo_a.json         — ubicaciones de patrullas propuestas (turno Tarde, K=40).
-- modulo_a_k75.json     — el mismo plan con K=75 (escenario "mismo presupuesto
-                          que las comisarías actuales").
-- modulo_b.json         — versión vieja sobre hexágonos: zonas priorizadas.
+                          que el mapa cambie de turno sin refetch. Ya no lo
+                          consume el tablero (trabaja sobre barrios) pero sí
+                          presentacion/gen_mapas.py.
+- modulo_a_k75.json     — patrullas propuestas con K=75 (escenario "mismo
+                          presupuesto que las comisarías actuales").
 - modulo_b_red.json     — cámaras propuestas sobre la red vial (ubicaciones
                           concretas), ordenadas por ganancia marginal.
 - modulo_c.json         — ranking de accesos/controles.
 - comisarias.geojson    — 75 comisarías reales (contexto en el mapa).
 - camaras.geojson       — 224 cámaras reales (contexto en el mapa).
-- metricas.json         — evolución mensual, calibración, resumen v1/v2
-                          y cobertura de Módulo A por K (para el panel
-                          de métricas del modelo).
+
+Las salidas por barrio y comuna que consume el tablero salen del otro script
+de esta capa: generar_export_dashboard.py.
+
+Se dejaron de exportar tres archivos que ya no lee nadie: `modulo_a.json`
+(K=40, reemplazado por el escenario K=75), `modulo_b.json` (versión sobre
+hexágonos, reemplazada por la red vial) y `metricas.json` (los paneles de
+calibración y evolución del dashboard viejo). Los parquet de origen siguen
+donde estaban; lo que se corta es la copia en public/data/, que se subía a
+producción sin que nada la pidiera. `metricas.json` además tenía los números
+de v1/v2 y de cobertura hardcodeados, o sea una segunda copia del README que
+había que actualizar a mano — el problema que este proyecto ya tuvo tres veces.
 """
 
 from __future__ import annotations
@@ -66,16 +75,11 @@ def exportar_hex_riesgo() -> None:
     print(f"hex_riesgo.geojson: {len(features)} hexágonos")
 
 
-def exportar_modulo_a() -> None:
-    df = pd.read_parquet(FEATURES / "modulo_a_patrullas_Tarde.parquet")
-    df.to_json(OUT / "modulo_a.json", orient="records", force_ascii=False)
-    print(f"modulo_a.json: {len(df)} ubicaciones")
-
-
 def exportar_modulo_a_k75() -> None:
     """El escenario de 75 patrullas — el que titula el material de presentación
-    ('mismo presupuesto que las 75 comisarías, 58,7% de cobertura'). Se exporta
-    aparte del K=40 de referencia; ver README, 'Escenario de recursos'."""
+    ('mismo presupuesto que las 75 comisarías, 58,7% de cobertura'). El K=40 que
+    se exportaba antes quedó sin consumidores; ver README, 'Escenario de
+    recursos'."""
     ruta = FEATURES / "modulo_a_patrullas_Tarde_k75.parquet"
     if not ruta.exists():
         print("modulo_a_k75.json: falta el parquet — correr modulo_a_patrullas.py --k 75")
@@ -85,16 +89,11 @@ def exportar_modulo_a_k75() -> None:
     print(f"modulo_a_k75.json: {len(df)} ubicaciones (escenario K=75)")
 
 
-def exportar_modulo_b() -> None:
-    df = pd.read_parquet(FEATURES / "modulo_b_camaras.parquet")
-    df.to_json(OUT / "modulo_b.json", orient="records", force_ascii=False)
-    print(f"modulo_b.json: {len(df)} zonas priorizadas (versión hexágonos)")
-
-
 def exportar_modulo_b_red() -> None:
     """Versión sobre la red vial — la que corresponde usar. Son ubicaciones
-    concretas (intersecciones), no zonas de 700m. Se exporta aparte para poder
-    comparar contra la anterior; ver README, 'Módulo B sobre la red vial'."""
+    concretas (intersecciones), no zonas de 700m. La versión sobre hexágonos
+    sigue en `modulo_b_camaras.parquet` para poder comparar, pero ya no se
+    exporta; ver README, 'Módulo B sobre la red vial'."""
     ruta = FEATURES / "modulo_b_camaras_red.parquet"
     if not ruta.exists():
         print("modulo_b_red.json: falta modulo_b_camaras_red.parquet — se omite")
@@ -121,43 +120,10 @@ def exportar_puntos(nombre_archivo: str, df: pd.DataFrame, props_cols: list[str]
     print(f"{nombre_archivo}: {len(features)} puntos")
 
 
-def exportar_metricas() -> None:
-    evolucion = pd.read_parquet(FEATURES / "evolucion_mensual.parquet")
-    calibracion = pd.read_parquet(FEATURES / "calibracion.parquet")
-    shap_importancia = pd.read_parquet(FEATURES / "shap_importancia_global.parquet")
-
-    # v1/v2 y cobertura de Módulo A no quedaron persistidos por sus scripts
-    # (train_baseline.py, train_v2.py, modulo_a_patrullas.py solo imprimen) —
-    # se copian acá desde los resultados ya documentados en el README. Si se
-    # reentrena o se corre Módulo A con otro K, actualizar a mano los dos lados.
-    # Modulo A actualizado post-grafo vial real (P1 auditoría): la cobertura
-    # ya no es distancia euclidiana, es distancia de calle real (Dijkstra
-    # sobre el grafo dirigido de OSM) — números bastante más bajos que la
-    # versión euclidiana anterior, que estaba sobreestimada.
-    metricas = {
-        "v1_vs_v2": {
-            "v1": {"mae": 0.2923, "recall_20": 0.455, "recall_30": 0.586},
-            "v2": {"mae": 0.2906, "recall_20": 0.454, "recall_30": 0.585},
-            "baseline_naive": {"mae": 0.2983, "recall_20": 0.447, "recall_30": 0.584},
-        },
-        "modulo_a_cobertura": {
-            "actual_75_comisarias": 0.3509,
-            "k20": 0.2704, "k40": 0.418, "k75": 0.5865,
-        },
-        "evolucion_mensual": evolucion.to_dict(orient="records"),
-        "calibracion": calibracion.to_dict(orient="records"),
-        "shap_importancia": shap_importancia.to_dict(orient="records"),
-    }
-    (OUT / "metricas.json").write_text(json.dumps(metricas, default=str), encoding="utf-8")
-    print("metricas.json guardado")
-
-
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     exportar_hex_riesgo()
-    exportar_modulo_a()
     exportar_modulo_a_k75()
-    exportar_modulo_b()
     exportar_modulo_b_red()
     exportar_modulo_c()
 
@@ -167,7 +133,6 @@ def main() -> None:
     camaras = pd.read_parquet(PROCESSED / "camaras.parquet").rename(columns={"latitud": "lat", "longitud": "lon"})
     exportar_puntos("camaras.geojson", camaras, ["tipo_de_fiscalizador"])
 
-    exportar_metricas()
     print(f"\nTodo exportado a {OUT}")
 
 

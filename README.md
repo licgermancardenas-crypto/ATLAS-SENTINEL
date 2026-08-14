@@ -802,8 +802,12 @@ Esto es más vendible que el resultado de Capa 1 solo: aunque el modelo apenas l
 
 Última etapa del roadmap. El dashboard nunca lee los parquet directo — todo pasa por un export para no acoplar el frontend al esquema de Python. Son dos scripts:
 
-- `src/export/generar_export.py` — las salidas por hexágono: `hex_riesgo.geojson` (401 hexágonos con riesgo por turno), `modulo_a/b/c.json`, `comisarias.geojson`, `camaras.geojson`, `metricas.json`.
+- `src/export/generar_export.py` — las salidas por hexágono y los puntos: `hex_riesgo.geojson` (401 hexágonos con riesgo por turno), `modulo_a_k75.json`, `modulo_b_red.json`, `modulo_c.json`, `comisarias.geojson`, `camaras.geojson`.
 - `src/export/generar_export_dashboard.py` — las salidas por unidad administrativa, que son las que consume el tablero actual: `barrios_riesgo.geojson`, `comunas_resumen.json`, `curva_k.json`, `sensibilidad_radio.json`, `serie_delitos.json` y `resumen.json`.
+
+De los dos, el tablero solo lee las salidas del segundo más los puntos y las capas de contexto del primero. `hex_riesgo.geojson` se sigue generando porque lo consume `presentacion/gen_mapas.py`.
+
+Tres salidas se dejaron de exportar cuando se reescribió el tablero, porque ya no las lee nadie: `modulo_a.json` (el plan con K=40, reemplazado por el escenario K=75), `modulo_b.json` (la versión sobre hexágonos, reemplazada por la de red vial) y `metricas.json` (alimentaba los paneles de calibración y evolución del dashboard viejo). Los parquet de origen no se tocan; lo que se corta es la copia en `public/data/`, que se subía a producción sin que nada la pidiera. `metricas.json` además llevaba los números de v1/v2 y de cobertura de Módulo A hardcodeados — una segunda copia de las tablas de este README que había que actualizar a mano en los dos lados.
 
 `dashboard/` es un proyecto Next.js 16 + React 19 + TypeScript + Tailwind v4, en el mismo repo (no separado — ver decisión más arriba).
 
