@@ -414,6 +414,49 @@ La última fila aísla el efecto del quiebre de composición del simple paso del
 
 Salidas en `quiebre_2025.parquet` y sus dos archivos hermanos.
 
+### ¿El techo es del fenómeno o de la resolución? (`src/validation/escala_cuadra.py`)
+
+El EDA midió que el ranking de hexágonos de 700m es casi inmóvil entre años (Spearman 0,983) y de ahí salió que el problema está saturado. Pero eso se midió a **una** resolución. La ley de concentración del delito (Weisburd 2015) dice que el delito se concentra en **segmentos de calle**, no en barrios, y que esas cuadras sí se prenden y apagan. Si valiera acá, la grilla de 700m estaría promediando dinámica real y el techo sería de la unidad de análisis, no del fenómeno. Es lo único que quedaba por probar del lado del modelado, y no es cambiar de algoritmo: es cambiar de unidad.
+
+Se asignó cada uno de los 1.352.985 delitos georreferenciados a su tramo más cercano de los 37.036 del grafo de OSM (largo mediano 103 m, que es la cuadra porteña típica).
+
+**1. La ley de Weisburd no replica en su forma fuerte.**
+
+| Unidad | % de unidades que acumula el 50% | Top 1% de unidades | Top 5% | Sin ningún delito en 10 años |
+|---|---|---|---|---|
+| Cuadra | **12,0%** | 13,1% | 31,7% | 6,7% |
+| Cuadra, sin puntos sospechosos | 13,9% | 9,1% | 26,9% | 6,7% |
+| Hexágono (700m) | 18,8% | 5,9% | 19,7% | 0% |
+
+Weisburd reporta alrededor del **5%** de segmentos para el 50% de los delitos en varias ciudades de Estados Unidos. Acá hace falta **12-14%**, dos a tres veces más. Y solo el 6,7% de las cuadras no tuvo ni un delito en diez años. **El delito en CABA es bastante más difuso de lo que predice el benchmark.** Bajar de escala concentra —12% contra 19% del hexágono— pero mucho menos de lo que la hipótesis anticipaba.
+
+**2. Sí hay más dinámica real a escala de cuadra, y hace falta un control para verlo.** Comparar la estabilidad de cuadras contra la de hexágonos sin más sería una trampa: una cuadra tiene 3,65 delitos por año contra 273 de un hexágono, y con conteos así de chicos el ranking se desordena solo por ruido de muestreo. Por eso lo observado se compara contra una **nula de Poisson**: dos años simulados con la tasa de cada unidad fija, para medir cuánto Spearman destruye el azar por sí solo.
+
+| Unidad | Spearman observado | Nula de Poisson | **Brecha** | Delitos/unidad/año |
+|---|---|---|---|---|
+| Cuadra | 0,6919 | 0,7531 | **0,0612** | 3,65 |
+| Hexágono | 0,9839 | 0,9941 | **0,0102** | 272,8 |
+
+La brecha es **seis veces mayor** a escala de cuadra. O sea que **el techo de 0,983 que midió el EDA era en parte un artefacto de la resolución**: a 700m casi todo el movimiento posible ya está promediado, y a escala de cuadra queda movimiento real por encima del ruido.
+
+Pero hay que leer la magnitud con cuidado. De toda la inestabilidad observada a nivel cuadra (1 − 0,69 = 0,31), solo **0,061 —un quinto— es cambio real**; el resto es ruido de muestreo. Y el número está sesgado **a favor** de la hipótesis: asignar por cercanía reparte el error de geocodificación entre cuadras vecinas, y ese error actúa como ruido extra en los dos años, empujando el Spearman observado por debajo de la nula. **0,061 es una cota superior de la dinámica real**, no una estimación.
+
+**3. Adentro de un hexágono caliente el delito no está concentrado.** Es la pregunta operativa, y la respuesta cierra el tema:
+
+| En los 40 hexágonos más calientes | Mediana |
+|---|---|
+| Cuadras con al menos un delito | **96** |
+| Delito en las 3 peores cuadras | 15,6% |
+| Delito en las 5 peores cuadras | 22,2% |
+
+La hipótesis era que dentro de una zona peligrosa habría dos o tres cuadras cargando todo. **No es así**: hay 96 cuadras con delito y las tres peores juntan el 15,6%. Está repartido.
+
+**Veredicto: no vale la pena construirlo.** El hallazgo científico es real y corrige al EDA —parte del techo era de la resolución, no del fenómeno—, pero las tres piezas juntas dicen que no se puede capitalizar: la concentración es dos a tres veces menor que el benchmark que motivaba la idea, la dinámica extra es una cota superior de 0,061 sobre un piso de ruido enorme (3,65 delitos por cuadra y año), y adentro de las zonas calientes el delito está lo bastante repartido como para que **desplegar por zona siga siendo lo correcto** — que es exactamente lo que hace el Módulo A.
+
+El resultado 3 es, de hecho, una **validación del Módulo A** que no teníamos: patrullar por radio de cobertura no está regando de más, porque no existe el puñado de cuadras que concentre el delito de la zona.
+
+Salidas en `escala_cuadra.parquet` y sus dos archivos hermanos.
+
 **Conclusión de la fase de modelado.** Con esto se cierra la pregunta abierta: se probaron gradient boosting agregado, desagregado por tipo, a grano semanal, con exógenas, como pronóstico con origen deslizante, y ahora un proceso auto-excitante. Ninguno le saca al promedio histórico más de unos pocos puntos de Recall. La razón está medida y es estructural, no algorítmica: el mapa de riesgo de un año predice el del siguiente con Spearman 0,983.
 
 ## Auditoría técnica externa y remediación P0
