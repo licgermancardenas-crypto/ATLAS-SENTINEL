@@ -646,6 +646,30 @@ La lectura de fondo no cambió al pasar a distancia de red, solo se volvió más
 
 **La restricción de equidad es dura, y se nota**: con K=5 el solver devuelve `Infeasible` — no existe forma de ubicar 5 patrullas que deje a las 15 comunas con al menos un hexágono cubierto. Por debajo de ~10 unidades el problema directamente no tiene solución. Es el comportamiento correcto: el modelo no puede "resolver" el trade-off entre eficiencia y cobertura territorial abandonando comunas enteras.
 
+**Sensibilidad al radio de cobertura (`sensibilidad_radio_patrullas.py`) — el número aguanta, el plan no.** Los 800m salieron del documento de arquitectura, no de estos datos, y todo el titular del Módulo A se apoya en ellos. El precedente del Módulo C —donde barrer el buffer de 30m dio vuelta el primer puesto— obligaba a hacer la prueba equivalente. Barrido de 300 a 1500m, recalculando la matriz de cobertura en cada uno:
+
+| Radio | Actual (75 comisarías) | Óptimo K=75 | Ganancia | Ganancia relativa | Cruce | Plan igual al de 800m |
+|---|---|---|---|---|---|---|
+| 300 m | 5,4% | 45,3% | +39,9 pp | +744% | K=15 | 53% |
+| 500 m | 11,5% | 45,3% | +33,7 pp | +293% | K=20 | 53% |
+| 650 m | 24,6% | 49,5% | +24,9 pp | +101% | K=30 | 68% |
+| **800 m** | **35,1%** | **58,7%** | **+23,6 pp** | **+67%** | **K=30** | — |
+| 1000 m | 53,7% | 83,1% | +29,4 pp | +55% | K=35 | 28% |
+| 1200 m | 66,5% | 97,7% | +31,2 pp | +47% | K=30 | 19% |
+| 1500 m | 79,1% | 100,0% | +20,9 pp | +26% | K=30 | 17% |
+
+**1. La ganancia en puntos es robusta; la ganancia relativa no.** En puntos va de 20,9 a 39,9 sobre un rango de radio de 5x, y en la franja operativamente plausible (650-1200m) queda entre **23,6 y 31,2 puntos**. La relativa va de +26% a +744%, pero eso es un artefacto del denominador: la cobertura actual se derrumba a 5,4% con radio chico y el cociente explota sin que pase nada interesante.
+
+Tiene una consecuencia sobre cómo se comunica el resultado. **El titular robusto es "+23,6 puntos de cobertura", no "67% más riesgo cubierto".** El segundo suena mejor y es el que estaba en el material de presentación, pero es el que depende del supuesto.
+
+**2. El punto de cruce aguanta, y del lado conservador.** "Treinta patrullas rinden más que setenta y cinco comisarías" se sostiene con cualquier radio de 650m para arriba (K=30, salvo 35 a 1000m), y con radios más chicos es todavía mejor (K=15 a 20). Nunca hace falta más de 35.
+
+**3. El plan sí se mueve, y bastante.** A 650m comparte el 68% de las ubicaciones con el plan de 800m; a 1000m, solo el **28%**. Los radios grandes hay que descartarlos del análisis —a 1200m la cobertura óptima ya es 97,7% y a 1500m es 100%, así que el problema se vuelve degenerado y hay muchos conjuntos de 75 que empatan—, pero **1000m todavía no satura (83,1%) y aun así comparte apenas el 28%**. Eso es informativo: mover el radio un 25% cambia cerca de tres cuartos de las ubicaciones propuestas.
+
+**Lectura conjunta**: el tamaño de la oportunidad es sólido y no depende del parámetro; **las 75 ubicaciones concretas sí**. El mapa del Módulo A hay que leerlo como "el plan para un radio de 800m", no como "el plan". Antes de comprometer un despliegue, el radio efectivo es exactamente el tipo de dato que hay que pedirle a quien conoce la operación — y es lo que la página de presentación ya listaba como paso 2, ahora con una medición atrás.
+
+Salida en `sensibilidad_radio_patrullas.json`.
+
 `TURNO` es un parámetro al inicio del script y `K` se pasa por línea de comandos (`--k 75`), pensados como los sliders de un dashboard futuro. El plan de K=40 conserva el nombre de archivo histórico (`modulo_a_patrullas_Tarde.parquet`) porque es el que citan las tablas de arriba; cualquier otro K va a `modulo_a_patrullas_Tarde_k{K}.parquet` para que un escenario no pise al otro. La curva completa de cobertura vs. K se puede regenerar reusando la matriz de cobertura una sola vez — lo caro es el Dijkstra desde los 476 candidatos (~6s), no resolver el MCLP (<1s por valor de K).
 
 ## Módulo B — Ubicación de cámaras nuevas (`src/optimization/modulo_b_camaras.py`)
