@@ -11,7 +11,14 @@ type Columna = "nombre" | "comuna" | "riesgo" | "delitos" | "tasa" | "n_hex";
 /* La tasa cada 100.000 divide por población residente, así que en los barrios
    donde entra mucha gente que no vive ahí queda inflada. El asterisco marca el
    quinto superior de afluencia no residente (subte + EcoBici por habitante).
-   No corrige el número — avisa que ese número compara peor que los otros. */
+   No corrige el número — avisa que ese número compara peor que los otros.
+
+   La ausencia de asterisco NO garantiza lo contrario: el índice ve subte y
+   bici, así que se le escapan los barrios a los que se llega en tren o
+   colectivo. Está medido contra la ENMODO 2018 en
+   src/validation/validar_presion_visitantes.py — ordena igual en general
+   (Spearman 0,73) pero deja a la Comuna 9, Liniers y Mataderos, 10 puestos
+   más abajo de lo que dice la encuesta. */
 function TasaCelda({ barrio, claveD }: { barrio: BarrioProps; claveD: string }) {
   const t = tasa100k(barrio[claveD] as number, barrio.poblacion as number);
   if (t === null) return <span className="text-ink-muted">—</span>;

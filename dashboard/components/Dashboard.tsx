@@ -131,7 +131,10 @@ export default function Dashboard() {
              + `La población sale del padrón prorrateado por área (2.890.151 en total). `
              + `Mide sobre población residente, así que sobreestima donde entra mucha gente que no vive ahí. `
              + `La selección actual está marcada cuando cae en el quinto de mayor afluencia no residente, `
-             + `medida con el flujo de subte y EcoBici por habitante.`,
+             + `medida con el flujo de subte y EcoBici por habitante. `
+             + `Esa medida se validó contra la Encuesta de Movilidad Domiciliaria 2018 y ordena igual (Spearman 0,73), `
+             + `pero al ver solo dos modos subestima los barrios que se llegan en tren o colectivo: `
+             + `Liniers y Mataderos son el caso claro, y ahí la tasa también está sobreestimada aunque no aparezca marcada.`,
       },
       {
         etiqueta: "Cobertura actual",

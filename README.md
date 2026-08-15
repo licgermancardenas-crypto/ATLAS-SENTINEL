@@ -854,6 +854,32 @@ Lo que sí funciona es **no tocar el denominador y marcar dónde leerlo con pinz
 
 En el tablero eso es un asterisco al lado de la tasa en la columna nueva "Cada 100k" de la tabla, para el quinto superior, y una nota en ámbar en el KPI cuando la selección cae ahí. **No corrige el número: avisa que ese número compara peor que los otros.**
 
+#### Validación contra la ENMODO 2018 (`src/validation/validar_presion_visitantes.py`)
+
+El índice de afluencia ve dos modos de transporte. La pregunta es si eso alcanza para ordenar la afluencia real, que incluye tren, colectivo, auto y a pie. La [Encuesta de Movilidad Domiciliaria 2018](https://data.buenosaires.gob.ar/dataset/encuesta-movilidad-domiciliaria) sirve de contraste independiente: encuesta domiciliaria multimodal del AMBA, 16.667 hogares y 59.452 viajes, con el destino de cada viaje georreferenciado a **radio censal** y código INDEC de comuna (`radio_destino`, `cod_partido_destino`, factor de expansión `PONDERA`). De esos viajes, 12.261 terminan en CABA, entre 554 y 1.478 por comuna.
+
+Se compara el índice contra los viajes que llegan a cada comuna **desde otra jurisdicción**, por habitante — la definición operativa de "gente que no vive acá".
+
+**Resultado: Spearman 0,729.** Dos fuentes independientes, con métodos y años distintos, ordenan casi igual. Coinciden en los extremos: ambas ponen la Comuna 1 primera, la 3 segunda y la 8 última.
+
+**Pero el índice tiene un punto ciego identificado.** La Comuna 9 (Liniers, Mataderos, Parque Avellaneda) es **cuarta** para la encuesta y **decimocuarta** para el índice: diez puestos de diferencia. Es coherente con la causa — Liniers es un nodo de tren y de colectivos de larga distancia, y no tiene subte. La conclusión operativa es que **la falta de asterisco no garantiza que la tasa esté bien**: donde se llega en tren o colectivo, el índice subestima. Queda anotado en la ayuda del KPI del tablero, no solo acá.
+
+**Por qué ENMODO no se usa para corregir el denominador, aunque sea la fuente conceptualmente correcta.** Está vencida, y el desfasaje tiene justo el patrón espacial que arruinaría la corrección. Medido con los molinetes del propio pipeline, que llegan a 2025:
+
+| | 2018 → 2025 |
+|---|---|
+| Subte, total | −35,3% |
+| Microcentro (agregado) | −40,2% |
+| San Nicolás | −49,0% |
+| Resto de los barrios | −31,1% |
+| Nueva Pompeya | −1,0% |
+
+San Nicolás perdió la mitad de su tráfico de subte y Nueva Pompeya el 1%. Un denominador de 2018 aplicado a delitos de 2025 sobrecorregiría exactamente los barrios que la marca quiere señalar, y el error tendría el mismo patrón espacial que el problema que viene a arreglar. Es coherente con lo documentado para el microcentro post-pandemia: teletrabajo del 35% al 70% según rubro, y 25% de vacancia de oficinas contra 14,9% del resto de la Ciudad. **ENMODO sirve para validar el orden, no para fijar el nivel.**
+
+Dos límites más de la fuente: encuesta hogares del AMBA, así que no captura turistas —relevante en San Telmo, Recoleta y Puerto Madero—, y se actualiza cada diez años. La validación quedó como script para poder repetirla cuando salga la próxima ola; si el acuerdo cae de 0,6 avisa solo.
+
+Nota al margen: el INDEC **no** publica datos de movilidad por telefonía celular. Quien sí lo hace es el INE español, con sus [estudios de movilidad a partir de la telefonía móvil](https://www.ine.es/experimental/movilidad/experimental_em.htm). Si en algún momento aparece un equivalente local, reemplazaría a ENMODO y a este índice de una.
+
 Decisiones de la versión actual:
 
 - **Agregación por promedio de hexágonos, no por suma.** Los barrios varían mucho en superficie; sumar convierte el mapa de riesgo en un mapa de tamaños. El total se guarda aparte porque para asignar recursos el volumen sí importa.
