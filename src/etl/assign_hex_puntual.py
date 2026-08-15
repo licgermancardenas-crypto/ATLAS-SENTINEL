@@ -13,7 +13,7 @@ siniestros, cámaras, alumbrado) más el resto de los datasets puntuales
 con lat/lon directo: cajeros, comisarías (ubicación puntual), escuelas,
 hospitales, universidades, estadios, eventos masivos (solo filas con
 lat/lon — la mayoría de 2023-2026 no tienen, quedan sin hex_id) y las
-estaciones de ecobici/molinetes.
+estaciones de ecobici/molinetes/trenes.
 
 Quedan afuera de este script (no son point-in-hex simple, son overlay de
 polígono contra la grilla): espacios_verdes y comisarias.parquet (el de
@@ -47,6 +47,7 @@ DATASETS = [
     ("eventos_masivos", "lat", "lon", None),
     ("ecobici_estaciones", "lat", "lon", None),
     ("molinetes_estaciones", "lat", "lon", None),
+    ("trenes_estaciones", "lat", "lon", None),
 ]
 
 

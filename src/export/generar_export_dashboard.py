@@ -179,27 +179,41 @@ def _presion_visitantes() -> tuple[pd.Series, pd.Series]:
     delitos, así que la corrección se aplicaría a media ciudad y no a la otra
     media. Peor: Puerto Madero, el caso de manual de población flotante, no
     tiene subte — corregir por molinetes lo dejaba primero en el ranking, o sea
-    exactamente al revés. EcoBici sí llega a los 48 barrios, pero sus magnitudes
-    (46M de viajes) no son sumables con las del subte (2.730M de pasajeros).
+    exactamente al revés. Las magnitudes tampoco son sumables entre sí: EcoBici
+    son 46M de viajes, el subte 2.730M de pasajeros y el tren 107M de boletos.
 
-    La salida es entonces el promedio de los percentiles de ambas fuentes,
+    La salida es entonces el promedio de las cuotas de las tres fuentes,
     relativizado por población — el mismo criterio de rank que ya usa
     `modulo_b_camaras.py` por la misma razón de escalas incomparables.
+
+    El tren entró después que las otras dos, y por un motivo medido: validando
+    el índice contra la ENMODO 2018 (`src/validation/validar_presion_visitantes.py`)
+    la Comuna 9 —Liniers, Mataderos— salía 4ª en la encuesta y 14ª acá, porque
+    con solo subte y bici no se ve un nodo al que se llega en tren.
     """
-    h = _poblacion_por_hex()
-    fl = pd.read_parquet(FEATURES / "hex_flujo_turno.parquet")
-    fl["hex_id"] = fl["hex_id"].astype(str)
-    h = h.copy()
+    h = _poblacion_por_hex().copy()
     h["hex_id"] = h["hex_id"].astype(str)
 
+    fl = pd.read_parquet(FEATURES / "hex_flujo_turno.parquet")
+    fl["hex_id"] = fl["hex_id"].astype(str)
+    flujo = fl.groupby("hex_id")[["flujo_ecobici", "flujo_molinetes"]].sum()
+
+    # el tren no pasa por hex_flujo_turno: esa tabla alimenta el feature set del
+    # modelo y sumarlo ahí obligaría a reentrenar. Acá se lee aparte.
+    tr = pd.read_parquet(FEATURES / "trenes_estaciones_hex.parquet")
+    tr["hex_id"] = tr["hex_id"].astype(str)
+    flujo["flujo_trenes"] = tr.groupby("hex_id")["pax"].sum()
+    flujo = flujo.fillna(0.0)
+
+    FUENTES = ["flujo_ecobici", "flujo_molinetes", "flujo_trenes"]
+
     def por(nivel: str) -> pd.Series:
-        base = (fl.merge(h, on="hex_id", how="inner")
-                .groupby(nivel)[["flujo_ecobici", "flujo_molinetes"]].sum())
+        base = (flujo.join(h.set_index("hex_id")[[nivel]], how="inner")
+                .groupby(nivel)[FUENTES].sum())
         pobl = h.groupby(nivel)["poblacion_hex"].sum()
         # cada fuente se lleva a fracción del total de la Ciudad antes de
         # promediar; si no, el subte domina por tres órdenes de magnitud
-        cuota = (base["flujo_ecobici"] / base["flujo_ecobici"].sum()
-                 + base["flujo_molinetes"] / base["flujo_molinetes"].sum()) / 2
+        cuota = sum(base[f] / base[f].sum() for f in FUENTES) / len(FUENTES)
         return (cuota / pobl.replace(0, pd.NA)).rank(pct=True)
 
     return por("barrio_id"), por("comuna_id")

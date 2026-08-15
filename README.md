@@ -850,7 +850,7 @@ La tasa cada 100.000 divide por población **residente**, así que se infla dond
 - Con la corrección aplicada igual, el ranking casi no se movía (Spearman 0,9897 contra la tasa sin corregir). El efecto real era grande en un puñado de barrios —San Nicolás −37%, Constitución −26%, Monserrat −25%— y nulo en el resto.
 - El factor de conversión de "entradas diarias" a "residentes equivalentes" es un parámetro inventado, sin nada en los datos que lo fije.
 
-Lo que sí funciona es **no tocar el denominador y marcar dónde leerlo con pinzas**. EcoBici sí llega a los 48 barrios (570 estaciones contra 90 del subte), pero sus magnitudes no son sumables con las del subte (46M de viajes contra 2.730M de pasajeros), así que se combinan como percentiles —el mismo criterio que ya usaba `modulo_b_camaras.py` por la misma razón— relativizados por población. El resultado es un índice de afluencia no residente que ordena bien: arriba San Nicolás (1,00), Monserrat (0,98), **Puerto Madero (0,96, sin subte, capturado por EcoBici)**, Chacarita, Constitución y Retiro; abajo Mataderos (0,02), Villa Lugano (0,04) y Versalles (0,06). Correlaciona con la tasa a Spearman 0,333, o sea que agrega información en vez de repetirla.
+Lo que sí funciona es **no tocar el denominador y marcar dónde leerlo con pinzas**. EcoBici sí llega a los 48 barrios (570 estaciones contra 90 del subte), pero sus magnitudes no son sumables con las del subte (46M de viajes contra 2.730M de pasajeros), así que se combinan como percentiles —el mismo criterio que ya usaba `modulo_b_camaras.py` por la misma razón— relativizados por población. Correlaciona con la tasa a Spearman 0,333, o sea que agrega información en vez de repetirla.
 
 En el tablero eso es un asterisco al lado de la tasa en la columna nueva "Cada 100k" de la tabla, para el quinto superior, y una nota en ámbar en el KPI cuando la selección cae ahí. **No corrige el número: avisa que ese número compara peor que los otros.**
 
@@ -862,7 +862,24 @@ Se compara el índice contra los viajes que llegan a cada comuna **desde otra ju
 
 **Resultado: Spearman 0,729.** Dos fuentes independientes, con métodos y años distintos, ordenan casi igual. Coinciden en los extremos: ambas ponen la Comuna 1 primera, la 3 segunda y la 8 última.
 
-**Pero el índice tiene un punto ciego identificado.** La Comuna 9 (Liniers, Mataderos, Parque Avellaneda) es **cuarta** para la encuesta y **decimocuarta** para el índice: diez puestos de diferencia. Es coherente con la causa — Liniers es un nodo de tren y de colectivos de larga distancia, y no tiene subte. La conclusión operativa es que **la falta de asterisco no garantiza que la tasa esté bien**: donde se llega en tren o colectivo, el índice subestima. Queda anotado en la ayuda del KPI del tablero, no solo acá.
+**Y encontró un punto ciego que después se corrigió.** En la primera versión, con subte y EcoBici solamente, la Comuna 9 (Liniers, Mataderos, Parque Avellaneda) era **cuarta** para la encuesta y **decimocuarta** para el índice: diez puestos. La causa era transparente — Liniers es un nodo de tren y de colectivos de larga distancia, y no tiene subte.
+
+#### Sumar el tren (`pipeline/ingest_trenes_boletos.py`)
+
+Se agregó el modo que faltaba, con dos fuentes: los **boletos vendidos por estación** que publica la CNRT (ZIP con un XLSX por línea, 1994 al presente, actualización mensual) y las **estaciones de ferrocarril** de BA Data para geolocalizarlas. 41 estaciones en CABA, 107,2M de pasajeros en 2025, el 35,6% de la red del AMBA.
+
+Dos trampas del cruce, ambas resueltas con alias explícitos sobre 43 nombres —una cantidad donde el fuzzy match es más riesgo que ayuda—:
+
+- La CNRT usa el nombre oficial y BA Data el corto, o al revés: "Plaza Constitución" vs "Constitución", "Once" vs "Estación Once". Sin los alias se perdían **las dos terminales más grandes de la Ciudad**, 37,0M y 15,3M de pasajeros, el 44% del total de CABA.
+- **Retiro son tres terminales** en el GeoJSON (Mitre, San Martín y Belgrano Norte comparten predio y nombre) y tres entradas en la CNRT ("Retiro", "Retiro Ramal Tigre", "Retiro Ramal Suárez/Mitre"). Sin tratarlo, cada fila del GeoJSON se llevaba el total de "Retiro" y el barrio quedaba con 26,4M en vez de los 15,4M reales: 71% de más.
+
+El tren se lee aparte y **no** entra en `hex_flujo_turno.parquet`, que es lo que alimenta el feature set del modelo — sumarlo ahí obligaría a reentrenar, y esto es un indicador del tablero, no una variable del modelo.
+
+**Resultado, medido con el mismo script:** Spearman **0,729 → 0,768**, y Liniers pasa de percentil 0,12 a 0,83, o sea entra al quinto que se marca. La Comuna 9 sube del puesto 14 al 12.
+
+**Lo que queda sin cubrir es el colectivo**, del que no hay pasajeros por parada publicados. Mataderos es el caso: 0,02 de percentil, sin estación de tren ni de subte, pero con afluencia real. Por eso **la falta de asterisco no garantiza que la tasa esté bien**, y eso está dicho en la ayuda del KPI del tablero, no solo acá.
+
+El resultado ordena así: arriba Constitución (1,00), San Nicolás (0,98), Chacarita (0,96), Monserrat (0,94), Retiro (0,92), **Puerto Madero (0,90, sin subte ni tren, capturado por EcoBici)** y Liniers (0,83); abajo Mataderos (0,02), Villa Lugano y Versalles.
 
 **Por qué ENMODO no se usa para corregir el denominador, aunque sea la fuente conceptualmente correcta.** Está vencida, y el desfasaje tiene justo el patrón espacial que arruinaría la corrección. Medido con los molinetes del propio pipeline, que llegan a 2025:
 
