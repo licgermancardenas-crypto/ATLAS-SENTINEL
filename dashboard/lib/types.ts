@@ -25,17 +25,20 @@ export const TURNOS: { key: Turno; label: string; corto: string }[] = [
 export type TipoDelito =
   | "todos" | "robo" | "hurto" | "lesiones" | "amenazas" | "vialidad" | "homicidios";
 
+/** `uno` es el singular con artículo ("un robo", "una lesión"). Va como campo y
+ *  no derivado del label porque el español no permite deducirlo: hay que saber
+ *  el género y que el plural de "vialidad" en estos datos son siniestros. */
 export const TIPOS: {
-  key: TipoDelito; label: string; superficie: boolean; nota?: string;
+  key: TipoDelito; label: string; uno: string; superficie: boolean; nota?: string;
 }[] = [
-  { key: "todos", label: "Todos los tipos", superficie: true },
-  { key: "robo", label: "Robo", superficie: true },
-  { key: "hurto", label: "Hurto", superficie: true },
-  { key: "lesiones", label: "Lesiones", superficie: true },
-  { key: "amenazas", label: "Amenazas", superficie: true },
-  { key: "vialidad", label: "Vialidad", superficie: false,
+  { key: "todos", label: "Todos los tipos", uno: "un delito", superficie: true },
+  { key: "robo", label: "Robo", uno: "un robo", superficie: true },
+  { key: "hurto", label: "Hurto", uno: "un hurto", superficie: true },
+  { key: "lesiones", label: "Lesiones", uno: "una lesión", superficie: true },
+  { key: "amenazas", label: "Amenazas", uno: "una amenaza", superficie: true },
+  { key: "vialidad", label: "Vialidad", uno: "un siniestro vial", superficie: false,
     nota: "Son siniestros viales, no delitos de seguridad: quedaron excluidos de la superficie de riesgo." },
-  { key: "homicidios", label: "Homicidios", superficie: false,
+  { key: "homicidios", label: "Homicidios", uno: "un homicidio", superficie: false,
     nota: "78 hechos en el año de test y PEI 54%: muy pocos casos para una superficie de riesgo propia." },
 ];
 
@@ -161,6 +164,25 @@ export interface FilaSerie {
   n: number;
 }
 
+/** Cuándo ocurren los delitos. Cada corte es {tipo -> conteos}, con "todos"
+ *  incluido, para que los perfiles sigan el filtro de tipo del tablero: el
+ *  perfil horario de vialidad y el de robo no se parecen en nada. */
+export interface PerfilTemporal {
+  anio: number;
+  /** Días efectivamente cubiertos por los datos. No asumir 365. */
+  dias: number;
+  totales: Record<string, number>;
+  /** 24 posiciones, hora 0 a 23. */
+  franja: Record<string, number[]>;
+  /** 7 posiciones, en el orden de `dias_orden` (arranca lunes). */
+  dia_semana: Record<string, number[]>;
+  /** 4 posiciones: mañana, tarde, noche, madrugada. */
+  turno: Record<string, number[]>;
+  dias_orden: string[];
+}
+
+export const TURNOS_PERFIL = ["Mañana", "Tarde", "Noche", "Madrugada"];
+
 export interface Resumen {
   periodo: { desde: number; hasta: number };
   delitos_ultimo_anio: number;
@@ -191,6 +213,7 @@ export interface DatosDashboard {
   curvaK: CurvaK;
   radio: SensibilidadRadio;
   serie: FilaSerie[];
+  perfil: PerfilTemporal;
   resumen: Resumen;
 }
 

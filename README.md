@@ -825,6 +825,22 @@ Lo que hace no trivial la interfaz es que **la asimetría del análisis tiene qu
 
 El fallback al agregado vive en una sola función (`claveRiesgo` en `lib/types.ts`), no repartido por los componentes: si cada uno lo dedujera por su cuenta, alcanzaría con que uno se olvidara para que el mapa dibujara ceros y pareciera "sin riesgo".
 
+### Indicadores para el que mira, no para el que modela
+
+El tablero tenía un KPI que decía **"Riesgo medio por celda: 0,397"**. Es la salida del modelo, pero un 0,397 no se puede dimensionar sin conocer la escala, y encima cambia de escala con el filtro por tipo. Se reemplazó por **tasa cada 100.000 habitantes** (4.512 para toda la Ciudad), que es el estándar con el que se compara delito entre jurisdicciones y además corrige algo que el conteo crudo no: Palermo tiene 226.534 habitantes y Villa Real 5.500, así que un ranking por conteo mide sobre todo cuánta gente vive en cada barrio. La población sale del prorrateo por área de `overlay_poligonos.py` y suma exacto los 2.890.151 del padrón. La salvedad —que mide sobre población residente y por lo tanto sobreestima donde entra mucha gente que no vive ahí, como el microcentro— va en la ayuda del propio KPI.
+
+El panel **"Cuándo ocurren"** (`components/Cuando.tsx`) traduce el volumen a frecuencia y agrega el perfil temporal, desde `perfil_temporal.json`:
+
+- **Cascada de frecuencias**: "un delito cada 4 minutos", más el desglose por hora / día / semana / mes. La unidad del titular se elige sola, porque el rango es enorme: son 130.421 delitos al año (uno cada 4 minutos) pero 78 homicidios (uno cada 4,7 días), y fijar la unidad en minutos daría "cada 6.735 minutos", que no se dimensiona.
+- **Perfil horario** con las bandas de turno de fondo, para no tener que contar posiciones y adivinar si el pico de las 18h cae en "tarde" o en "noche". Pico a las 18h, la tarde concentra el 42,6%.
+- **Perfil por día de la semana**: viernes es el más cargado, 27,1% arriba del domingo. La escala no arranca en cero a propósito — las diferencias entre días son de ~10% y contra un eje en cero las siete barras se ven iguales.
+
+Tres decisiones de honestidad en este panel:
+
+- **La cascada sigue la selección territorial; los perfiles no.** La cascada es un total dividido por tiempo, así que se puede calcular para cualquier comuna o barrio. Los perfiles vienen agregados a nivel Ciudad. Van visualmente separados y el perfil dice "toda la Ciudad" en su propio encabezado incluso con un filtro puesto, para que nadie filtre por Balvanera, mire el pico de las 18h y crea que es el pico de Balvanera.
+- **Con pocos casos no se afirma el patrón.** Debajo de 1.000 hechos en el año, el reparto por hora y por día es ruido: con homicidios el "día pico" cambia de año a año por azar. En ese caso el panel reemplaza la frase por la advertencia y deja solo la lectura por turno, que agrupa 6-8 horas y aguanta mucho mejor el poco volumen. El umbral es grosero a propósito: no pretende ser un test, solo evitar que el tablero anuncie "el sábado es 280% peor que el martes" como si fuera un hallazgo.
+- **El delta y la chispa del KPI de delitos siguen al tipo pero no al territorio**, porque la serie mensual está agregada a nivel Ciudad y recortarla por barrio sería inventar el dato. Que sigan al tipo sí importa: con el filtro en lesiones o amenazas el delta es positivo mientras el total cae, que es justo lo que el quiebre de 2025 predice.
+
 Decisiones de la versión actual:
 
 - **Agregación por promedio de hexágonos, no por suma.** Los barrios varían mucho en superficie; sumar convierte el mapa de riesgo en un mapa de tamaños. El total se guarda aparte porque para asignar recursos el volumen sí importa.

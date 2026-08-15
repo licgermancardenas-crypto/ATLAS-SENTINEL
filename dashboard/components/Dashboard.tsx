@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import type { BarrioProps, Capa, DatosDashboard, TipoDelito, Turno } from "@/lib/types";
 import { CAPAS, claveDelitos, claveRiesgo, riesgoEsDelTipo, tipoInfo } from "@/lib/types";
 import { cargarDatos } from "@/lib/data";
-import { delta, num, num3, pct, pp } from "@/lib/formato";
+import { delta, num, num3, pct, pp, tasa100k } from "@/lib/formato";
 import { cortesPorCuantil, ETIQUETAS_CLASE, VAR_RIESGO } from "@/lib/escala";
 import { KpiRow } from "./Kpi";
 import {
@@ -14,6 +14,7 @@ import {
 import { BarrasComuna, CurvaCobertura, SensibilidadAlRadio, SerieAnual } from "./Graficos";
 import TablaBarrios from "./TablaBarrios";
 import Salvedades from "./Salvedades";
+import Cuando from "./Cuando";
 
 // Leaflet toca `window` al importarse, así que no puede renderizar en el servidor
 const Mapa = dynamic(() => import("./Mapa"), {
@@ -68,22 +69,29 @@ export default function Dashboard() {
   const kpis = useMemo(() => {
     if (!datos) return [];
     const r = datos.resumen;
-    const clave = claveRiesgo(turno, tipo);
     const claveD = claveDelitos(tipo);
-    const propio = riesgoEsDelTipo(tipo);
     const sel = comuna === null ? props : props.filter((b) => b.comuna === comuna);
     const foco = barrio ? props.filter((b) => b.nombre === barrio) : sel;
 
     const delitos = foco.reduce((s, b) => s + (b[claveD] as number), 0);
-    const riesgoMedio = foco.length ? foco.reduce((s, b) => s + (b[clave] as number), 0) / foco.length : 0;
+    const poblacion = foco.reduce((s, b) => s + ((b.poblacion as number) ?? 0), 0);
+    const tasa = tasa100k(delitos, poblacion);
 
     const punto = datos.curvaK.curva.find((p) => p.k === kPatrullas);
     const cob = punto?.cobertura ?? null;
     const actual = datos.curvaK.cobertura_actual;
 
+    // la serie anual se calcula por tipo, no solo del total: así el delta y la
+    // chispa siguen sirviendo con el filtro puesto, que es donde más informan
+    // (lesiones y amenazas suben en 2025 mientras el total baja)
+    const etiquetaSerie = tipo === "todos" ? null : tipoInfo(tipo).label;
     const serieAnual = [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025].map((a) =>
-      datos.serie.filter((f) => f.anio === a).reduce((s, f) => s + f.n, 0),
+      datos.serie
+        .filter((f) => f.anio === a && (etiquetaSerie === null || f.tipo === etiquetaSerie))
+        .reduce((s, f) => s + f.n, 0),
     );
+    const previo = serieAnual[serieAnual.length - 2];
+    const ultimo = serieAnual[serieAnual.length - 1];
 
     return [
       {
@@ -91,31 +99,31 @@ export default function Dashboard() {
                 : barrio ? "Delitos · barrio" : comuna !== null ? "Delitos · comuna" : "Delitos registrados",
         valor: num(delitos),
         nota: <>en {r.periodo.hasta}{barrio ? ` · ${barrio}` : comuna !== null ? ` · Comuna ${comuna}` : " · toda la Ciudad"}</>,
-        // el delta compara contra el año previo del total, así que solo tiene
-        // sentido cuando no hay ningún filtro puesto
-        delta: comuna === null && !barrio && tipo === "todos"
-          ? { texto: delta(r.delitos_ultimo_anio / r.delitos_anio_previo - 1), tono: "alerta" as const }
+        // el delta y la chispa siguen al tipo, pero no a la comuna ni al
+        // barrio: la serie mensual está agregada a nivel Ciudad y no se puede
+        // recortar por territorio sin inventar el dato
+        delta: comuna === null && !barrio && previo > 0
+          ? { texto: delta(ultimo / previo - 1), tono: "alerta" as const }
           : undefined,
-        chispa: comuna === null && !barrio && tipo === "todos" ? serieAnual : undefined,
+        chispa: comuna === null && !barrio ? serieAnual : undefined,
         ayuda: "Delitos georreferenciados del último año cerrado. El nivel de 2025 está bajo revisión — ver salvedades.",
       },
       {
-        etiqueta: propio ? `Riesgo medio · ${tipoInfo(tipo).label.toLowerCase()}` : "Riesgo medio por celda",
-        valor: num3(riesgoMedio),
-        nota: propio
-          ? <>turno {turno === "manana" ? "mañana" : turno} · superficie propia</>
-          : tipo === "todos"
-          ? <>turno {turno === "manana" ? "mañana" : turno} · {foco.length} barrio{foco.length === 1 ? "" : "s"}</>
-          : <span className="text-[var(--warn)]">superficie agregada — {tipoInfo(tipo).label} no tiene una propia</span>,
-        // las superficies por tipo están normalizadas por separado: la media de
-        // amenazas (0,014) y la de robo (0,086) no se pueden comparar entre sí,
-        // solo dentro del mismo tipo. Se dice acá y no en las salvedades porque
-        // es sobre este número exacto donde se cometería el error.
-        ayuda: propio
-          ? `Predicción del modelo por tipo, promediada sobre las celdas de la selección. El nivel no es comparable contra otros tipos: cada superficie está normalizada por separado. Lo comparable es el ranking entre barrios.`
-          : tipo === "todos"
-          ? "Predicción del modelo agregado, promediada sobre las celdas de la selección."
-          : `${tipoInfo(tipo).nota} El mapa sigue dibujando el riesgo agregado.`,
+        // reemplaza al "riesgo medio por celda", que era el índice crudo del
+        // modelo: un 0,397 no se puede dimensionar sin conocer la escala. La
+        // tasa cada 100.000 es el estándar con el que se compara delito entre
+        // jurisdicciones, y además corrige lo que el conteo crudo no: Palermo
+        // tiene 226.534 habitantes y Villa Real 5.500, así que el ranking por
+        // conteo mide sobre todo cuánta gente vive en cada barrio.
+        etiqueta: "Tasa de delito",
+        valor: tasa === null ? "—" : num(tasa),
+        nota: tasa === null
+          ? <span className="text-[var(--warn)]">sin población para esta selección</span>
+          : <>cada 100.000 habitantes · {num(poblacion)} hab.</>,
+        ayuda: `Delitos de ${tipo === "todos" ? "todos los tipos" : tipoInfo(tipo).label.toLowerCase()} `
+             + `por cada 100.000 habitantes de la selección. Es lo comparable entre barrios de tamaño distinto. `
+             + `La población sale del padrón prorrateado por área (2.890.151 en total). `
+             + `Ojo: mide sobre población residente, así que sobreestima en barrios donde entra mucha gente que no vive ahí, como el microcentro.`,
       },
       {
         etiqueta: "Cobertura actual",
@@ -139,7 +147,9 @@ export default function Dashboard() {
         ayuda: "Lo que el modelo hace bien: priorizar. PAI 2,77 y PEI 99,5% sobre el 10% del área.",
       },
     ];
-  }, [datos, turno, tipo, comuna, barrio, kPatrullas, props]);
+    // sin `turno`: desde que el riesgo medio salió de esta fila, ninguna tarjeta
+    // depende del turno — delitos, tasa y cobertura son anuales
+  }, [datos, tipo, comuna, barrio, kPatrullas, props]);
 
   if (error) {
     return (
@@ -173,6 +183,15 @@ export default function Dashboard() {
   const cortes = cortesPorCuantil(props.map((b) => b[clave] as number));
   const capaInfo = CAPAS.find((c) => c.key === capa)!;
   const superficiePropia = riesgoEsDelTipo(tipo);
+
+  // la cascada de frecuencias sí puede seguir la selección territorial, porque
+  // es un total dividido por tiempo. Los perfiles de hora y día no, y por eso
+  // el panel los separa — ver el comentario de cabecera de Cuando.tsx
+  const focoActual = barrio
+    ? props.filter((b) => b.nombre === barrio)
+    : comuna === null ? props : props.filter((b) => b.comuna === comuna);
+  const delitosFoco = focoActual.reduce((s, b) => s + (b[claveDelitos(tipo)] as number), 0);
+  const ambito = barrio ?? (comuna === null ? "toda la Ciudad" : `Comuna ${comuna}`);
 
   return (
     <main className="h-full flex flex-col overflow-hidden">
@@ -246,6 +265,9 @@ export default function Dashboard() {
               </p>
               <CurvaCobertura curva={datos.curvaK} kActual={kPatrullas} onK={setKPatrullas} />
             </section>
+
+            <Cuando perfil={datos.perfil} tipo={tipo}
+                    delitosSeleccion={delitosFoco} ambito={ambito} />
 
             <section className="card p-3">
               <h2 className="text-xs font-semibold uppercase tracking-[0.07em] text-ink-2 mb-1">

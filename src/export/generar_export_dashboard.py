@@ -23,12 +23,16 @@ Salidas en dashboard/public/data/:
                            depende el número.
 - serie_delitos.json       serie mensual por tipo, 2016-2025, para las
                            tendencias y el contexto del quiebre de 2025.
+- perfil_temporal.json     cuándo ocurren: por hora, por día de la semana y por
+                           turno, cortado por tipo. Es lo que alimenta los
+                           indicadores de frecuencia del tablero.
 - resumen.json             los números sueltos que van en las tarjetas de KPI,
                            en un solo lugar en vez de hardcodeados en el front.
 """
 
 from __future__ import annotations
 
+import calendar
 import json
 from pathlib import Path
 
@@ -127,7 +131,7 @@ def delitos() -> pd.DataFrame:
     global _DELITOS
     if _DELITOS is None:
         d = pd.read_parquet(FEATURES / "delitos_hex.parquet",
-                            columns=["fecha", "barrio", "comuna", "tipo"])
+                            columns=["fecha", "barrio", "comuna", "tipo", "franja", "dia", "turno"])
         f = pd.to_datetime(d["fecha"], errors="coerce")
         _DELITOS = pd.DataFrame({
             "anio": f.dt.year.astype("int16"),
@@ -135,9 +139,30 @@ def delitos() -> pd.DataFrame:
             "barrio": d["barrio"].astype(str).str.upper().str.strip().astype("category"),
             "comuna": pd.to_numeric(d["comuna"], errors="coerce"),
             "tipo": d["tipo"].astype("category"),
+            # -1 marca la hora desconocida (148 casos en 2025). Se guarda como
+            # valor y no como NaN para poder dejar la columna en int8: un solo
+            # NaN la promovería a float64 y son 1,35M de filas.
+            "franja": pd.to_numeric(d["franja"], errors="coerce").fillna(-1).astype("int8"),
+            "dia": d["dia"].astype(str).str.upper().str.strip().astype("category"),
+            "turno": d["turno"].astype("category"),
         })
         del d, f
     return _DELITOS
+
+
+def _poblacion_por_hex() -> pd.DataFrame:
+    """hex_id -> población, con su barrio y comuna. Es lo que permite pasar de
+    conteos crudos a tasa cada 100.000 habitantes, que es lo único comparable
+    entre barrios de tamaño muy distinto (Palermo tiene 226.534 habitantes y
+    Villa Real 5.500: el conteo crudo mide sobre todo cuánta gente vive ahí).
+
+    La población ya viene prorrateada por área dentro del barrio desde
+    `overlay_poligonos.py`; la suma da exacto los 2.890.151 del padrón.
+    """
+    hexes = (pd.read_parquet(FEATURES / "hex_maestra.parquet")
+             .dropna(subset=["barrio_id"])[["hex_id", "barrio_id", "comuna_id"]])
+    pob = pd.read_parquet(FEATURES / "hex_poblacion.parquet")
+    return hexes.merge(pob, on="hex_id", how="left").fillna({"poblacion_hex": 0.0})
 
 
 def _delitos_por_barrio() -> pd.Series:
@@ -156,6 +181,7 @@ def exportar_barrios() -> None:
     por_tipo = _riesgo_por_tipo_por_hex()
     por_barrio = _delitos_por_barrio()   # ojo: no llamarlo `delitos`, tapa a la función
     delitos_tipo = _delitos_por_barrio_y_tipo()
+    pob_barrio = _poblacion_por_hex().groupby("barrio_id")["poblacion_hex"].sum()
 
     # promedio por hexágono, no suma: los barrios varían mucho en superficie y
     # sumar convierte el mapa en un mapa de tamaños. El total se guarda aparte
@@ -179,6 +205,7 @@ def exportar_barrios() -> None:
             "comuna": int(fila["comuna"]) if fila is not None else None,
             "n_hex": int(fila["n_hex"]) if fila is not None else 0,
             "delitos_2025": _delitos_de(nombre, por_barrio),
+            "poblacion": int(round(float(pob_barrio.get(nombre, 0.0)))),
         }
         for t in TURNOS:
             k = TURNO_KEY[t]
@@ -216,12 +243,15 @@ def exportar_comunas() -> None:
     por_comuna_tipo = (dd.groupby(["comuna", "tipo"], observed=True).size()
                        .unstack(fill_value=0).reindex(columns=TIPOS_DELITO, fill_value=0))
 
+    pob_comuna = _poblacion_por_hex().groupby("comuna_id")["poblacion_hex"].sum()
+
     filas = []
     for comuna, g in por_hex.groupby("comuna_id"):
         gt = por_tipo.loc[por_tipo.index.intersection(g["hex_id"])]
         fila = {"comuna": int(comuna), "n_hex": int(len(g)),
                 "n_barrios": int(g["barrio_id"].nunique()),
-                "delitos_2025": int(por_comuna.get(int(comuna), 0))}
+                "delitos_2025": int(por_comuna.get(int(comuna), 0)),
+                "poblacion": int(round(float(pob_comuna.get(comuna, 0.0))))}
         for t in TURNOS:
             if t in g.columns:
                 fila[f"riesgo_{TURNO_KEY[t]}"] = round(float(g[t].mean()), 5)
@@ -253,6 +283,59 @@ def exportar_serie_delitos() -> None:
     (OUT / "serie_delitos.json").write_text(
         serie.to_json(orient="records", force_ascii=False), encoding="utf-8")
     print(f"serie_delitos.json: {len(serie)} filas ({serie.anio.min()}-{serie.anio.max()})")
+
+
+DIAS_ORDEN = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"]
+
+
+def exportar_perfil_temporal() -> None:
+    """Cuándo ocurren los delitos: por hora, por día de la semana y por turno.
+
+    Todo cortado por tipo además del total, porque el tablero filtra por tipo y
+    un perfil horario que no siguiera el filtro sería peor que no tenerlo: el
+    perfil de vialidad y el de robo no se parecen en nada.
+
+    Los conteos van crudos y no en porcentaje: el front necesita el total para
+    calcular la cascada de frecuencias, y dejar que divida él evita tener dos
+    redondeos distintos del mismo número.
+    """
+    d = delitos()
+    ult = d.loc[d["anio"] == ANIO_ULTIMO]
+
+    def cortes(col: str, orden: list) -> dict:
+        """{tipo -> [conteo por cada valor de `orden`]}, con 'todos' incluido."""
+        salida: dict[str, list[int]] = {}
+        tabla = ult.groupby([col, "tipo"], observed=True).size().unstack(fill_value=0)
+        tabla = tabla.reindex(index=orden, fill_value=0).reindex(columns=TIPOS_DELITO, fill_value=0)
+        salida["todos"] = [int(v) for v in tabla.sum(axis=1)]
+        for tp in TIPOS_DELITO:
+            salida[TIPO_KEY[tp]] = [int(v) for v in tabla[tp]]
+        return salida
+
+    totales = {"todos": int(len(ult))}
+    for tp in TIPOS_DELITO:
+        totales[TIPO_KEY[tp]] = int((ult["tipo"] == tp).sum())
+
+    # los días efectivamente cubiertos, no 365 fijo: se suman los largos de los
+    # meses presentes. Si el último año viniera cortado, dividir por 365
+    # subestimaría la frecuencia y la cascada del tablero quedaría mal
+    dias = sum(calendar.monthrange(ANIO_ULTIMO, int(m))[1]
+               for m in sorted(ult["mes"].unique()))
+
+    perfil = {
+        "anio": ANIO_ULTIMO,
+        "dias": dias,
+        "totales": totales,
+        # -1 es la hora desconocida; se excluye del perfil horario para no
+        # dibujar una barra fantasma, pero sigue contando en los totales
+        "franja": cortes("franja", list(range(24))),
+        "dia_semana": cortes("dia", DIAS_ORDEN),
+        "turno": cortes("turno", ["Mañana", "Tarde", "Noche", "Madrugada"]),
+        "dias_orden": [d.capitalize() for d in DIAS_ORDEN],
+    }
+    (OUT / "perfil_temporal.json").write_text(
+        json.dumps(perfil, ensure_ascii=False), encoding="utf-8")
+    print(f"perfil_temporal.json: {dias} días, {totales['todos']} delitos")
 
 
 def exportar_resumen() -> None:
@@ -308,6 +391,7 @@ def main() -> None:
     copiar_json(FEATURES / "modulo_a_curva_k.json", "curva_k.json")
     copiar_json(FEATURES / "sensibilidad_radio_patrullas.json", "sensibilidad_radio.json")
     exportar_serie_delitos()
+    exportar_perfil_temporal()
     exportar_resumen()
     print(f"\nTodo en {OUT}")
 
