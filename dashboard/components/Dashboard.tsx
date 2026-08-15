@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import type { BarrioProps, Capa, DatosDashboard, TipoDelito, Turno } from "@/lib/types";
-import { CAPAS, claveDelitos, claveRiesgo, riesgoEsDelTipo, tipoInfo } from "@/lib/types";
+import { CAPAS, claveDelitos, claveRiesgo, riesgoEsDelTipo, tasaInflada, tipoInfo } from "@/lib/types";
 import { cargarDatos } from "@/lib/data";
 import { delta, num, num3, pct, pp, tasa100k } from "@/lib/formato";
 import { cortesPorCuantil, ETIQUETAS_CLASE, VAR_RIESGO } from "@/lib/escala";
@@ -76,6 +76,10 @@ export default function Dashboard() {
     const delitos = foco.reduce((s, b) => s + (b[claveD] as number), 0);
     const poblacion = foco.reduce((s, b) => s + ((b.poblacion as number) ?? 0), 0);
     const tasa = tasa100k(delitos, poblacion);
+    // con toda la Ciudad seleccionada la advertencia no aplica: el numerador y
+    // el denominador cubren lo mismo. Solo importa al mirar una parte
+    const infladaSel = foco.length < props.length
+      && foco.some((b) => tasaInflada(b.presion_visitantes as number | null));
 
     const punto = datos.curvaK.curva.find((p) => p.k === kPatrullas);
     const cob = punto?.cobertura ?? null;
@@ -119,11 +123,15 @@ export default function Dashboard() {
         valor: tasa === null ? "—" : num(tasa),
         nota: tasa === null
           ? <span className="text-[var(--warn)]">sin población para esta selección</span>
+          : infladaSel
+          ? <span className="text-[var(--warn)]">sobreestimada · mucha gente que no vive acá</span>
           : <>cada 100.000 habitantes · {num(poblacion)} hab.</>,
         ayuda: `Delitos de ${tipo === "todos" ? "todos los tipos" : tipoInfo(tipo).label.toLowerCase()} `
              + `por cada 100.000 habitantes de la selección. Es lo comparable entre barrios de tamaño distinto. `
              + `La población sale del padrón prorrateado por área (2.890.151 en total). `
-             + `Ojo: mide sobre población residente, así que sobreestima en barrios donde entra mucha gente que no vive ahí, como el microcentro.`,
+             + `Mide sobre población residente, así que sobreestima donde entra mucha gente que no vive ahí. `
+             + `La selección actual está marcada cuando cae en el quinto de mayor afluencia no residente, `
+             + `medida con el flujo de subte y EcoBici por habitante.`,
       },
       {
         etiqueta: "Cobertura actual",

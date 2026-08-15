@@ -165,6 +165,46 @@ def _poblacion_por_hex() -> pd.DataFrame:
     return hexes.merge(pob, on="hex_id", how="left").fillna({"poblacion_hex": 0.0})
 
 
+def _presion_visitantes() -> tuple[pd.Series, pd.Series]:
+    """Percentil de afluencia no residente, por barrio y por comuna.
+
+    La tasa cada 100.000 mide sobre población *residente*, así que se infla
+    donde entra mucha gente que no vive ahí: San Nicolás tiene 29.273 vecinos y
+    la tasa más alta de la Ciudad. Esto no corrige la tasa —marca dónde hay que
+    leerla con pinzas.
+
+    Por qué un percentil y no una población flotante estimada: se probó usar los
+    molinetes como denominador y no se sostiene. Solo 23 de los 48 barrios
+    tienen estación de subte, y esos 23 concentran apenas dos tercios de los
+    delitos, así que la corrección se aplicaría a media ciudad y no a la otra
+    media. Peor: Puerto Madero, el caso de manual de población flotante, no
+    tiene subte — corregir por molinetes lo dejaba primero en el ranking, o sea
+    exactamente al revés. EcoBici sí llega a los 48 barrios, pero sus magnitudes
+    (46M de viajes) no son sumables con las del subte (2.730M de pasajeros).
+
+    La salida es entonces el promedio de los percentiles de ambas fuentes,
+    relativizado por población — el mismo criterio de rank que ya usa
+    `modulo_b_camaras.py` por la misma razón de escalas incomparables.
+    """
+    h = _poblacion_por_hex()
+    fl = pd.read_parquet(FEATURES / "hex_flujo_turno.parquet")
+    fl["hex_id"] = fl["hex_id"].astype(str)
+    h = h.copy()
+    h["hex_id"] = h["hex_id"].astype(str)
+
+    def por(nivel: str) -> pd.Series:
+        base = (fl.merge(h, on="hex_id", how="inner")
+                .groupby(nivel)[["flujo_ecobici", "flujo_molinetes"]].sum())
+        pobl = h.groupby(nivel)["poblacion_hex"].sum()
+        # cada fuente se lleva a fracción del total de la Ciudad antes de
+        # promediar; si no, el subte domina por tres órdenes de magnitud
+        cuota = (base["flujo_ecobici"] / base["flujo_ecobici"].sum()
+                 + base["flujo_molinetes"] / base["flujo_molinetes"].sum()) / 2
+        return (cuota / pobl.replace(0, pd.NA)).rank(pct=True)
+
+    return por("barrio_id"), por("comuna_id")
+
+
 def _delitos_por_barrio() -> pd.Series:
     d = delitos()
     return d.loc[d["anio"] == ANIO_ULTIMO, "barrio"].value_counts()
@@ -182,6 +222,7 @@ def exportar_barrios() -> None:
     por_barrio = _delitos_por_barrio()   # ojo: no llamarlo `delitos`, tapa a la función
     delitos_tipo = _delitos_por_barrio_y_tipo()
     pob_barrio = _poblacion_por_hex().groupby("barrio_id")["poblacion_hex"].sum()
+    presion_barrio, _ = _presion_visitantes()
 
     # promedio por hexágono, no suma: los barrios varían mucho en superficie y
     # sumar convierte el mapa en un mapa de tamaños. El total se guarda aparte
@@ -206,6 +247,9 @@ def exportar_barrios() -> None:
             "n_hex": int(fila["n_hex"]) if fila is not None else 0,
             "delitos_2025": _delitos_de(nombre, por_barrio),
             "poblacion": int(round(float(pob_barrio.get(nombre, 0.0)))),
+            "presion_visitantes": (round(float(presion_barrio[nombre]), 3)
+                                   if nombre in presion_barrio.index
+                                   and pd.notna(presion_barrio[nombre]) else None),
         }
         for t in TURNOS:
             k = TURNO_KEY[t]
@@ -244,6 +288,7 @@ def exportar_comunas() -> None:
                        .unstack(fill_value=0).reindex(columns=TIPOS_DELITO, fill_value=0))
 
     pob_comuna = _poblacion_por_hex().groupby("comuna_id")["poblacion_hex"].sum()
+    _, presion_comuna = _presion_visitantes()
 
     filas = []
     for comuna, g in por_hex.groupby("comuna_id"):
@@ -251,7 +296,10 @@ def exportar_comunas() -> None:
         fila = {"comuna": int(comuna), "n_hex": int(len(g)),
                 "n_barrios": int(g["barrio_id"].nunique()),
                 "delitos_2025": int(por_comuna.get(int(comuna), 0)),
-                "poblacion": int(round(float(pob_comuna.get(comuna, 0.0))))}
+                "poblacion": int(round(float(pob_comuna.get(comuna, 0.0)))),
+                "presion_visitantes": (round(float(presion_comuna[comuna]), 3)
+                                       if comuna in presion_comuna.index
+                                       and pd.notna(presion_comuna[comuna]) else None)}
         for t in TURNOS:
             if t in g.columns:
                 fila[f"riesgo_{TURNO_KEY[t]}"] = round(float(g[t].mean()), 5)

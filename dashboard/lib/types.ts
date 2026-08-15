@@ -233,3 +233,13 @@ export const claveDelitos = (tipo: TipoDelito = "todos") =>
  *  agregado. Lo consultan el encabezado del mapa y el KPI para decirlo. */
 export const riesgoEsDelTipo = (tipo: TipoDelito) =>
   tipo !== "todos" && tipoInfo(tipo).superficie;
+
+/** Percentil de afluencia no residente arriba del cual se marca la tasa.
+ *
+ *  0,8 deja marcado el quinto superior. Es un corte relativo y no absoluto a
+ *  propósito: no existe un umbral "verdadero" de cuánta gente de afuera infla
+ *  una tasa, pero sí se puede decir cuáles son los barrios donde más pesa. */
+export const UMBRAL_PRESION = 0.8;
+
+export const tasaInflada = (presion: number | null | undefined) =>
+  presion != null && presion >= UMBRAL_PRESION;

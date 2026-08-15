@@ -2,11 +2,30 @@
 
 import { useMemo, useState } from "react";
 import type { BarrioProps, TipoDelito, Turno } from "@/lib/types";
-import { claveDelitos, claveRiesgo, riesgoEsDelTipo, tipoInfo } from "@/lib/types";
-import { num, num3 } from "@/lib/formato";
+import { claveDelitos, claveRiesgo, riesgoEsDelTipo, tasaInflada, tipoInfo } from "@/lib/types";
+import { num, num3, tasa100k } from "@/lib/formato";
 import { claseDe, cortesPorCuantil, ETIQUETAS_CLASE, VAR_RIESGO } from "@/lib/escala";
 
-type Columna = "nombre" | "comuna" | "riesgo" | "delitos" | "n_hex";
+type Columna = "nombre" | "comuna" | "riesgo" | "delitos" | "tasa" | "n_hex";
+
+/* La tasa cada 100.000 divide por población residente, así que en los barrios
+   donde entra mucha gente que no vive ahí queda inflada. El asterisco marca el
+   quinto superior de afluencia no residente (subte + EcoBici por habitante).
+   No corrige el número — avisa que ese número compara peor que los otros. */
+function TasaCelda({ barrio, claveD }: { barrio: BarrioProps; claveD: string }) {
+  const t = tasa100k(barrio[claveD] as number, barrio.poblacion as number);
+  if (t === null) return <span className="text-ink-muted">—</span>;
+  const inflada = tasaInflada(barrio.presion_visitantes as number | null);
+  return (
+    <span title={inflada
+      ? `${barrio.nombre} está entre los barrios con más afluencia de gente que no vive ahí, `
+        + "así que esta tasa —que divide por población residente— queda sobreestimada."
+      : undefined}>
+      {num(t)}
+      {inflada && <span className="text-[var(--warn)] ml-0.5" aria-label="tasa sobreestimada">*</span>}
+    </span>
+  );
+}
 
 export default function TablaBarrios({
   barrios, turno, tipo, comuna, barrioActivo, onBarrio,
@@ -29,6 +48,7 @@ export default function TablaBarrios({
       numerica: true },
     { key: "delitos", label: tipo === "todos" ? "Delitos 2025" : `${tipoInfo(tipo).label} 2025`,
       numerica: true },
+    { key: "tasa", label: "Cada 100k", numerica: true },
     { key: "n_hex", label: "Celdas", numerica: true },
   ];
 
@@ -40,7 +60,10 @@ export default function TablaBarrios({
   const filas = useMemo(() => {
     const base = comuna === null ? barrios : barrios.filter((b) => b.comuna === comuna);
     const campo = (c: Columna) => (c === "riesgo" ? clave : c === "delitos" ? claveD : c);
-    const valor = (b: BarrioProps) => b[campo(orden.col)] as string | number;
+    const valor = (b: BarrioProps): string | number =>
+      orden.col === "tasa"
+        ? tasa100k(b[claveD] as number, b.poblacion as number) ?? -1
+        : (b[campo(orden.col)] as string | number);
     return [...base].sort((a, b) => {
       const va = valor(a), vb = valor(b);
       const cmp = typeof va === "string" ? va.localeCompare(vb as string, "es") : (va as number) - (vb as number);
@@ -119,6 +142,9 @@ export default function TablaBarrios({
                   <td className="border-b border-line px-3 py-1.5 text-right tabular text-ink-2">{b.comuna ?? "—"}</td>
                   <td className="border-b border-line px-3 py-1.5 text-right tabular font-medium">{num3(v)}</td>
                   <td className="border-b border-line px-3 py-1.5 text-right tabular text-ink-2">{num(b[claveD] as number)}</td>
+                  <td className="border-b border-line px-3 py-1.5 text-right tabular text-ink-2">
+                    <TasaCelda barrio={b} claveD={claveD} />
+                  </td>
                   <td className="border-b border-line px-3 py-1.5 text-right tabular text-ink-muted">{b.n_hex}</td>
                 </tr>
               );

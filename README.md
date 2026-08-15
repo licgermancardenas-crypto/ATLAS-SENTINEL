@@ -841,6 +841,19 @@ Tres decisiones de honestidad en este panel:
 - **Con pocos casos no se afirma el patrón.** Debajo de 1.000 hechos en el año, el reparto por hora y por día es ruido: con homicidios el "día pico" cambia de año a año por azar. En ese caso el panel reemplaza la frase por la advertencia y deja solo la lectura por turno, que agrupa 6-8 horas y aguanta mucho mejor el poco volumen. El umbral es grosero a propósito: no pretende ser un test, solo evitar que el tablero anuncie "el sábado es 280% peor que el martes" como si fuera un hallazgo.
 - **El delta y la chispa del KPI de delitos siguen al tipo pero no al territorio**, porque la serie mensual está agregada a nivel Ciudad y recortarla por barrio sería inventar el dato. Que sigan al tipo sí importa: con el filtro en lesiones o amenazas el delta es positivo mientras el total cae, que es justo lo que el quiebre de 2025 predice.
 
+#### Población flotante: los molinetes no sirven de denominador, sí de marca
+
+La tasa cada 100.000 divide por población **residente**, así que se infla donde entra mucha gente que no vive ahí. San Nicolás tiene 29.273 vecinos y la tasa más alta de la Ciudad (15.687). Se probó corregir el denominador con los molinetes del subte y **no se sostiene**:
+
+- **Solo 23 de los 48 barrios tienen estación de subte.** Los 25 restantes concentran el 33,1% de los delitos y el 36% de la población, así que la corrección se aplicaría a media ciudad y no a la otra media, y las dos mitades dejarían de ser comparables — que es peor que no corregir.
+- **Puerto Madero no tiene subte.** Es el caso de manual de población flotante (6.726 residentes, oficinas y turismo), y corrigiendo solo por molinetes pasaba a ser el barrio número uno del ranking: la corrección lo empeoraba en vez de arreglarlo.
+- Con la corrección aplicada igual, el ranking casi no se movía (Spearman 0,9897 contra la tasa sin corregir). El efecto real era grande en un puñado de barrios —San Nicolás −37%, Constitución −26%, Monserrat −25%— y nulo en el resto.
+- El factor de conversión de "entradas diarias" a "residentes equivalentes" es un parámetro inventado, sin nada en los datos que lo fije.
+
+Lo que sí funciona es **no tocar el denominador y marcar dónde leerlo con pinzas**. EcoBici sí llega a los 48 barrios (570 estaciones contra 90 del subte), pero sus magnitudes no son sumables con las del subte (46M de viajes contra 2.730M de pasajeros), así que se combinan como percentiles —el mismo criterio que ya usaba `modulo_b_camaras.py` por la misma razón— relativizados por población. El resultado es un índice de afluencia no residente que ordena bien: arriba San Nicolás (1,00), Monserrat (0,98), **Puerto Madero (0,96, sin subte, capturado por EcoBici)**, Chacarita, Constitución y Retiro; abajo Mataderos (0,02), Villa Lugano (0,04) y Versalles (0,06). Correlaciona con la tasa a Spearman 0,333, o sea que agrega información en vez de repetirla.
+
+En el tablero eso es un asterisco al lado de la tasa en la columna nueva "Cada 100k" de la tabla, para el quinto superior, y una nota en ámbar en el KPI cuando la selección cae ahí. **No corrige el número: avisa que ese número compara peor que los otros.**
+
 Decisiones de la versión actual:
 
 - **Agregación por promedio de hexágonos, no por suma.** Los barrios varían mucho en superficie; sumar convierte el mapa de riesgo en un mapa de tamaños. El total se guarda aparte porque para asignar recursos el volumen sí importa.
