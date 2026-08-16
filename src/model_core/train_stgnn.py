@@ -56,6 +56,7 @@ import torch.nn as nn
 FEATURES = Path(__file__).resolve().parent.parent.parent / "data" / "features"
 TABLA = FEATURES / "training_table_semanal.parquet"
 BACKTEST_LGBM = FEATURES / "backtest_pronostico.parquet"
+RUTA_SALIDA = FEATURES / "backtest_stgnn.parquet"
 
 TARGET = "conteo_delitos"
 TURNOS = ["Madrugada", "Mañana", "Tarde", "Noche"]
@@ -261,8 +262,26 @@ def main() -> None:
     # los mismos orígenes que backtest_pronostico.py: el último predice la
     # última semana disponible
     objetivos = list(range(len(semanas) - n_origenes, len(semanas)))
-    filas = []
-    for i, j in enumerate(objetivos, 1):
+
+    # Se reanuda desde lo ya guardado. Hace falta porque la corrida entera son
+    # ~2 horas y el entorno corta los procesos de fondo antes: las dos primeras
+    # veces murió a los 40-45 minutos. Reanudar es legítimo acá porque la
+    # semilla está fija y cada origen se entrena de cero — los orígenes ya
+    # calculados dan idéntico si se repiten, verificado entre corridas.
+    filas: list[dict] = []
+    if RUTA_SALIDA.exists():
+        previo = pd.read_parquet(RUTA_SALIDA)
+        hechos = set(previo["objetivo"])
+        esperados = {pd.Timestamp(semanas[j]).date().isoformat() for j in objetivos}
+        if hechos <= esperados:
+            filas = previo.to_dict("records")
+            objetivos = [j for j in objetivos
+                         if pd.Timestamp(semanas[j]).date().isoformat() not in hechos]
+            print(f"reanudando: {len(filas)} orígenes ya hechos, faltan {len(objetivos)}")
+        else:
+            print("el parquet previo es de otra configuración — se recalcula entero")
+
+    for i, j in enumerate(objetivos, len(filas) + 1):
         t0 = time.time()
         modelo = entrenar(Y, est, A, fin_train=j - 1)
         X, _ = ventanas(Y, j, j)
@@ -281,13 +300,17 @@ def main() -> None:
             fila[f"mae_{nombre}"] = float(np.abs(real - p).mean())
             fila[f"recall20_{nombre}"] = recall_at_k(real, p)
         filas.append(fila)
-        print(f"  [{i:2d}/{len(objetivos)}] {fila['objetivo']}  "
+        print(f"  [{i:2d}/{n_origenes}] {fila['objetivo']}  "
               f"MAE stgnn={fila['mae_stgnn']:.4f}  hist={fila['mae_historico']:.4f}  "
               f"({fila['segundos']}s)")
+        # se guarda en cada origen y no al final: la corrida completa son ~2
+        # horas y la primera vez se cortó en el origen 10 sin dejar nada. El
+        # costo de reescribir un parquet de 26 filas es irrelevante al lado de
+        # perder una hora de cómputo.
+        pd.DataFrame(filas).to_parquet(RUTA_SALIDA, index=False)
 
     res = pd.DataFrame(filas)
-    ruta = FEATURES / "backtest_stgnn.parquet"
-    res.to_parquet(ruta, index=False)
+    ruta = RUTA_SALIDA
 
     print(f"\n{'=' * 66}\nST-GNN COMO PRONÓSTICO A UNA SEMANA — {len(res)} orígenes\n{'=' * 66}")
     for nombre in ("stgnn", "persistencia", "historico"):
