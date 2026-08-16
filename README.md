@@ -904,6 +904,7 @@ Decisiones de la versión actual:
 - **Leaflet directo, sin react-leaflet.** El mapa se repinta decenas de veces por cambio de filtro; manejar las capas a mano evita reconstruir el árbol de React en cada cambio, y esquiva el problema conocido de react-leaflet con StrictMode montando dos veces.
 - **Cuantiles y no escala lineal** para el color, igual que en la primera versión: el riesgo está muy sesgado a la derecha y una rampa lineal deja 40 barrios del mismo color.
 - **Las salvedades van dentro del tablero**, colapsadas pero con el número visible en el título. Un tablero que muestra números sin decir de qué no responden invita a leerlos como si respondieran de todo.
+- **La selección vive en la query string** (`?tipo=vialidad&comuna=1&turno=noche`). Sirve para mandar el tablero ya filtrado y, sobre todo, para poder capturarlo o revisarlo sin manejar el navegador a mano: `chrome --headless --screenshot --window-size=1600,1200 "http://localhost:3000/?tipo=vialidad"` sale directo con el filtro puesto. Solo se escriben los parámetros que difieren del default, así la URL sigue siendo legible, y se usa `replaceState` para que el botón de atrás no se llene de entradas.
 - **Los KPIs salen de `resumen.json`**, no hardcodeados en el front: un solo lugar donde corregirlos.
 
 **Gotchas de esta etapa**:

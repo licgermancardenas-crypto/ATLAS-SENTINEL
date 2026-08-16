@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import type { BarrioProps, Capa, DatosDashboard, TipoDelito, Turno } from "@/lib/types";
-import { CAPAS, claveDelitos, claveRiesgo, riesgoEsDelTipo, tasaInflada, tipoInfo } from "@/lib/types";
+import {
+  CAPAS, claveDelitos, claveRiesgo, riesgoEsDelTipo, tasaInflada, TIPOS, tipoInfo, TURNOS,
+} from "@/lib/types";
 import { cargarDatos } from "@/lib/data";
 import { delta, num, num3, pct, pp, tasa100k } from "@/lib/formato";
 import { cortesPorCuantil, ETIQUETAS_CLASE, VAR_RIESGO } from "@/lib/escala";
@@ -26,17 +28,42 @@ const Mapa = dynamic(() => import("./Mapa"), {
   ),
 });
 
+/* La selección vive también en la query string. Sirve para dos cosas:
+   mandarle a alguien el tablero ya filtrado ("mirá hurto en la Comuna 1") y
+   poder capturarlo o revisarlo sin tener que manejar el navegador a mano.
+   Se lee una vez al montar y se reescribe con replaceState, así el botón de
+   atrás no se llena de entradas por cada clic en un filtro. */
+function leerURL<T extends string>(clave: string, validos: readonly T[], porDefecto: T): T {
+  if (typeof window === "undefined") return porDefecto;
+  const v = new URLSearchParams(window.location.search).get(clave);
+  return validos.includes(v as T) ? (v as T) : porDefecto;
+}
+
+function leerNum(clave: string, porDefecto: number | null): number | null {
+  if (typeof window === "undefined") return porDefecto;
+  const v = new URLSearchParams(window.location.search).get(clave);
+  if (v === null) return porDefecto;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : porDefecto;
+}
+
 export default function Dashboard() {
   const [datos, setDatos] = useState<DatosDashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const [turno, setTurno] = useState<Turno>("tarde");
-  const [comuna, setComuna] = useState<number | null>(null);
-  const [capa, setCapa] = useState<Capa>("patrullas");
-  const [tipo, setTipo] = useState<TipoDelito>("todos");
-  const [kPatrullas, setKPatrullas] = useState(75);
-  const [barrio, setBarrio] = useState<string | null>(null);
-  const [tema, setTema] = useState<"light" | "dark">("light");
+  const [turno, setTurno] = useState<Turno>(
+    () => leerURL("turno", TURNOS.map((t) => t.key), "tarde"));
+  const [comuna, setComuna] = useState<number | null>(() => leerNum("comuna", null));
+  const [capa, setCapa] = useState<Capa>(
+    () => leerURL("capa", CAPAS.map((c) => c.key), "patrullas"));
+  const [tipo, setTipo] = useState<TipoDelito>(
+    () => leerURL("tipo", TIPOS.map((t) => t.key), "todos"));
+  const [kPatrullas, setKPatrullas] = useState(() => leerNum("k", 75) ?? 75);
+  const [barrio, setBarrio] = useState<string | null>(
+    () => (typeof window === "undefined"
+      ? null : new URLSearchParams(window.location.search).get("barrio")));
+  const [tema, setTema] = useState<"light" | "dark">(
+    () => leerURL("tema", ["light", "dark"] as const, "light"));
 
   useEffect(() => {
     cargarDatos().then(setDatos).catch((e: Error) => setError(e.message));
@@ -45,6 +72,21 @@ export default function Dashboard() {
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", tema);
   }, [tema]);
+
+  // solo se escriben los valores que no son el default: una URL con seis
+  // parámetros siempre puestos es ilegible y no se puede compartir a mano
+  useEffect(() => {
+    const p = new URLSearchParams();
+    if (turno !== "tarde") p.set("turno", turno);
+    if (tipo !== "todos") p.set("tipo", tipo);
+    if (comuna !== null) p.set("comuna", String(comuna));
+    if (barrio) p.set("barrio", barrio);
+    if (capa !== "patrullas") p.set("capa", capa);
+    if (kPatrullas !== 75) p.set("k", String(kPatrullas));
+    if (tema !== "light") p.set("tema", tema);
+    const q = p.toString();
+    window.history.replaceState(null, "", q ? `?${q}` : window.location.pathname);
+  }, [turno, tipo, comuna, barrio, capa, kPatrullas, tema]);
 
   // al elegir un barrio conviene fijar también su comuna: si no, el mapa
   // resalta un polígono y la tabla sigue mostrando los otros 47. Va en el
