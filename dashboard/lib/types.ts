@@ -236,10 +236,18 @@ export const riesgoEsDelTipo = (tipo: TipoDelito) =>
 
 /** Percentil de afluencia no residente arriba del cual se marca la tasa.
  *
- *  0,8 deja marcado el quinto superior. Es un corte relativo y no absoluto a
- *  propósito: no existe un umbral "verdadero" de cuánta gente de afuera infla
- *  una tasa, pero sí se puede decir cuáles son los barrios donde más pesa. */
-export const UMBRAL_PRESION = 0.8;
+ *  Es un corte relativo y no absoluto a propósito: no existe un umbral
+ *  "verdadero" de cuánta gente de afuera infla una tasa, pero sí se puede decir
+ *  cuáles son los barrios donde más pesa.
+ *
+ *  0,75 y no 0,80 porque el índice solo ve transporte motorizado —subte, tren
+ *  y bici— y por lo tanto subestima a los barrios que reciben gente a pie o en
+ *  colectivo. Con 0,80 quedaban afuera San Telmo (0,79) y Recoleta (0,77), que
+ *  son turismo y peatonal: dos casos donde la tasa está claramente inflada y
+ *  el índice no lo ve del todo. Ante un instrumento que se sabe conservador,
+ *  conviene errar marcando de más: el costo de un asterisco sobrante es que
+ *  alguien mire un número con más cuidado del necesario. */
+export const UMBRAL_PRESION = 0.75;
 
 export const tasaInflada = (presion: number | null | undefined) =>
   presion != null && presion >= UMBRAL_PRESION;

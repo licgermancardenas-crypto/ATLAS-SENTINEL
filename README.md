@@ -852,7 +852,9 @@ La tasa cada 100.000 divide por población **residente**, así que se infla dond
 
 Lo que sí funciona es **no tocar el denominador y marcar dónde leerlo con pinzas**. EcoBici sí llega a los 48 barrios (570 estaciones contra 90 del subte), pero sus magnitudes no son sumables con las del subte (46M de viajes contra 2.730M de pasajeros), así que se combinan como percentiles —el mismo criterio que ya usaba `modulo_b_camaras.py` por la misma razón— relativizados por población. Correlaciona con la tasa a Spearman 0,333, o sea que agrega información en vez de repetirla.
 
-En el tablero eso es un asterisco al lado de la tasa en la columna nueva "Cada 100k" de la tabla, para el quinto superior, y una nota en ámbar en el KPI cuando la selección cae ahí. **No corrige el número: avisa que ese número compara peor que los otros.**
+En el tablero eso es un asterisco al lado de la tasa en la columna nueva "Cada 100k" de la tabla, para el cuarto superior (percentil 0,75), y una nota en ámbar en el KPI cuando la selección cae ahí. **No corrige el número: avisa que ese número compara peor que los otros.**
+
+El corte está en 0,75 y no en 0,80 por una razón concreta: el índice solo ve transporte motorizado, así que subestima a los barrios que reciben gente a pie. Con 0,80 quedaban justo afuera **San Telmo (0,79) y Recoleta (0,77)** —turismo y peatonal, dos casos donde la tasa está claramente inflada—. Ante un instrumento que se sabe conservador, conviene errar marcando de más: el costo de un asterisco sobrante es que alguien mire un número con más cuidado del necesario.
 
 #### Validación contra la ENMODO 2018 (`src/validation/validar_presion_visitantes.py`)
 

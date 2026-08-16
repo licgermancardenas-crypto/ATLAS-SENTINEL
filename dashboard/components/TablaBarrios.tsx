@@ -10,7 +10,7 @@ type Columna = "nombre" | "comuna" | "riesgo" | "delitos" | "tasa" | "n_hex";
 
 /* La tasa cada 100.000 divide por población residente, así que en los barrios
    donde entra mucha gente que no vive ahí queda inflada. El asterisco marca el
-   quinto superior de afluencia no residente (subte + tren + EcoBici por
+   cuarto superior de afluencia no residente (subte + tren + EcoBici por
    habitante). No corrige el número — avisa que compara peor que los otros.
 
    La ausencia de asterisco NO garantiza lo contrario: falta el colectivo, del
