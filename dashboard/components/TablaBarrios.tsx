@@ -10,13 +10,14 @@ type Columna = "nombre" | "comuna" | "riesgo" | "delitos" | "tasa" | "n_hex";
 
 /* La tasa cada 100.000 divide por población residente, así que en los barrios
    donde entra mucha gente que no vive ahí queda inflada. El asterisco marca el
-   cuarto superior de afluencia no residente (subte + tren + EcoBici por
-   habitante). No corrige el número — avisa que compara peor que los otros.
+   cuarto superior de afluencia no residente (subte + tren + colectivo +
+   EcoBici por habitante). No corrige el número — avisa que compara peor.
 
-   La ausencia de asterisco NO garantiza lo contrario: falta el colectivo, del
-   que no hay pasajeros por parada publicados. Está medido contra la ENMODO
-   2018 en src/validation/validar_presion_visitantes.py — Spearman 0,77, y lo
-   que queda sin cubrir es Mataderos, que recibe gente en bondi. */
+   Está medido contra la ENMODO 2018 en
+   src/validation/validar_presion_visitantes.py: Spearman 0,81. El colectivo
+   entra repartido parejo entre las paradas de cada línea porque SUBE informa
+   por línea, así que el índice sirve para ordenar barrios, no para afirmar
+   cuánta gente de afuera recibe uno en particular. */
 function TasaCelda({ barrio, claveD }: { barrio: BarrioProps; claveD: string }) {
   const t = tasa100k(barrio[claveD] as number, barrio.poblacion as number);
   if (t === null) return <span className="text-ink-muted">—</span>;

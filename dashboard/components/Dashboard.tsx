@@ -173,10 +173,10 @@ export default function Dashboard() {
              + `La población sale del padrón prorrateado por área (2.890.151 en total). `
              + `Mide sobre población residente, así que sobreestima donde entra mucha gente que no vive ahí. `
              + `La selección actual está marcada cuando cae en el cuarto de mayor afluencia no residente, `
-             + `medida con el flujo de subte, tren y EcoBici por habitante. `
-             + `Esa medida se validó contra la Encuesta de Movilidad Domiciliaria 2018 y ordena igual (Spearman 0,77). `
-             + `Le falta el colectivo, del que no hay pasajeros por parada publicados, así que todavía subestima `
-             + `los barrios a los que se llega sobre todo en bondi — Mataderos es el caso que queda.`,
+             + `medida con el flujo de subte, tren, colectivo y EcoBici por habitante. `
+             + `Se validó contra la Encuesta de Movilidad Domiciliaria 2018 y ordena igual (Spearman 0,81). `
+             + `El colectivo entra repartido: SUBE informa por línea y no por parada, así que los boletos de cada `
+             + `línea se distribuyen parejo entre sus paradas — sirve para el ranking, no para el nivel de un barrio suelto.`,
       },
       {
         etiqueta: "Cobertura actual",

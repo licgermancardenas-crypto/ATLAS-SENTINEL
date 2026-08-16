@@ -3,20 +3,23 @@
 El tablero marca la tasa de delito cada 100.000 habitantes en los barrios donde
 entra mucha gente que no vive ahí, porque ahí el denominador residencial se
 queda corto. El índice que hace esa marca combina molinetes de subte, boletos
-de tren y estaciones de EcoBici como percentiles, relativizados por población
-(ver `generar_export_dashboard.py`, `_presion_visitantes`).
+de tren, usos de SUBE en colectivo y estaciones de EcoBici como percentiles,
+relativizados por población (ver `generar_export_dashboard.py`,
+`_presion_visitantes`).
 
-Ese índice ve tres modos. La pregunta es si alcanza para ordenar la afluencia
-real, que incluye también colectivo, auto y a pie.
+Ese índice ve cuatro modos. La pregunta es si alcanza para ordenar la afluencia
+real, que incluye también auto y a pie.
 
-Historial de lo que fue midiendo este script:
+Historial de lo que fue midiendo este script — cada fuente entró solo después
+de que este número mejorara:
 
-- Con subte + EcoBici: Spearman 0,729. Punto ciego claro en la Comuna 9
-  (Liniers, Mataderos), 4ª para la encuesta y 14ª para el índice.
-- Sumando el tren (`pipeline/ingest_trenes_boletos.py`): Spearman 0,768, y
-  Liniers pasa de percentil 0,12 a 0,83, o sea entra al quinto marcado. La
-  Comuna 9 sube a 12ª. Lo que queda sin cubrir es Mataderos, que recibe gente
-  en colectivo y del colectivo no hay pasajeros por parada publicados.
+- subte + EcoBici: Spearman 0,729. Punto ciego claro en la Comuna 9 (Liniers,
+  Mataderos), 4ª para la encuesta y 14ª para el índice.
+- + tren (`pipeline/ingest_trenes_boletos.py`): 0,768. Liniers pasa de
+  percentil 0,12 a 0,83 y la Comuna 9 sube a 12ª.
+- + colectivo (`pipeline/ingest_colectivos_sube.py`): 0,811. La Comuna 9 sube a
+  11ª. Lo que sigue afuera es el viaje a pie y en auto, que ninguna fuente de
+  boletos puede ver.
 
 La ENMODO 2018 sirve de contraste independiente: es una encuesta domiciliaria
 multimodal del AMBA (16.667 hogares, 59.452 viajes) con el destino de cada

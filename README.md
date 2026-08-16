@@ -877,11 +877,34 @@ Dos trampas del cruce, ambas resueltas con alias explícitos sobre 43 nombres �
 
 El tren se lee aparte y **no** entra en `hex_flujo_turno.parquet`, que es lo que alimenta el feature set del modelo — sumarlo ahí obligaría a reentrenar, y esto es un indicador del tablero, no una variable del modelo.
 
-**Resultado, medido con el mismo script:** Spearman **0,729 → 0,768**, y Liniers pasa de percentil 0,12 a 0,83, o sea entra al quinto que se marca. La Comuna 9 sube del puesto 14 al 12.
+**Resultado, medido con el mismo script:** Spearman **0,729 → 0,768**, y Liniers pasa de percentil 0,12 a 0,83, o sea entra al cuarto que se marca. La Comuna 9 sube del puesto 14 al 12.
 
-**Lo que queda sin cubrir es el colectivo**, del que no hay pasajeros por parada publicados. Mataderos es el caso: 0,02 de percentil, sin estación de tren ni de subte, pero con afluencia real. Por eso **la falta de asterisco no garantiza que la tasa esté bien**, y eso está dicho en la ayuda del KPI del tablero, no solo acá.
+#### Sumar el colectivo (`pipeline/ingest_colectivos_sube.py`)
 
-El resultado ordena así: arriba Constitución (1,00), San Nicolás (0,98), Chacarita (0,96), Monserrat (0,94), Retiro (0,92), **Puerto Madero (0,90, sin subte ni tren, capturado por EcoBici)** y Liniers (0,83); abajo Mataderos (0,02), Villa Lugano y Versalles.
+El colectivo es el modo que más mueve del AMBA: **2.603 millones de pasajeros en 2025**, contra 301M del tren y 194M del subte. Faltaba porque **SUBE informa por línea, no por parada** — no existe publicado dónde sube cada pasajero.
+
+Se resuelve repartiendo, y el supuesto queda a la vista:
+
+```
+pax_barrio = Σ_línea  pax_línea × (paradas de la línea en el barrio / paradas totales de la línea)
+```
+
+Es decir, se asume que las subidas se distribuyen **parejo a lo largo del recorrido**. Es falso —cabeceras y nodos de trasbordo concentran mucho más— pero es el supuesto neutral: cualquier alternativa exige inventar dónde está la demanda. Dividir por las paradas **totales** y no solo por las de CABA es lo que hace que una línea que apenas entra a la Ciudad aporte poco en vez de volcarle todo el recorrido del conurbano.
+
+El cruce SUBE↔GTFS se hace por número de línea, extraído con una regex de los prefijos que SUBE usa sin criterio fijo (`BSAS_LINEA_002`, `BS_ASLINEA_123`, `BS_AS_LINEA 715M`) y del ramal del GTFS (`505R3` → 505). **Cruzan 267 de 323 líneas, el 85,7% de los pasajeros**; las que quedan afuera son sobre todo de la serie 500, suburbanas, que en su mayoría no entran a CABA. Los `stop_times` del feed son 1,4GB, así que se leen en chunks de dos columnas acumulando un set de pares (línea, parada) — nunca entra entero en RAM.
+
+**Resultado: Spearman 0,768 → 0,811.** Cada fuente entró solo después de que ese número mejorara; el script de validación es lo que decide, no el criterio de que "faltaba un modo".
+
+#### Dónde queda el índice, y qué sigue sin ver
+
+Marcados (percentil ≥ 0,75, 13 de 48): Constitución (1,00), San Nicolás (0,98), Chacarita (0,96), Monserrat (0,94), Retiro (0,92), **Puerto Madero (0,90 — sin subte ni tren ni casi colectivo, lo captura EcoBici)**, Balvanera (0,88), San Telmo (0,85), Liniers (0,83), Palermo (0,81), Nueva Pompeya (0,79), Belgrano (0,77) y Parque Patricios (0,75).
+
+Dos cosas que conviene tener presentes:
+
+- **Mataderos sigue en 0,08** pese a 15,5M de pasajeros de colectivo, y Villa Lugano en 0,02 pese a 19,1M. No es que el índice no los vea: es que ese volumen, relativizado por su población, queda abajo. La señal de la Comuna 9 en ENMODO parece venir sobre todo de Liniers, que sí es un nodo y sí está marcado. Es una hipótesis, no algo medido a nivel barrio — ENMODO solo llega a comuna.
+- **El umbral es relativo, así que cada fuente nueva reacomoda el borde.** Al entrar el colectivo, Recoleta pasó de 0,77 a 0,73 y perdió el asterisco. No hay un valor "verdadero" acá, hay un ranking.
+
+Lo que ninguna fuente de boletos puede ver es el viaje **a pie y en auto**. Por eso la falta de asterisco no garantiza que la tasa esté bien, y eso está dicho en la ayuda del KPI del tablero, no solo acá.
 
 **Por qué ENMODO no se usa para corregir el denominador, aunque sea la fuente conceptualmente correcta.** Está vencida, y el desfasaje tiene justo el patrón espacial que arruinaría la corrección. Medido con los molinetes del propio pipeline, que llegan a 2025:
 

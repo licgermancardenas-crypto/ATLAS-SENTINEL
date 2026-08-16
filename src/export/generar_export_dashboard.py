@@ -205,15 +205,28 @@ def _presion_visitantes() -> tuple[pd.Series, pd.Series]:
     flujo["flujo_trenes"] = tr.groupby("hex_id")["pax"].sum()
     flujo = flujo.fillna(0.0)
 
+    # el colectivo entra ya agregado por barrio y no por hexágono: SUBE informa
+    # por línea, así que el reparto a paradas es un supuesto uniforme (ver
+    # `pipeline/ingest_colectivos_sube.py`) y bajarlo a hexágono le daría una
+    # precisión que el método no tiene
+    col = pd.read_parquet(FEATURES / "colectivos_barrio.parquet")
+    barrio_a_comuna = h.groupby("barrio_id")["comuna_id"].first()
+
     FUENTES = ["flujo_ecobici", "flujo_molinetes", "flujo_trenes"]
 
     def por(nivel: str) -> pd.Series:
         base = (flujo.join(h.set_index("hex_id")[[nivel]], how="inner")
                 .groupby(nivel)[FUENTES].sum())
+        base["flujo_colectivos"] = (
+            col.set_index("barrio")["pax"] if nivel == "barrio_id"
+            else col.assign(c=col["barrio"].map(barrio_a_comuna)).groupby("c")["pax"].sum())
+        base = base.fillna(0.0)
         pobl = h.groupby(nivel)["poblacion_hex"].sum()
         # cada fuente se lleva a fracción del total de la Ciudad antes de
-        # promediar; si no, el subte domina por tres órdenes de magnitud
-        cuota = sum(base[f] / base[f].sum() for f in FUENTES) / len(FUENTES)
+        # promediar; si no, el colectivo y el subte se comen a la bici por
+        # órdenes de magnitud
+        fuentes = FUENTES + ["flujo_colectivos"]
+        cuota = sum(base[f] / base[f].sum() for f in fuentes) / len(fuentes)
         return (cuota / pobl.replace(0, pd.NA)).rank(pct=True)
 
     return por("barrio_id"), por("comuna_id")
