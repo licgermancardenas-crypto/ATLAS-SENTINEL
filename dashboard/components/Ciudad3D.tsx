@@ -38,6 +38,13 @@ import { cortesPorCuantil, ETIQUETAS_CLASE } from "@/lib/escala";
    se puede es arrancar en un encuadre donde no se ve nada. */
 const CENTRO: [number, number] = [-58.3816, -34.6037];
 const ZOOM_INICIAL = 14.6;
+
+/* De dónde se piden las teselas. En desarrollo salen de `public/tejido/`, pero
+   son ~87 MB y no tienen por qué viajar dentro del deploy: subidas a un
+   almacenamiento aparte, la aplicación queda liviana, los redeploys son rápidos
+   y no se arriesga el límite de tamaño (`caba.pmtiles` solo ya pesa 72 MB).
+   Se apunta con NEXT_PUBLIC_TEJIDO_URL; sin esa variable, todo sigue local. */
+const TEJIDO = process.env.NEXT_PUBLIC_TEJIDO_URL ?? "/tejido";
 const LIMITES: [number, number, number, number] = [-58.55, -34.71, -58.33, -34.52];
 
 /* Radio real del Módulo A, el mismo que reporta resumen.json. No se inventa:
@@ -219,19 +226,19 @@ export default function Ciudad3D() {
           // dos juegos de teselas y no uno: ver el porqué en
           // pipeline/ingest_tejido_urbano.py — teselar un millón de volúmenes a
           // z12 es inviable, así que a escala de ciudad solo van los hitos
-          tejido: { type: "vector", url: "pmtiles:///tejido/caba.pmtiles" },
-          hitos: { type: "vector", url: "pmtiles:///tejido/caba_hitos.pmtiles" },
+          tejido: { type: "vector", url: `pmtiles://${TEJIDO}/caba.pmtiles` },
+          hitos: { type: "vector", url: `pmtiles://${TEJIDO}/caba_hitos.pmtiles` },
           // capa base: sin el río y la traza de calles el tejido flota en negro
-          agua: { type: "geojson", data: "/tejido/agua.geojson" },
-          verde: { type: "geojson", data: "/tejido/verde.geojson" },
-          puentes: { type: "geojson", data: "/tejido/puentes.geojson" },
-          calles: { type: "vector", url: "pmtiles:///tejido/calles.pmtiles" },
+          agua: { type: "geojson", data: `${TEJIDO}/agua.geojson` },
+          verde: { type: "geojson", data: `${TEJIDO}/verde.geojson` },
+          puentes: { type: "geojson", data: `${TEJIDO}/puentes.geojson` },
+          calles: { type: "vector", url: `pmtiles://${TEJIDO}/calles.pmtiles` },
           // el Tejido Urbano es edificación por parcela, así que lo que está
           // parado en una plaza no existe ahí: el Obelisco entra por acá
-          monumentos: { type: "geojson", data: "/tejido/monumentos.geojson" },
+          monumentos: { type: "geojson", data: `${TEJIDO}/monumentos.geojson` },
           // 350.660 árboles con altura medida y 102.700 luminarias
-          arbolado: { type: "vector", url: "pmtiles:///tejido/arbolado.pmtiles" },
-          alumbrado: { type: "vector", url: "pmtiles:///tejido/alumbrado.pmtiles" },
+          arbolado: { type: "vector", url: `pmtiles://${TEJIDO}/arbolado.pmtiles` },
+          alumbrado: { type: "vector", url: `pmtiles://${TEJIDO}/alumbrado.pmtiles` },
           /* Única capa que sale a internet. Va apagada por defecto y con
              interruptor: sin ella el tablero funciona entero sin conexión. */
           satelital: {

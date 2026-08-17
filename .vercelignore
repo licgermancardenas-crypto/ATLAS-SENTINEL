@@ -1,0 +1,50 @@
+# Que sube a Vercel y que no.
+#
+# El proyecto tiene configurado `dashboard` como directorio raiz, asi que el
+# deploy sale desde la raiz del repo y el contexto de subida es TODO el
+# repositorio. Sin este archivo viajarian los 154 MB del parquet del tejido, el
+# ZIP de 161 MB, el .venv entero y el resto del pipeline, que no tienen nada que
+# hacer en un sitio estatico.
+#
+# OJO CON LA BARRA INICIAL. Los patrones son estilo gitignore: `data/` sin barra
+# matchea CUALQUIER carpeta llamada data a cualquier profundidad, incluida
+# `dashboard/public/data/`, que es de donde el tablero lee todo. La primera
+# version de este archivo hizo exactamente eso y dejo el sitio desplegado
+# tirando 404 en los ocho archivos de datos. Con `/data/` el patron queda
+# anclado a la raiz del repo y solo excluye lo que tiene que excluir.
+#
+# El CLI de Vercel no lee .gitignore: lo que no este aca, sube.
+
+# datos y derivados del pipeline (los del tablero viven en dashboard/public/data)
+/data/
+/mlruns/
+/mlartifacts/
+/mlflow.db
+
+# codigo que no se despliega: el tablero es estatico y no ejecuta Python
+/.venv/
+/src/
+/pipeline/
+/api/
+/models/
+/notebooks/
+/tests/
+/presentacion/
+/web/
+__pycache__/
+*.pyc
+
+# cache HTTP de osmnx, aparece en cualquier carpeta desde la que se corra
+cache/
+
+# referencias de diseño y documentos de la raiz
+/*.jpg
+/*.pdf
+
+# Las teselas del modulo 3D viven en almacenamiento aparte (Vercel Blob) y la
+# aplicacion las pide con NEXT_PUBLIC_TEJIDO_URL. Si subieran aca tambien,
+# estarian dos veces y el deploy pesaria 87 MB de mas.
+/dashboard/public/tejido/
+
+/dashboard/node_modules/
+/dashboard/.next/

@@ -34,6 +34,9 @@ web/node_modules/
 web/dist/
 web/.env
 
+# enlace local al proyecto de Vercel (ids de proyecto y organizacion)
+.vercel/
+
 # entorno
 .env
 .env.local

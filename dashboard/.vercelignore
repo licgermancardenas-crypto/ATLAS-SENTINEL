@@ -1,0 +1,11 @@
+# Las teselas del modulo 3D NO viajan en el deploy: son ~87 MB y viven en
+# almacenamiento aparte (Vercel Blob). La aplicacion las pide por HTTP contra
+# la URL de NEXT_PUBLIC_TEJIDO_URL, que en produccion apunta al Blob y sin esa
+# variable cae de nuevo a /tejido para desarrollo local.
+#
+# Si esto no estuviera, el CLI subiria los 87 MB en cada deploy y no habriamos
+# ganado nada sacandolos.
+public/tejido/
+
+# cache de osmnx, si algun script corrio desde esta carpeta
+cache/
