@@ -11,8 +11,10 @@ data/features/
 __pycache__/
 *.pyc
 
-# cache HTTP de osmnx (respuestas crudas de Overpass API)
-src/etl/cache/
+# cache HTTP de osmnx (respuestas crudas de Overpass API). Va con comodin
+# porque osmnx cachea en ./cache relativo al directorio de trabajo, asi que
+# aparece una copia por cada carpeta desde la que se corra un script.
+cache/
 
 # tracking local de MLflow (experimentos, no versionado)
 mlruns/
@@ -22,6 +24,10 @@ mlflow.db
 # páginas con las figuras ya inyectadas: son ~1,5MB de SVG derivado por página,
 # se regeneran con presentacion/gen_mapas.py y gen_eda_figs.py
 presentacion/build/
+
+# teselas del tejido urbano 3D: ~100MB derivados del dataset de la Ciudad,
+# se regeneran con pipeline/ingest_tejido_urbano.py
+dashboard/public/tejido/
 
 # node / web
 web/node_modules/

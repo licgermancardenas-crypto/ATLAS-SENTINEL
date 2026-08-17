@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import type { BarrioProps, Capa, DatosDashboard, TipoDelito, Turno } from "@/lib/types";
 import {
   CAPAS, claveDelitos, claveRiesgo, riesgoEsDelTipo, tasaInflada, TIPOS, tipoInfo, TURNOS,
@@ -273,6 +274,11 @@ export default function Dashboard() {
           <SelectorCapa valor={capa} onChange={setCapa} />
           {capa === "patrullas" && <ControlK valor={kPatrullas} onChange={setKPatrullas} disponibles={ks} />}
           <div className="ml-auto flex items-end gap-2">
+            <Link href="/3d"
+              className="rounded border border-line bg-surface-1 px-2.5 py-1 text-[11px]
+                         hover:bg-surface-sunk">
+              Ver en 3D
+            </Link>
             <ToggleTema tema={tema} onChange={() => setTema((t) => (t === "light" ? "dark" : "light"))} />
           </div>
         </div>
