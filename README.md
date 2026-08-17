@@ -457,7 +457,37 @@ El resultado 3 es, de hecho, una **validación del Módulo A** que no teníamos:
 
 Salidas en `escala_cuadra.parquet` y sus dos archivos hermanos.
 
-**Conclusión de la fase de modelado.** Con esto se cierra la pregunta abierta: se probaron gradient boosting agregado, desagregado por tipo, a grano semanal, con exógenas, como pronóstico con origen deslizante, y ahora un proceso auto-excitante. Ninguno le saca al promedio histórico más de unos pocos puntos de Recall. La razón está medida y es estructural, no algorítmica: el mapa de riesgo de un año predice el del siguiente con Spearman 0,983.
+### ¿El techo es del fenómeno o de la clase de modelo? (`src/model_core/train_stgnn.py`)
+
+La lectura documentada del techo es que a esta resolución el proceso es "casi puramente espacial": `hex_id` domina la importancia de features y la dinámica temporal aporta poco. Esa lectura tenía una ambigüedad que ninguna prueba anterior resolvía. **Todos los modelos probados hasta acá son de la misma clase.** Un GBM sobre features tabulares ve la vecindad espacial solo a través de dos columnas resumidas (`vecino_k1_roll4`, `vecino_k2_roll4`) y la historia solo a través de lags fijos. Si hubiera estructura espacio-temporal que esas columnas aplanan, un modelo que propague información por el grafo real de hexágonos y recorra la secuencia debería encontrarla.
+
+**El modelo.** Los 401 hexágonos son nodos y la vecindad H3 k=1 son las aristas (2.226 aristas, grado medio 5,55 — los bordes de la Ciudad tienen menos de 6 vecinos). Cada nodo lleva 4 canales por semana, uno por turno, más 6 estáticas del hexágono. Dos convoluciones 1D sobre el tiempo, dos capas de convolución de grafo, salida por turno con softplus y pérdida Poisson — la misma familia que el objetivo del LightGBM. Ventana de 12 semanas, 48 unidades, early stopping sobre las últimas 8 semanas antes de cada origen. Mismo protocolo que `backtest_pronostico.py`: 26 orígenes semanales, reentrenando en cada uno.
+
+**Resultado, sobre las mismas 26 semanas:**
+
+| Modelo | MAE | Recall@20% | Semanas que le gana al ST-GNN |
+|---|---|---|---|
+| LightGBM semanal | **0,9195** | **46,4%** | 25 de 26 |
+| Promedio histórico | 0,9432 | 45,7% | 25 de 26 |
+| **ST-GNN** | 0,9898 | 44,4% | — |
+| Persistencia | 1,1677 | 43,7% | 0 de 26 |
+
+**La red pierde contra todo menos la persistencia.** Tiene 4,9% más de MAE que el promedio histórico por hex×turno y 7,6% más que el LightGBM, y le gana a cada uno en **1 sola de las 26 semanas**. En Recall@20% le gana al histórico en 3 semanas y al LightGBM en ninguna. Contra la persistencia sí gana cómodo —15,2% menos de MAE, las 26 semanas— o sea que la red aprendió algo real; simplemente no aprendió nada que el promedio histórico no tuviera ya.
+
+**Y eso contesta la pregunta.** Se le dio a un modelo el grafo H3 real en vez de dos columnas resumidas, y la secuencia completa en vez de lags fijos, y no encontró estructura espacio-temporal que el GBM estuviera aplanando. **El techo es del fenómeno, no de la clase de modelo.**
+
+**Las salvedades, que son reales y no cambian la conclusión.** 401 nodos y ~500 semanas es un dataset chico para deep learning, así que la red se eligió deliberadamente pequeña (48 unidades) con early stopping, y corrió con un presupuesto fijo de 60 épocas y una sola semilla. Una red más grande, más regularizada o con más búsqueda de hiperparámetros podría acercarse más. Lo que no es plausible es que dé vuelta una diferencia de este signo: no está perdiendo por poco contra el mejor modelo, está perdiendo contra el **promedio histórico**, que no tiene ningún parámetro que ajustar. Y el argumento no descansa en el resultado de la red sola — coincide con lo que ya midieron el EDA (Spearman 0,983 entre años), el Hawkes y el análisis a escala de cuadra.
+
+**Dos cosas de ingeniería que quedaron en el camino**, porque explican por qué el script tiene la forma que tiene:
+
+- **La primera versión ponía un GRU sobre la secuencia de cada nodo**: 401 nodos × 16 semanas de lote son 6.416 secuencias por paso, y en CPU eso daba 18 minutos por origen — casi ocho horas para los 26. Reemplazar la recurrencia por dos convoluciones 1D sobre el tiempo y hacer la propagación espacial una sola vez (y no en cada paso temporal) bajó el costo unas veinte veces sin perder ni la estructura temporal aprendida ni la propagación por la vecindad real. La corrida final fueron 157 minutos, mediana de 265 s por origen.
+- **La adyacencia va dispersa y no densa**, por costo y no por estilo: la matriz es 401×401 = 160.801 celdas de las que solo 2.627 son distintas de cero. Con densa cada origen pasaba de diez minutos.
+
+El script **guarda en cada origen y se reanuda** leyendo el parquet previo. No es una comodidad: la corrida entera son más de dos horas y el entorno cortó los procesos de fondo tres veces (a los 45, 40 y pocos minutos). Reanudar es legítimo acá porque la semilla está fija y cada origen se entrena de cero — los orígenes ya calculados dan idéntico si se repiten, verificado entre corridas.
+
+Salidas en `backtest_stgnn.parquet`.
+
+**Conclusión de la fase de modelado.** Con esto se cierra la pregunta abierta: se probaron gradient boosting agregado, desagregado por tipo, a grano semanal, con exógenas, como pronóstico con origen deslizante, un proceso auto-excitante, un cambio de unidad de análisis a la cuadra, y una red neuronal espacio-temporal sobre el grafo de hexágonos. Ninguno le saca al promedio histórico más de unos pocos puntos de Recall. Y las dos pruebas que podían haber movido el diagnóstico de lugar —bajar de escala y cambiar de clase de modelo— lo confirmaron en vez de refutarlo. La razón está medida y es estructural, no algorítmica: el mapa de riesgo de un año predice el del siguiente con Spearman 0,983.
 
 ## Auditoría técnica externa y remediación P0
 
@@ -948,3 +978,75 @@ Gotchas encontrados: `siniestros_hechos` guarda lat/lon como texto, no float (se
 Cierra los 3 cruces de la tabla que no son point-in-hex: `espacios_verdes` (% de área verde por hex — overlay real, 372 de 401 hex tienen algo de verde, media 7,1%), `comisarias` (qué comisaría de patrullaje cubre la mayor parte de cada hex — por área de intersección, no por centroide; los 401 hex quedaron cubiertos) y **población por hex**, prorrateada por área dentro del barrio ya asignado (no hace falta overlay hex-contra-barrio real: como los hexágonos H3-8 tienen área casi idéntica entre sí, prorratear por área da resultados casi uniformes dentro de cada barrio — verificado, la suma total coincide exacto con `poblacion_barrio` real: 2.890.151).
 
 **Bug real encontrado y corregido**: la primera versión calculaba el denominador de la proporción (`area_total_por_barrio`, vía `groupby().transform("sum")`) *antes* de un `.merge()`, y lo reusaba después. `merge()` devuelve un DataFrame con índice nuevo (0..n-1) que no respeta el orden de filas original — pandas alinea operaciones aritméticas por índice, no por posición, así que la división terminó emparejando cada hex con el denominador de OTRO hex, silenciosamente (sin error, sin warning). El síntoma: la población total sumaba 3.478.949 en vez de 2.890.151, un 20% de más, y decenas de miles de más/de menos por barrio sin patrón obvio. Se corrigió haciendo todo el cálculo — merge y transform — sobre el mismo dataframe sin cortes en el medio. Regla general: nunca guardar el resultado de un `groupby().transform()` para usarlo después de un `merge()`/`sort`/cualquier operación que pueda reindexar.
+
+## Pronóstico mensual a nivel Ciudad (`src/model_core/forecast_mensual.py`)
+
+Todo lo modelado hasta acá contesta **dónde**: hexágono × turno, grano semanal, métricas de ranking. Falta la otra pregunta, la que el tablero no puede contestar: **cuánto delito registrado va a haber el mes que viene en toda la Ciudad**. Es una serie única de 120 meses (2016-01 a 2025-12), no un problema espacial, así que el modelo es de series de tiempo y no el LightGBM.
+
+Replica el enfoque del proyecto previo de LAPD (`ml_forecast.py`: Prophet, horizonte de 12 meses, apertura por categoría) con **dos cambios deliberados**, y los dos resultaron decisivos:
+
+**1. Los regímenes entran como regresores, no como tendencia.** La serie tiene dos perturbaciones enormes que no son tendencia: el pozo de la pandemia (mínimo de 2.850 delitos en abril de 2020 contra ~12.500 normales) y el escalón de enero de 2025 (−16% de golpe, el que documenta `quiebre_2025.py`). Prophet sin ayuda lee el escalón como pendiente y la extrapola. Cada régimen es acá una indicadora multiplicativa, así que desplaza el nivel sin tocar la tendencia.
+
+**2. La validación es de origen deslizante de verdad.** El script de LAPD titula "cross-validation" un gráfico que compara el ajuste in-sample contra los datos con los que se ajustó — eso mide memoria, no pronóstico. Acá se reentrena en cada uno de los 84 orígenes y se predice a 1..12 meses, el mismo protocolo de `backtest_pronostico.py`.
+
+**El port literal falla, y falla en la dirección peligrosa.**
+
+| Modelo | MAE meses normales | MAPE | Sesgo | MAE h=12 |
+|---|---|---|---|---|
+| **prophet_regimen** | **970,7** | **7,7%** | −318,5 | 1.254,9 |
+| ets (Holt-Winters) | 1.080,3 | 8,6% | +167,2 | 1.288,2 |
+| naive estacional | 1.081,4 | 8,6% | −742,5 | **1.105,3** |
+| prophet (port literal) | 2.137,6 | 16,9% | −1.342,2 | 3.120,7 |
+
+Prophet tal cual tiene **más del doble de error** que la misma librería con los regresores de régimen, y a 12 meses casi el triple. Está extrapolando la recuperación pos-pandemia como si fuera tendencia estructural: proyecta 2026 en +13,9% sobre 2025, cuando el resto converge a "plano". Es exactamente el modo de falla que el cambio 1 anticipaba.
+
+**Por horizonte no gana siempre el mismo, y el ganador a un año es el baseline.**
+
+| Horizonte | 1º | 2º | 3º | 4º |
+|---|---|---|---|---|
+| h=1 | ets (522) | prophet_regimen (732) | naive (1.109) | prophet (1.426) |
+| h=3 | prophet_regimen (805) | ets (888) | naive (1.098) | prophet (1.606) |
+| h=6 | prophet_regimen (939) | naive (1.072) | ets (1.231) | prophet (2.067) |
+| h=12 | **naive (1.105)** | prophet_regimen (1.255) | ets (1.288) | prophet (3.121) |
+
+A un mes gana el suavizado exponencial, a 3 y 6 el Prophet con regímenes, y **a doce meses no hay nada que le gane a "el mismo mes del año pasado"**. Es el mismo patrón que el proyecto ya tiene medido en la grilla espacial, donde el promedio histórico por hex×turno es casi imbatible: cuanto más lejos se mira, más gana la estructura estacional pelada y menos aporta el modelo.
+
+**El quiebre de 2025 no lo vio venir nadie, y el backtest está armado para que así sea.** Un régimen solo existe para el modelo si ya había empezado en el origen; y un régimen todavía activo se extiende al futuro sin fecha de cierre, porque uno sabe que está adentro pero no cuándo sale. Sin esa regla, darle al modelo la fecha del escalón sería filtrarle el futuro y el número mediría cualquier cosa.
+
+| Modelo | MAE en 2025 | Sesgo |
+|---|---|---|
+| prophet_regimen | 1.360 | **+1.295** |
+| ets | 1.364 | +1.186 |
+| naive estacional | 2.042 | +2.042 |
+| prophet | 2.758 | +2.758 |
+
+Todos sobreestiman, todos por mucho: en diciembre de 2024 el mejor modelo proyectaba ~12.900 delitos mensuales para 2025 contra los ~10.900 que se registraron. **Ese es el costo real de un quiebre y no hay método que lo evite** — es la contracara de lo que ya sabíamos, que el nivel de 2025 se movió por algo que no estaba en los datos previos.
+
+**Las bandas: una corrección al diagnóstico inicial.** La cobertura nativa de Prophet promedia 68,5% sobre todos los meses normales contra un 90% declarado, lo que a primera vista pide calibración conformal como la que ya usa `conformal_prediction.py`. Abierta por año, la lectura cambia:
+
+| Año del mes objetivo | ets | naive | prophet | prophet_regimen |
+|---|---|---|---|---|
+| 2019 | 42,3% | 80,8% | 24,4% | 23,1% |
+| 2020 | 70,8% | 100% | 37,5% | 41,7% |
+| 2022 | 66,7% | 100% | 0,0% | 27,8% |
+| 2023 | 70,8% | 100% | 34,0% | 81,9% |
+| 2024 | 74,3% | 100% | 94,4% | **94,4%** |
+
+La sub-cobertura está **entera en los orígenes con historia corta**: con 3-4 años de datos Prophet cubre 23%, con 8 o más llega a 94%. No es un defecto del método sino del tamaño de la muestra en los primeros orígenes. Calibrando con 2019-2022 y midiendo fuera, en 2023-2024, se confirma: `prophet_regimen` pasa de 96,2% a 98,6% — la calibración **ensancha de más**, porque le mete adentro un problema que ya no existe. Se dejan las dos bandas guardadas y **se usa la nativa**. La calibrada vuelve a ser lo correcto si esto se corre sobre una serie corta.
+
+**Pronóstico 2026** (base: 10.868 delitos registrados/mes en 2025):
+
+| Modelo | Pronóstico | vs 2025 | Banda 90% |
+|---|---|---|---|
+| **prophet_regimen** | **10.993/mes** | **+1,1%** | 9.564 – 12.434 |
+| naive estacional | 10.868/mes | +0,0% | 6.626 – 15.111 |
+| ets | 9.904/mes | −8,9% | 8.669 – 11.138 |
+| prophet | 12.381/mes | +13,9% | 9.599 – 15.289 |
+
+Por tipo: hurto +4,7%, robo +0,9%, vialidad +0,6%, amenazas −5,7%, lesiones −16,2%, homicidios −19,6% (sobre 5 casos mensuales, o sea ruido).
+
+**Veredicto: 2026 plano.** Y las dos aperturas que más se mueven —lesiones −16,2% y hurto +4,7%— son justo los tipos que el quiebre de 2025 empujó en rampa, así que ahí el modelo está proyectando la continuación de un movimiento cuyo origen quedó en duda. No conviene leerlas como señal.
+
+**Qué es este número y qué no.** Pronostica **delito registrado**, no delito. La distinción no es un tecnicismo: `quiebre_2025.py` dejó explícitamente inhabilitada cualquier afirmación sobre niveles, y un pronóstico mensual de volumen *es* una afirmación sobre niveles, así que hereda entera esa salvedad. Sirve para planificar carga de trabajo sobre el sistema de denuncias; no para decir cuánto delito va a sufrir la gente.
+
+Salidas en `forecast_mensual_backtest.parquet`, `forecast_mensual_2026.parquet` y `forecast_mensual_por_tipo.parquet`.

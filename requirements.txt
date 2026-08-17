@@ -14,5 +14,8 @@ shap==0.52.0
 osmnx==2.1.1
 networkx==3.6.1
 mlflow==3.15.1
+# forecast_mensual.py: series de tiempo a nivel Ciudad
+statsmodels==0.14.6
+prophet==1.4.0
 # CPU: pip install torch --index-url https://download.pytorch.org/whl/cpu
 torch==2.13.0
