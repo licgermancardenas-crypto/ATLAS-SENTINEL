@@ -257,6 +257,70 @@ def calles() -> None:
           f"en {time.time() - t0:.0f}s")
 
 
+def arbolado() -> None:
+    """Copas de árbol como volúmenes, a partir del censo de la Ciudad.
+
+    350.660 ejemplares con altura medida. Se dibuja **solo la copa**, no el
+    tronco: a la escala en que se mira la ciudad el tronco no llega a un píxel,
+    y duplicar la geometría para algo invisible costaría el doble de teselas.
+    La copa es un prisma que arranca al 45% de la altura del árbol, que es
+    donde empieza la fronda de un árbol de vereda podado.
+
+    **El radio de copa NO está en el dataset y es una aproximación de dibujo.**
+    El censo mide altura y diámetro de tronco a la altura del pecho, no la
+    extensión de la copa. Se deriva del tronco, que es la relación menos mala
+    (un árbol más grueso tiene copa más ancha), acotada a un rango razonable
+    para vereda. Sirve para que el arbolado se vea; no lo uses para calcular
+    sombra ni cobertura vegetal.
+    """
+    print("[6] arbolado...")
+    d = pd.read_parquet(RAIZ / "data" / "processed" / "arbolado.parquet")
+    print(f"    {len(d):,} ejemplares")
+
+    radio = (0.08 * d["dap_cm"]).clip(1.2, 6.0)
+    # sin diámetro de tronco se cae a la altura, que es peor pero es lo que hay
+    radio = radio.where(d["dap_cm"] > 0, (0.22 * d["altura_m"]).clip(1.2, 5.0))
+
+    pts = gpd.GeoSeries(gpd.points_from_xy(d["lon"], d["lat"]), crs=4326).to_crs(CRS_METRICO)
+    # resolution=2 da octógonos (geopandas lo traduce a quad_segs de shapely, y
+    # pasar los dos choca): ocho vértices alcanzan y sobran para una copa de
+    # cinco metros vista desde arriba, y pesan la mitad que un círculo
+    copas = pts.buffer(radio.to_numpy(), resolution=2).to_crs(4326)
+
+    g = gpd.GeoDataFrame({"alt": d["altura_m"].round(1)}, geometry=copas, crs=4326)
+    destino = DESTINO / "arbolado.pmtiles"
+    for resto in (destino, Path(f"{destino}.tmp.mbtiles"),
+                  Path(f"{destino}.tmp.mbtiles.temp.db")):
+        resto.unlink(missing_ok=True)
+    t0 = time.time()
+    # desde z15: una copa de 5 m a z14 mide medio píxel
+    g.to_file(destino, driver="PMTiles", layer="arbolado", MINZOOM=15, MAXZOOM=16)
+    print(f"    {destino.name}: {destino.stat().st_size / 1048576:.2f} MB "
+          f"en {time.time() - t0:.0f}s")
+
+
+def alumbrado() -> None:
+    """Las luminarias de la Ciudad, para el aire nocturno.
+
+    102.700 puntos que ya estaban ingestados. No llevan ningún atributo a la
+    tesela: se dibujan todas igual, y lo único que importa es dónde están.
+    """
+    print("[7] alumbrado...")
+    d = pd.read_parquet(RAIZ / "data" / "processed" / "alumbrado.parquet")
+    d = d.dropna(subset=["lat", "lng"])
+    g = gpd.GeoDataFrame(geometry=gpd.points_from_xy(d["lng"], d["lat"]), crs=4326)
+    print(f"    {len(g):,} luminarias")
+
+    destino = DESTINO / "alumbrado.pmtiles"
+    for resto in (destino, Path(f"{destino}.tmp.mbtiles"),
+                  Path(f"{destino}.tmp.mbtiles.temp.db")):
+        resto.unlink(missing_ok=True)
+    t0 = time.time()
+    g.to_file(destino, driver="PMTiles", layer="alumbrado", MINZOOM=14, MAXZOOM=16)
+    print(f"    {destino.name}: {destino.stat().st_size / 1048576:.2f} MB "
+          f"en {time.time() - t0:.0f}s")
+
+
 def main() -> None:
     DESTINO.mkdir(parents=True, exist_ok=True)
     agua()
@@ -264,6 +328,8 @@ def main() -> None:
     puentes()
     monumentos()
     calles()
+    arbolado()
+    alumbrado()
     print(f"\nListo. Todo en /{DESTINO.name}/")
 
 

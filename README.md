@@ -1050,3 +1050,84 @@ Por tipo: hurto +4,7%, robo +0,9%, vialidad +0,6%, amenazas −5,7%, lesiones �
 **Qué es este número y qué no.** Pronostica **delito registrado**, no delito. La distinción no es un tecnicismo: `quiebre_2025.py` dejó explícitamente inhabilitada cualquier afirmación sobre niveles, y un pronóstico mensual de volumen *es* una afirmación sobre niveles, así que hereda entera esa salvedad. Sirve para planificar carga de trabajo sobre el sistema de denuncias; no para decir cuánto delito va a sufrir la gente.
 
 Salidas en `forecast_mensual_backtest.parquet`, `forecast_mensual_2026.parquet` y `forecast_mensual_por_tipo.parquet`.
+
+## Módulo 3D — la Ciudad construida (`pipeline/ingest_tejido_urbano.py`, `build_base_3d.py`, `dashboard/app/3d/`)
+
+El tablero venía mostrando riesgo sobre polígonos planos. Este módulo lo muestra sobre la ciudad real, en volumen, con las capas operativas encima. La ruta es `/3d`.
+
+**Primero el portero técnico, que era una duda real.** El tablero usa Leaflet justamente porque MapLibre GL había volteado el proceso GPU de Chrome en esta máquina (`0xC0000005`). Una vista 3D necesita WebGL sí o sí, así que se probó antes de escribir una línea de la aplicación: WebGL2 acelerado por hardware (ANGLE/D3D11), shaders compilando, dibujo verificado leyendo el píxel del framebuffer, y 4.900 extrusiones girando a **60 fps con cero contextos perdidos**. El crash no se reproduce.
+
+### La volumetría: el Tejido Urbano de la Ciudad
+
+Sale del dataset **Tejido Urbano** (Secretaría de Desarrollo Urbano, fotogrametría): **1.386.616 polígonos con la altura en metros** de cada volumen construido. No hace falta estimar nada — la alternativa, OSM, tiene las huellas pero solo el **7,2%** de los edificios con altura declarada, medido sobre el microcentro que es la zona mejor mapeada.
+
+Dos cosas que hay que entender antes de usarlo:
+
+1. **No es un polígono por edificio, son 4,5 por parcela.** Hay 309.169 parcelas y cada una viene partida en los volúmenes que la componen: el frente de 2,8 m, el cuerpo de 25,2 m, la medianera de 5,6 m. Se extruyen tal cual, sin agrupar: agrupar por parcela aplanaría justamente el escalonado que hace que la silueta se parezca a la ciudad real.
+2. **Las alturas son múltiplos de 2,8 m**, el piso tipo. La fuente cuenta pisos y multiplica, no mide el edificio. Sirve para volumetría; no es cota.
+
+Limpieza: se descartan las astillas de menos de 10 m² (el 27% de los polígonos — patios internos y restos de la partición, invisibles a escala de ciudad) y se recortan las alturas imposibles. El máximo del dataset es **830 m**; el edificio más alto de la Ciudad ronda los 235 m, así que todo lo que pase de 240 m es error de fotogrametría. Son solo 2 casos, pero uno arruina la escala visual de toda la vista. Quedan **1.019.395 volúmenes**.
+
+### Teselas: por qué son dos archivos y no uno
+
+Pedir z12-16 de una sola vez es **inviable**, y el modo de falla vale la pena documentarlo: a z12 la Ciudad entra en cuatro teselas, o sea que el teselador tiene que meter 250.000 polígonos en cada una para después descartar casi todos por el límite de tamaño. Corrió quince minutos, escribió **35 GB de reescrituras de SQLite** y no había producido un solo byte de salida.
+
+La solución es partir por zoom:
+
+| Archivo | Contenido | Zooms | Peso | Tiempo |
+|---|---|---|---|---|
+| `caba.pmtiles` | los 1.019.395 volúmenes | 14-16 | 72,4 MB | 22 min |
+| `caba_hitos.pmtiles` | solo los de 40 m o más (17.353, el 1,7%) | 12-13 | 0,67 MB | **16 s** |
+
+Los 16 segundos contra los quince minutos sin salida son la medida exacta del problema. A escala de ciudad los edificios comunes miden menos de un píxel igual, así que los hitos alcanzan para que se lea la silueta.
+
+Se generan con el GDAL que ya trae pyogrio (driver PMTiles), así que **no hace falta tippecanoe ni WSL** — que además no está instalado en esta máquina.
+
+**El riesgo no se hornea en las teselas.** Depende del turno y del tipo de delito, así que meterlo adentro obligaría a regenerar 72 MB por cada combinación. Va como capa de piso, debajo de los edificios, y se cambia al vuelo.
+
+### La capa base: lo que hace reconocible a Buenos Aires
+
+`build_base_3d.py` arma el vacío, que es la otra mitad de una ciudad. Sin esto el tejido flota en negro.
+
+| Capa | Qué es | Fuente |
+|---|---|---|
+| Agua | 263 polígonos: Río de la Plata, Dársena Norte, lagos de Palermo | OSM |
+| Verde | 826 parques y plazas | dataset de la Ciudad |
+| Calles | 31.961 tramos con jerarquía real | dataset de la Ciudad |
+| Puentes | 859 tramos elevados (546 de autopista, 313 de tren) | OSM |
+| Monumentos | 100 estructuras que el tejido no tiene | OSM |
+| Arbolado | 350.660 árboles con altura medida | dataset de la Ciudad |
+| Alumbrado | 102.700 luminarias | dataset de la Ciudad |
+
+Cuatro decisiones que no son obvias:
+
+- **El río hay que recortarlo sí o sí.** El polígono del Río de la Plata en OSM mide 30.256 km², unas 1.500 veces la superficie de CABA. Sin recorte pesa más que todo el resto junto.
+- **Los canteros centrales se descartan del verde.** Son miles de tiras de dos metros que ensucian el dibujo y no se leen como verde. Con eso y el mínimo de 500 m², 2.176 polígonos quedan en 826.
+- **Los puentes se dibujan DESPUÉS de los edificios**, porque están elevados. Debajo, el tejido de la ribera los tapa y la General Paz o la 25 de Mayo desaparecen justo donde cruzan.
+- **Los monumentos hacen falta porque el Tejido Urbano es edificación por parcela.** Lo que está parado en el medio de una plaza no ocupa parcela: **el Obelisco no aparece por ningún lado**. Se verificó — no hay ningún volumen de entre 55 y 80 m a menos de 130 m de sus coordenadas, y lo más alto cerca es un edificio de 48,9 m del otro lado de la 9 de Julio. De los 139 monumentos de OSM se descartan los 39 que el tejido ya tiene (el Teatro Colón sí ocupa parcela, traerlo de OSM lo dibujaría dos veces encima).
+
+**Overpass se cayó tres veces durante el armado**, así que la consulta rota entre espejos y el caché quedó apuntado a una ruta fija del proyecto (osmnx cachea en `./cache` relativo al directorio de trabajo, o sea que la misma consulta desde dos carpetas distintas se baja dos veces).
+
+### Lo que es dato y lo que es dibujo
+
+Vale separarlo, porque en una vista que busca parecer real la línea se borra fácil:
+
+- **El radio de copa de los árboles no está en el dataset.** El censo mide altura y diámetro de tronco a la altura del pecho, no la extensión de la copa. Se deriva del tronco, acotado a un rango de vereda. Sirve para que el arbolado se vea; **no sirve para calcular sombra ni cobertura vegetal**.
+- **Las ventanas de las fachadas son decoración.** El interruptor aplica un patrón generado por código: una torre de Puerto Madero y una casa de Villa Devoto reciben exactamente la misma ventana. Además, con patrón MapLibre ignora `fill-extrusion-color` y se pierde el gris que aclara con la altura. Por eso es interruptor y no el modo único.
+- **La foto aérea es la única capa que sale a internet** (Esri World Imagery). Va apagada por defecto: sin ella el tablero funciona entero sin conexión.
+
+### Tres bugs propios, y por qué vale contarlos
+
+1. **El contenedor colapsaba a 0 px de alto.** MapLibre le agrega la clase `maplibregl-map` al mismo div y su hoja de estilos declara `position: relative`; Next inyecta ese CSS después del de Tailwind, así que con la misma especificidad pisaba a `absolute`. El div quedaba sin altura propia con todos sus hijos absolutos. **El mapa renderizaba perfecto adentro de una caja invisible** — se confirmó leyendo píxeles naranjas del framebuffer mientras la pantalla estaba en negro. El arreglo es posicionar por estilo en línea, que ninguna hoja puede pisar.
+2. **Arrastrar el mapa tapaba la vista con un error fatal.** Al mover la cámara MapLibre aborta las peticiones de las teselas que dejaron de hacer falta, y una petición abortada llega como `Failed to fetch`. Es el teselado funcionando, no una falla. Ahora solo se considera fatal lo que rompe **antes** de que el mapa cargue.
+3. **La cámara arrancaba a z12,4**, donde un edificio de 20 m de frente ocupa medio píxel. La ciudad se dibujaba y era invisible; solo se veían las cámaras porque los círculos tienen tamaño fijo en píxeles.
+
+Hay además un comportamiento del navegador que conviene saber: **MapLibre difiere hasta el parseo del estilo a un `requestAnimationFrame`**, y el navegador congela rAF en las pestañas de segundo plano. Si se abre `/3d` en una pestaña de fondo, el mapa no llega ni a leer el estilo — cero fuentes, cero capas. Se recupera solo al volver, pero la vista lo avisa en pantalla en vez de dejar un "cargando" eterno sin motivo.
+
+### El techo, medido
+
+- **La volumetría son prismas.** Huella y altura, en escalones de 2,8 m. No hay techos, ni retiros, ni balcones, ni fachadas. Ningún estilo agrega detalle que no esté en el dato.
+- **MapLibre 5 no tiene sombras ni oclusión ambiental** (verificado en sus definiciones de tipos). Tiene degradado vertical y niebla atmosférica, que es lo que se usa acá, pero el aspecto "renderizado" de un motor 3D tiene un límite duro.
+- **El LIDAR oficial se evaluó y se descartó.** La Ciudad publica escaneos de nueve edificios emblemáticos, pero son **2,4 GB** en total (de 48,7 MB la Catedral a 571,5 MB el Dique 3) y **seis de los nueve son RAR con extensión `.zip`**. Llevarlos al navegador exige extraer, diezmar la nube, reconstruir malla, georreferenciar, exportar a glTF y escribir una capa de three.js dentro de MapLibre. Es el ítem más caro por amplio margen y mejora **9 edificios de 1.019.395**; el hueco que lo motivaba —el Obelisco— ya está resuelto por la vía barata.
+
+Salidas en `dashboard/public/tejido/` (~87 MB, no versionadas: se regeneran con los dos scripts de `pipeline/`). El navegador las pide por rango HTTP, así que nunca baja más que las teselas del encuadre.

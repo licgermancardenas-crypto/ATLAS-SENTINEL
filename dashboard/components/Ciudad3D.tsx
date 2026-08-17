@@ -95,6 +95,40 @@ function circulo(lon: number, lat: number, radioM: number, pasos = 48): Feature<
 
 const vacio: FeatureCollection = { type: "FeatureCollection", features: [] };
 
+/** Textura de fachada, dibujada en un canvas en vez de traída de un archivo.
+ *
+ *  Es una grilla de ventanas con algunas encendidas. Se genera por código para
+ *  no versionar un PNG ni depender de nada externo, y con semilla fija para que
+ *  el patrón sea igual en cada carga (si cambiara, el mismo edificio tendría
+ *  otras luces prendidas cada vez que se recarga).
+ *
+ *  Hay que decir qué es: **decoración, no dato**. El Tejido Urbano da huella y
+ *  altura, no fachadas. Una torre de Puerto Madero y una casa de Villa Devoto
+ *  reciben exactamente la misma ventana. Sirve para que el volumen se lea como
+ *  edificio; no dice nada del edificio.
+ */
+function texturaFachada(): ImageData {
+  const L = 64, canvas = document.createElement("canvas");
+  canvas.width = canvas.height = L;
+  const c = canvas.getContext("2d")!;
+  c.fillStyle = "#2a2f38";
+  c.fillRect(0, 0, L, L);
+
+  let semilla = 7;
+  const azar = () => (semilla = (semilla * 1103515245 + 12345) % 2147483648) / 2147483648;
+
+  const paso = 8, margen = 2;
+  for (let y = 0; y < L; y += paso) {
+    for (let x = 0; x < L; x += paso) {
+      const r = azar();
+      // una de cada cinco encendida; el resto, vidrio oscuro
+      c.fillStyle = r > 0.8 ? "#ffdca1" : r > 0.55 ? "#3d444f" : "#1c2027";
+      c.fillRect(x + margen, y + margen, paso - margen * 2, paso - margen * 2);
+    }
+  }
+  return c.getImageData(0, 0, L, L);
+}
+
 let protocoloRegistrado = false;
 
 /* La misma pintura para las dos capas de edificios (hitos y detalle): gris que
@@ -136,6 +170,7 @@ export default function Ciudad3D() {
   const [sel, setSel] = useState<{ altura: number; lngLat: maplibregl.LngLat } | null>(null);
   const [oculto, setOculto] = useState(false);
   const [base, setBase] = useState<"oscura" | "satelital">("oscura");
+  const [fachadas, setFachadas] = useState(false);
 
   /* MapLibre difiere el parseo del estilo con `requestAnimationFrame`, y el
      navegador no corre rAF en pestañas de segundo plano. O sea que si alguien
@@ -194,6 +229,9 @@ export default function Ciudad3D() {
           // el Tejido Urbano es edificación por parcela, así que lo que está
           // parado en una plaza no existe ahí: el Obelisco entra por acá
           monumentos: { type: "geojson", data: "/tejido/monumentos.geojson" },
+          // 350.660 árboles con altura medida y 102.700 luminarias
+          arbolado: { type: "vector", url: "pmtiles:///tejido/arbolado.pmtiles" },
+          alumbrado: { type: "vector", url: "pmtiles:///tejido/alumbrado.pmtiles" },
           /* Única capa que sale a internet. Va apagada por defecto y con
              interruptor: sin ella el tablero funciona entero sin conexión. */
           satelital: {
@@ -291,6 +329,44 @@ export default function Ciudad3D() {
             paint: PINTURA_EDIFICIO,
           },
           {
+            /* Copas de árbol. La base va al 45% de la altura por expresión y no
+               como atributo: calcularlo acá ahorra mandar un segundo número por
+               cada uno de los 350.660 ejemplares. */
+            id: "arbolado-3d", type: "fill-extrusion", source: "arbolado",
+            "source-layer": "arbolado", minzoom: 15,
+            paint: {
+              "fill-extrusion-height": ["get", "alt"],
+              "fill-extrusion-base": ["*", ["get", "alt"], 0.45],
+              "fill-extrusion-opacity": 0.95,
+              "fill-extrusion-vertical-gradient": true,
+              // más claro arriba: los árboles altos reciben más luz
+              "fill-extrusion-color": [
+                "interpolate", ["linear"], ["get", "alt"],
+                2, "#1e3324", 8, "#27452e", 16, "#325a39", 30, "#3f7047",
+              ],
+            },
+          },
+          {
+            // luminarias: el punto chico es el foco y el halo el resplandor
+            id: "alumbrado-halo", type: "circle", source: "alumbrado",
+            "source-layer": "alumbrado", minzoom: 15,
+            paint: {
+              "circle-radius": ["interpolate", ["linear"], ["zoom"], 15, 3, 16, 7],
+              "circle-color": "#ffcf7a",
+              "circle-opacity": 0.10,
+              "circle-blur": 1,
+            },
+          },
+          {
+            id: "alumbrado-foco", type: "circle", source: "alumbrado",
+            "source-layer": "alumbrado", minzoom: 15,
+            paint: {
+              "circle-radius": ["interpolate", ["linear"], ["zoom"], 15, 0.7, 16, 1.6],
+              "circle-color": "#ffe6b0",
+              "circle-opacity": 0.75,
+            },
+          },
+          {
             // en piedra clara y no en el gris del tejido: un monumento no es un
             // edificio más, y si se pinta igual se pierde entre las medianeras
             id: "monumentos-3d", type: "fill-extrusion", source: "monumentos",
@@ -381,7 +457,11 @@ export default function Ciudad3D() {
     }
 
     m.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "bottom-right");
-    m.on("load", () => { cargado.current = true; setListo(true); });
+    m.on("load", () => {
+      m.addImage("fachada", texturaFachada());
+      cargado.current = true;
+      setListo(true);
+    });
 
     /* Los errores después de que el mapa cargó NO son fatales y no deben tapar
        la vista. El caso que lo dejó en evidencia: al arrastrar el mapa MapLibre
@@ -443,6 +523,18 @@ export default function Ciudad3D() {
       m.setPaintProperty(capa, "line-opacity", sat ? sobreFoto : enOscuro);
     }
   }, [listo, base]);
+
+  /* --- fachadas lisas o con ventanas --- */
+  useEffect(() => {
+    const m = mapa.current;
+    if (!m || !listo) return;
+    /* Con patrón, MapLibre ignora `fill-extrusion-color`: se pierde el gris que
+       aclara con la altura y todos los edificios quedan iguales. Es el precio
+       de las ventanas, y por eso esto es un interruptor y no el modo único. */
+    for (const capa of ["edificios", "edificios-hitos"]) {
+      m.setPaintProperty(capa, "fill-extrusion-pattern", fachadas ? "fachada" : undefined);
+    }
+  }, [listo, fachadas]);
 
   /* --- capa de riesgo (piso) --- */
   const cortes = useMemo(() => {
@@ -547,6 +639,12 @@ export default function Ciudad3D() {
             </button>
           ))}
         </div>
+
+        <label className="mb-3 flex cursor-pointer items-center gap-2 text-slate-300">
+          <input type="checkbox" checked={fachadas}
+            onChange={(e) => setFachadas(e.target.checked)} className="accent-blue-600" />
+          Ventanas en las fachadas
+        </label>
 
         <div className="mb-1 text-[10px] uppercase tracking-wider text-slate-400">Capa</div>
         <div className="mb-3 grid grid-cols-2 gap-1">
