@@ -17,6 +17,7 @@ import {
 import { BarrasComuna, CurvaCobertura, SensibilidadAlRadio, SerieAnual } from "./Graficos";
 import TablaBarrios from "./TablaBarrios";
 import Salvedades from "./Salvedades";
+import Pronostico from "./Pronostico";
 import Cuando from "./Cuando";
 
 // Leaflet toca `window` al importarse, así que no puede renderizar en el servidor
@@ -353,6 +354,12 @@ export default function Dashboard() {
               </h2>
               <SerieAnual serie={datos.serie} tipo={tipo} onTipo={setTipo} />
             </section>
+
+            {/* va debajo de la serie y no arriba: primero lo registrado, después
+                la proyección, que es la única forma de que se lean como la misma
+                línea. Sigue el filtro de tipo pero no el de territorio — el
+                panel lo aclara adentro. */}
+            <Pronostico datos={datos.pronostico} serie={datos.serie} tipo={tipo} />
 
             {/* va acá, pegado a las salvedades y no al Módulo A: es lo que hay
                 que leer antes de tomar las ubicaciones del mapa como un plan */}

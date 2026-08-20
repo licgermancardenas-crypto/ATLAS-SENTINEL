@@ -833,7 +833,7 @@ Esto es más vendible que el resultado de Capa 1 solo: aunque el modelo apenas l
 Última etapa del roadmap. El dashboard nunca lee los parquet directo — todo pasa por un export para no acoplar el frontend al esquema de Python. Son dos scripts:
 
 - `src/export/generar_export.py` — las salidas por hexágono y los puntos: `hex_riesgo.geojson` (401 hexágonos con riesgo por turno), `modulo_a_k75.json`, `modulo_b_red.json`, `modulo_c.json`, `comisarias.geojson`, `camaras.geojson`.
-- `src/export/generar_export_dashboard.py` — las salidas por unidad administrativa, que son las que consume el tablero actual: `barrios_riesgo.geojson`, `comunas_resumen.json`, `curva_k.json`, `sensibilidad_radio.json`, `serie_delitos.json` y `resumen.json`.
+- `src/export/generar_export_dashboard.py` — las salidas por unidad administrativa, que son las que consume el tablero actual: `barrios_riesgo.geojson`, `comunas_resumen.json`, `curva_k.json`, `sensibilidad_radio.json`, `serie_delitos.json`, `perfil_temporal.json`, `pronostico.json` y `resumen.json`.
 
 De los dos, el tablero solo lee las salidas del segundo más los puntos y las capas de contexto del primero. `hex_riesgo.geojson` se sigue generando porque lo consume `presentacion/gen_mapas.py`.
 
@@ -981,7 +981,7 @@ Cierra los 3 cruces de la tabla que no son point-in-hex: `espacios_verdes` (% de
 
 ## Pronóstico mensual a nivel Ciudad (`src/model_core/forecast_mensual.py`)
 
-Todo lo modelado hasta acá contesta **dónde**: hexágono × turno, grano semanal, métricas de ranking. Falta la otra pregunta, la que el tablero no puede contestar: **cuánto delito registrado va a haber el mes que viene en toda la Ciudad**. Es una serie única de 120 meses (2016-01 a 2025-12), no un problema espacial, así que el modelo es de series de tiempo y no el LightGBM.
+Todo lo modelado hasta acá contesta **dónde**: hexágono × turno, grano semanal, métricas de ranking. Falta la otra pregunta, la que el tablero no contestaba: **cuánto delito registrado va a haber el mes que viene en toda la Ciudad**. Es una serie única de 120 meses (2016-01 a 2025-12), no un problema espacial, así que el modelo es de series de tiempo y no el LightGBM.
 
 Replica el enfoque del proyecto previo de LAPD (`ml_forecast.py`: Prophet, horizonte de 12 meses, apertura por categoría) con **dos cambios deliberados**, y los dos resultaron decisivos:
 
@@ -1050,6 +1050,22 @@ Por tipo: hurto +4,7%, robo +0,9%, vialidad +0,6%, amenazas −5,7%, lesiones �
 **Qué es este número y qué no.** Pronostica **delito registrado**, no delito. La distinción no es un tecnicismo: `quiebre_2025.py` dejó explícitamente inhabilitada cualquier afirmación sobre niveles, y un pronóstico mensual de volumen *es* una afirmación sobre niveles, así que hereda entera esa salvedad. Sirve para planificar carga de trabajo sobre el sistema de denuncias; no para decir cuánto delito va a sufrir la gente.
 
 Salidas en `forecast_mensual_backtest.parquet`, `forecast_mensual_2026.parquet` y `forecast_mensual_por_tipo.parquet`.
+
+### En el tablero (`dashboard/components/Pronostico.tsx`)
+
+Los tres parquet existían pero no los leía nadie. El panel **"Cuánto delito registrado en 2026"** los pone abajo de la serie mensual, en ese orden a propósito: primero lo registrado, después la proyección, que es lo que hace que se lean como la misma línea. El export es `exportar_pronostico()` en `generar_export_dashboard.py` → `pronostico.json` (9,5 KB con los cuatro modelos, sus bandas, el error por horizonte y la apertura por tipo).
+
+Cuatro decisiones, y las cuatro salen de cosas que este README ya tenía medidas:
+
+**1. Van los cuatro modelos, no solo el que se usa.** El hallazgo del backtest es que el ganador cambia con el horizonte. Con un solo modelo en pantalla el pronóstico parece más firme de lo que es, así que el panel trae un selector y una tabla de 4 modelos × 4 horizontes con el mínimo de cada columna marcado — se ve de una que Holt-Winters gana a un mes, `prophet_regimen` en el medio y el baseline a doce. La tabla reemplazó a un gráfico de cuatro curvas de MAE: se cruzan y quedan a menos de 200 delitos entre sí, así que en 420 px de ancho las etiquetas se tapan entre ellas.
+
+**2. El error va pegado al número.** "10.993 por mes" solo significa algo al lado de "±971 en un mes normal" y "1.360 el año del quiebre, sobreestimando 1.295". Los tres están en el panel, no en una nota al pie.
+
+**3. Sigue el filtro de tipo, no el de territorio, y lo dice.** La serie modelada es de Ciudad entera; recortarla por comuna o barrio sería inventar el dato. Es la misma limitación que ya tenía la serie mensual, pero acá se explicita en el subtítulo porque un pronóstico invita más que una serie histórica a suponer que el número se está filtrando junto con el resto. Por tipo sí existe, con `prophet_regimen` únicamente.
+
+**4. El eje arranca en cero.** Con el eje recortado al rango de los datos, el +1,1% de 2026 se dibujaría como una pendiente dramática — exactamente la lectura que la sección de arriba dice que no hay que hacer.
+
+Con homicidios (5 por mes proyectados, banda 0–10) el panel reemplaza la variación por una advertencia de ruido, mismo criterio y mismo umbral que el panel de "cuándo ocurren": abajo de 1.000 casos al año el signo se da vuelta con dos o tres hechos. La salvedad de fondo —pronostica delito registrado, no delito— viaja en el propio JSON y se muestra al pie del panel, para que no dependa de que alguien abra las salvedades generales.
 
 ## Módulo 3D — la Ciudad construida (`pipeline/ingest_tejido_urbano.py`, `build_base_3d.py`, `dashboard/app/3d/`)
 

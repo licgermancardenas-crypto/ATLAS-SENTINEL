@@ -183,6 +183,67 @@ export interface PerfilTemporal {
 
 export const TURNOS_PERFIL = ["Mañana", "Tarde", "Noche", "Madrugada"];
 
+/* --------------------------------------------------------------- pronóstico
+ *
+ *  El pronóstico mensual es a nivel Ciudad y nada más: la serie que modela es
+ *  una sola, de 120 meses. No se puede recortar por comuna ni por barrio sin
+ *  inventar el dato, así que el componente ignora esos filtros y lo dice. Por
+ *  tipo sí existe, con el modelo elegido, y por eso `por_tipo` viene aparte.
+ */
+
+export interface MesPronostico {
+  /** 1-12. El año es el del objeto padre. */
+  mes: number;
+  yhat: number;
+  lo: number;
+  hi: number;
+}
+
+export interface ModeloPronostico {
+  key: string;
+  label: string;
+  nota: string;
+  /** Promedio mensual de los doce meses pronosticados. */
+  mensual: number;
+  total: number;
+  /** Variación contra el promedio mensual del último año cerrado. */
+  vs_base: number;
+  banda: [number, number];
+  mae_normal: number;
+  mape_normal: number;
+  sesgo_normal: number;
+  cobertura_normal: number;
+  /** Error del mismo modelo en 2025, el año del quiebre. */
+  mae_quiebre: number;
+  sesgo_quiebre: number;
+  /** Doce posiciones, MAE a horizonte 1..12 meses. */
+  mae_por_h: number[];
+  meses: MesPronostico[];
+}
+
+export interface TipoPronostico {
+  key: string;
+  label: string;
+  mensual: number;
+  base_mensual: number;
+  vs_base: number | null;
+  banda: [number, number];
+  meses: MesPronostico[];
+}
+
+export interface Pronostico {
+  anio: number;
+  elegido: string;
+  base: { anio: number; total: number; mensual: number };
+  backtest: {
+    n_origenes: number; desde: string; hasta: string;
+    horizonte: number; n_evaluaciones_normales: number;
+  };
+  modelos: ModeloPronostico[];
+  por_tipo: TipoPronostico[];
+  salvedad: string;
+}
+
 export interface Resumen {
   periodo: { desde: number; hasta: number };
   delitos_ultimo_anio: number;
@@ -214,6 +275,7 @@ export interface DatosDashboard {
   radio: SensibilidadRadio;
   serie: FilaSerie[];
   perfil: PerfilTemporal;
+  pronostico: Pronostico;
   resumen: Resumen;
 }
 

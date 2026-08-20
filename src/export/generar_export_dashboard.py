@@ -26,6 +26,10 @@ Salidas en dashboard/public/data/:
 - perfil_temporal.json     cuándo ocurren: por hora, por día de la semana y por
                            turno, cortado por tipo. Es lo que alimenta los
                            indicadores de frecuencia del tablero.
+- pronostico.json          el pronóstico mensual de Ciudad para 2026 con los
+                           cuatro modelos del backtest, sus bandas y el error
+                           medido de cada uno. Va con el backtest adentro
+                           porque un pronóstico sin su error no se puede leer.
 - resumen.json             los números sueltos que van en las tarjetas de KPI,
                            en un solo lugar en vez de hardcodeados en el front.
 """
@@ -413,6 +417,143 @@ def exportar_perfil_temporal() -> None:
     print(f"perfil_temporal.json: {dias} días, {totales['todos']} delitos")
 
 
+# ────────────────────────────────────────────── pronóstico mensual de Ciudad
+
+# Los cuatro modelos del backtest, en el orden en que conviene leerlos: primero
+# el que se usa, último el port literal que falla. El texto es el que explica
+# por qué están los cuatro y no solo el ganador — la conclusión del README es
+# que ninguno gana en todos los horizontes, y eso hay que poder verlo.
+MODELOS_FORECAST: list[tuple[str, str, str]] = [
+    ("prophet_regimen", "Prophet con regímenes",
+     "Prophet con la pandemia y el escalón de 2025 como indicadoras multiplicativas. "
+     "Es el que menos error tiene en meses normales y a horizontes de 3 a 6 meses."),
+    ("ets", "Holt-Winters",
+     "Suavizado exponencial con estacionalidad. Es el mejor a un mes vista."),
+    ("naive_estacional", "El mismo mes del año pasado",
+     "El baseline. A doce meses no hay modelo que le gane: cuanto más lejos se "
+     "mira, más pesa la estacionalidad pelada."),
+    ("prophet", "Prophet, port literal",
+     "Prophet sin regresores de régimen, como en el proyecto de LAPD. Lee la "
+     "recuperación pos-pandemia como tendencia y la extrapola: más del doble de error."),
+]
+MODELO_ELEGIDO = "prophet_regimen"
+ANIO_PRONOSTICO = 2026
+
+
+def _meses(df: pd.DataFrame, col_lo: str, col_hi: str) -> list[dict]:
+    """Las doce filas de un pronóstico, ordenadas y redondeadas a delito entero.
+
+    Se redondea acá y no en el front: son conteos de hechos, y un decimal en un
+    número que ya tiene una banda de ±1.400 finge una precisión que no existe.
+    """
+    filas = df.sort_values("ds")
+    return [{"mes": int(r.ds.month), "yhat": round(float(r.yhat)),
+             "lo": round(float(getattr(r, col_lo))), "hi": round(float(getattr(r, col_hi)))}
+            for r in filas.itertuples()]
+
+
+def exportar_pronostico() -> None:
+    """El pronóstico mensual de Ciudad, con su backtest, para el tablero.
+
+    Tres cosas van juntas y no se pueden separar sin volver el número engañoso:
+    el pronóstico, la banda, y el error medido del modelo que lo produjo. Un
+    "10.993 delitos por mes en 2026" solo significa algo al lado de "y su error
+    típico es de 971 en un mes normal, 1.360 en el año del quiebre".
+
+    Por eso el JSON lleva los cuatro modelos y no solo el elegido: el hallazgo
+    del backtest es que el ganador cambia con el horizonte y que a doce meses
+    gana el baseline. Mostrar un solo modelo escondería justo eso.
+    """
+    fc = FEATURES / "forecast_mensual_2026.parquet"
+    bt_path = FEATURES / "forecast_mensual_backtest.parquet"
+    tipos_path = FEATURES / "forecast_mensual_por_tipo.parquet"
+    if not (fc.exists() and bt_path.exists() and tipos_path.exists()):
+        print("pronostico.json: faltan los parquet de forecast_mensual — se omite")
+        return
+
+    pron = pd.read_parquet(fc)
+    bt = pd.read_parquet(bt_path)
+    por_tipo = pd.read_parquet(tipos_path)
+
+    bt = bt.assign(ae=bt["error"].abs(), ape=bt["error"].abs() / bt["real"] * 100)
+    normal = bt[bt["periodo"] == "normal"]
+    quiebre = bt[bt["periodo"] == "quiebre 2025"]
+
+    # la base contra la que se compara el pronóstico es el último año cerrado,
+    # el mismo que usan las tarjetas de KPI
+    por_anio = delitos()["anio"].value_counts().sort_index()
+    base_total = int(por_anio.loc[ANIO_ULTIMO])
+    base_mensual = base_total / 12
+
+    modelos = []
+    for key, label, nota in MODELOS_FORECAST:
+        p = pron[pron["modelo"] == key]
+        n = normal[normal["modelo"] == key]
+        q = quiebre[quiebre["modelo"] == key]
+        mensual = float(p["yhat"].mean())
+        modelos.append({
+            "key": key, "label": label, "nota": nota,
+            "mensual": round(mensual),
+            "total": round(float(p["yhat"].sum())),
+            "vs_base": mensual / base_mensual - 1,
+            "banda": [round(float(p["yhat_lower"].mean())), round(float(p["yhat_upper"].mean()))],
+            "mae_normal": round(float(n["ae"].mean()), 1),
+            "mape_normal": float(n["ape"].mean()) / 100,
+            "sesgo_normal": round(float(n["error"].mean()), 1),
+            "cobertura_normal": float(n["dentro"].mean()),
+            "mae_quiebre": round(float(q["ae"].mean()), 1),
+            "sesgo_quiebre": round(float(q["error"].mean()), 1),
+            "mae_por_h": [round(float(v)) for v in
+                          n.groupby("h")["ae"].mean().reindex(range(1, 13)).tolist()],
+            "meses": _meses(p, "yhat_lower", "yhat_upper"),
+        })
+
+    # el pronóstico por tipo corre solo con el modelo elegido: son seis series
+    # más cortas y con menos nivel, y comparar cuatro modelos en cada una no
+    # cambiaría la lectura. La banda es la nativa, igual que en el agregado.
+    tipos = []
+    for tipo in TIPOS_DELITO:
+        t = por_tipo[por_tipo["tipo"] == tipo]
+        if t.empty:
+            continue
+        mensual = float(t["yhat"].mean())
+        base_tipo = float(t["prom_ult12"].iloc[0])
+        tipos.append({
+            "key": TIPO_KEY[tipo], "label": tipo,
+            "mensual": round(mensual),
+            "base_mensual": round(base_tipo),
+            "vs_base": mensual / base_tipo - 1 if base_tipo > 0 else None,
+            "banda": [round(float(t["yhat_lower"].mean())), round(float(t["yhat_upper"].mean()))],
+            "meses": _meses(t, "yhat_lower", "yhat_upper"),
+        })
+
+    salida = {
+        "anio": ANIO_PRONOSTICO,
+        "elegido": MODELO_ELEGIDO,
+        "base": {"anio": ANIO_ULTIMO, "total": base_total, "mensual": round(base_mensual)},
+        "backtest": {
+            "n_origenes": int(bt["origen"].nunique()),
+            "desde": str(bt["origen"].min().date()),
+            "hasta": str(bt["origen"].max().date()),
+            "horizonte": int(bt["h"].max()),
+            # pares origen-objetivo por modelo, no meses: cada origen deja
+            # hasta doce objetivos y varios orígenes apuntan al mismo mes
+            "n_evaluaciones_normales": int(len(normal) / len(MODELOS_FORECAST)),
+        },
+        "modelos": modelos,
+        "por_tipo": tipos,
+        "salvedad":
+            "Pronostica delito registrado, no delito. El nivel de 2025 quedó bajo revisión "
+            "y un pronóstico de volumen es una afirmación sobre niveles, así que hereda "
+            "entera esa salvedad: sirve para dimensionar carga de trabajo sobre el sistema "
+            "de denuncias, no para decir cuánto delito va a sufrir la gente.",
+    }
+    (OUT / "pronostico.json").write_text(json.dumps(salida, ensure_ascii=False),
+                                         encoding="utf-8")
+    print(f"pronostico.json: {len(modelos)} modelos, {len(tipos)} tipos, "
+          f"{salida['backtest']['n_origenes']} orígenes de backtest")
+
+
 def exportar_resumen() -> None:
     """Los números de las tarjetas de KPI. Van acá y no hardcodeados en el
     front, para que haya un solo lugar donde corregirlos — el proyecto ya tuvo
@@ -467,6 +608,7 @@ def main() -> None:
     copiar_json(FEATURES / "sensibilidad_radio_patrullas.json", "sensibilidad_radio.json")
     exportar_serie_delitos()
     exportar_perfil_temporal()
+    exportar_pronostico()
     exportar_resumen()
     print(f"\nTodo en {OUT}")
 
