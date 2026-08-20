@@ -2,7 +2,7 @@ import Link from "next/link";
 import Ciudad3DCliente from "@/components/Ciudad3DCliente";
 
 export const metadata = {
-  title: "SIGE-BA — CABA en 3D",
+  title: "ATLAS SENTINEL — CABA en 3D",
   description: "El tejido construido de la Ciudad, extruido, con las capas operativas encima.",
 };
 

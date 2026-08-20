@@ -15,7 +15,7 @@ const firaCode = Fira_Code({
 });
 
 export const metadata: Metadata = {
-  title: "SIGE-BA — Riesgo de seguridad urbana",
+  title: "ATLAS SENTINEL — Riesgo de seguridad urbana",
   description: "Modelo predictivo de riesgo espacio-temporal para CABA — patrullas, cámaras y controles de acceso.",
 };
 

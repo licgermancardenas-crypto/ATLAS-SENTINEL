@@ -228,7 +228,7 @@ export default function Dashboard() {
           <div className="h-1 w-40 bg-surface-sunk rounded overflow-hidden">
             <div className="h-full w-1/3 bg-brand animate-pulse" />
           </div>
-          <span className="text-xs text-ink-muted">Cargando SIGE-BA…</span>
+          <span className="text-xs text-ink-muted">Cargando ATLAS SENTINEL…</span>
         </div>
       </main>
     );
@@ -255,7 +255,7 @@ export default function Dashboard() {
         <div className="px-4 py-2.5 flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-baseline gap-3 min-w-0">
             <h1 className="text-[15px] font-semibold tracking-tight whitespace-nowrap">
-              SIGE-BA <span className="text-ink-muted font-normal">· Riesgo urbano</span>
+              ATLAS SENTINEL <span className="text-ink-muted font-normal">· Riesgo urbano</span>
             </h1>
             <span className="text-[11px] text-ink-muted whitespace-nowrap hidden sm:block">
               Ciudad de Buenos Aires · {datos.resumen.periodo.desde}–{datos.resumen.periodo.hasta}
