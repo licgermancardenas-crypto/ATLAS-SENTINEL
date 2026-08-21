@@ -734,6 +734,36 @@ La curva de cobertura pasó a tener **dos series** —riesgo en el azul de marca
 
 Nota de método: la población por hexágono sale del prorrateo por área de `overlay_poligonos.py` y es Censo 2010, el mismo denominador que la tasa cada 100.000. Un hexágono sin población cruzada haría el script abortar en vez de contarlo como cero — contarlo como cero lo sacaría del numerador y del denominador a la vez, y la cobertura saldría inflada.
 
+### Cómo se reparte esa cobertura (`src/optimization/equidad_cobertura.py`)
+
+El MCLP tiene una restricción de equidad y es un **piso muy bajo**: exige que quede al menos *un* hexágono cubierto por comuna. Con 401 hexágonos y comunas de 20 a 40 cada una, cumplirla no dice casi nada sobre el reparto. Nunca se había medido qué pasa por encima de ese piso, y un optimizador que maximiza un total tiene todos los incentivos para concentrar la cobertura donde es barata.
+
+**Lo hace.** Comparando las 75 comisarías de hoy contra el plan optimizado a K=75, en cobertura de población dentro de cada comuna:
+
+| | Peor comuna | Mejor comuna | Brecha | Comunas bajo el 10% |
+|---|---|---|---|---|
+| Hoy (75 comisarías) | 13,6% (C8) | 56,7% (C3) | **43,1 pp** | **0** |
+| Plan optimizado, K=75 | 7,1% (C9) | 89,6% (C3) | **82,6 pp** | **1** |
+
+El plan cubre mucho más en total —de 25,0% a 40,9% de la población— y **casi duplica la brecha entre la comuna mejor y la peor cubierta**. Deja una comuna abajo del 10%, algo que la distribución actual, que creció históricamente y sin optimizar nada, no hace.
+
+**Cuatro de las quince comunas quedan peor que hoy:**
+
+| Comuna | Hoy | Con el plan | |
+|---|---|---|---|
+| 12 | 28,6% | 17,0% | −11,6 pp |
+| 10 | 31,8% | 21,1% | −10,7 pp |
+| 9 | 16,0% | 7,1% | −9,0 pp |
+| 11 | 22,9% | 18,3% | −4,6 pp |
+
+Y las que más ganan son las del centro: la 5 pasa de 15,8% a 71,0% y la 2 de 15,4% a 61,5%.
+
+**Esto no invalida el plan.** Cubre más riesgo y más gente que la distribución actual, que es exactamente lo que se le pidió maximizar. Lo que muestra es que **cubrir más y repartir mejor son dos objetivos distintos**, que el modelo solo persigue el primero, y que la restricción de equidad tal como está escrita no alcanza para el segundo. Es la clase de consecuencia que tiene que estar a la vista antes de que alguien tome las ubicaciones como una recomendación operativa.
+
+El panel del tablero lo muestra con un segmento por comuna entre lo que cubre hoy y lo que cubriría el plan, con el color diciendo la dirección: azul si mejora, ámbar si empeora. Sigue al selector de patrullas, así que se puede ver cómo evoluciona la brecha con el presupuesto — crece hasta K=90 (87,8 pp) y recién baja en K=110, cuando la saturación obliga a repartir.
+
+Nota de método: el denominador de cada comuna es **su propia población**, no la de la Ciudad. Con el denominador global una comuna chica nunca podría verse bien cubierta y la tabla mediría tamaño en vez de reparto. Y los tres indicadores van sueltos y no como un índice compuesto: peor, mejor y cuántas quedan abajo del umbral se leen por separado, y ninguno esconde a los otros.
+
 ## Módulo B — Ubicación de cámaras nuevas (`src/optimization/modulo_b_camaras.py`)
 
 Weighted Max Coverage resuelto greedy (no MILP — el documento pide un ranking por ganancia marginal, que es justo lo que da el algoritmo greedy clásico). Peso por hexágono = riesgo (promedio de turnos) × boost por baja densidad de alumbrado × boost por alto flujo peatonal (ecobici + molinetes, combinados por percentil porque las escalas no son comparables) × descuento si ya está cubierto por una cámara existente. Candidatos: hexágonos a más de 100m de una cámara actual (224 cámaras reales).

@@ -224,6 +224,45 @@ export interface CoberturaPoblacion {
   curva: PuntoCoberturaPoblacion[];
 }
 
+/* ------------------------------------------------ equidad de la cobertura
+ *
+ *  La curva mide cuánto cubre el plan; esto mide cómo lo reparte. Son cosas
+ *  distintas y el optimizador solo persigue la primera: su restricción de
+ *  equidad exige un hexágono cubierto por comuna y nada más.
+ */
+
+export interface ComunaCobertura {
+  comuna: number;
+  /** Fracción del riesgo de esa comuna que queda cubierta. */
+  riesgo: number;
+  /** Fracción de su población. El denominador es el de la comuna, no el de la Ciudad. */
+  poblacion: number;
+  habitantes: number;
+  n_hex: number;
+  n_hex_cubiertos: number;
+}
+
+export interface ResumenEquidad {
+  peor_comuna: number;
+  peor: number;
+  mejor_comuna: number;
+  mejor: number;
+  /** Diferencia en fracción entre la comuna mejor y la peor cubierta. */
+  brecha: number;
+  mediana: number;
+  sin_cubrir: number;
+}
+
+export interface EquidadCobertura {
+  turno: string;
+  radio_m: number;
+  umbral_sin_cubrir: number;
+  hoy: { resumen: ResumenEquidad; comunas: ComunaCobertura[] };
+  curva: (Partial<ResumenEquidad> & { k: number; estado: string })[];
+  /** Detalle por comuna, indexado por K como string. */
+  planes: Record<string, ComunaCobertura[]>;
+}
+
 export interface FilaRadio {
   radio_m: number;
   cobertura_actual: number;
@@ -437,6 +476,7 @@ export interface DatosDashboard {
   demografia: Demografia;
   comunasGeo: ComunasGeoJSON;
   coberturaPob: CoberturaPoblacion;
+  equidad: EquidadCobertura;
   resumen: Resumen;
 }
 

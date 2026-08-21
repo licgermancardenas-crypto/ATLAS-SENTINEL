@@ -23,6 +23,7 @@ import TablaBarrios from "./TablaBarrios";
 import Salvedades from "./Salvedades";
 import Pronostico from "./Pronostico";
 import Poblacion from "./Poblacion";
+import Equidad from "./Equidad";
 import Cuando from "./Cuando";
 
 // Leaflet toca `window` al importarse, así que no puede renderizar en el servidor
@@ -360,6 +361,8 @@ export default function Dashboard() {
                 <BrechaCobertura pob={datos.coberturaPob} kActual={kPatrullas} />
               </div>
             </section>
+
+            <Equidad datos={datos.equidad} kPatrullas={kPatrullas} />
 
             <Cuando perfil={datos.perfil} tipo={tipo}
                     delitosSeleccion={delitosFoco} ambito={ambito} />

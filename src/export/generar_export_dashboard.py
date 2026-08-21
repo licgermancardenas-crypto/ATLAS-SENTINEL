@@ -26,6 +26,10 @@ Salidas en dashboard/public/data/:
 - perfil_temporal.json     cuándo ocurren: por hora, por día de la semana y por
                            turno, cortado por tipo. Es lo que alimenta los
                            indicadores de frecuencia del tablero.
+- equidad_cobertura.json   como se reparte esa cobertura entre las 15 comunas,
+                           hoy y con el plan. La restriccion de equidad del
+                           MCLP es un piso de un hexagono por comuna y no
+                           impide concentrar el resto.
 - cobertura_poblacion.json cuanta *gente* cubre el Modulo A, no solo cuanto
                            riesgo, y cuanto cambiaria el plan si el objetivo
                            fuera la poblacion en vez del riesgo.
@@ -849,6 +853,7 @@ def main() -> None:
     copiar_json(FEATURES / "modulo_a_curva_k.json", "curva_k.json")
     copiar_json(FEATURES / "sensibilidad_radio_patrullas.json", "sensibilidad_radio.json")
     copiar_json(FEATURES / "cobertura_poblacion.json", "cobertura_poblacion.json")
+    copiar_json(FEATURES / "equidad_cobertura.json", "equidad_cobertura.json")
     exportar_serie_delitos()
     exportar_perfil_temporal()
     exportar_pronostico()

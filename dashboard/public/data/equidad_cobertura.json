@@ -1,0 +1,1476 @@
+{
+ "turno": "Tarde",
+ "radio_m": 800,
+ "umbral_sin_cubrir": 0.1,
+ "hoy": {
+  "resumen": {
+   "peor_comuna": 8,
+   "peor": 0.13595038260532108,
+   "mejor_comuna": 3,
+   "mejor": 0.5666976378562492,
+   "brecha": 0.43074725525092805,
+   "mediana": 0.21246555625264377,
+   "sin_cubrir": 0
+  },
+  "comunas": [
+   {
+    "comuna": 3,
+    "riesgo": 0.5394760724790305,
+    "poblacion": 0.5666976378562492,
+    "habitantes": 106277,
+    "n_hex": 13,
+    "n_hex_cubiertos": 7
+   },
+   {
+    "comuna": 1,
+    "riesgo": 0.5993672616699421,
+    "poblacion": 0.4922471309047252,
+    "habitantes": 101347,
+    "n_hex": 36,
+    "n_hex_cubiertos": 14
+   },
+   {
+    "comuna": 10,
+    "riesgo": 0.3792943864901587,
+    "poblacion": 0.3179995394815514,
+    "habitantes": 52795,
+    "n_hex": 25,
+    "n_hex_cubiertos": 8
+   },
+   {
+    "comuna": 12,
+    "riesgo": 0.3706505097258806,
+    "poblacion": 0.28614359644449566,
+    "habitantes": 57262,
+    "n_hex": 29,
+    "n_hex_cubiertos": 8
+   },
+   {
+    "comuna": 6,
+    "riesgo": 0.2850760535847294,
+    "poblacion": 0.2856796118900589,
+    "habitantes": 50301,
+    "n_hex": 14,
+    "n_hex_cubiertos": 4
+   },
+   {
+    "comuna": 4,
+    "riesgo": 0.29967002139642146,
+    "poblacion": 0.23452565790107466,
+    "habitantes": 51184,
+    "n_hex": 42,
+    "n_hex_cubiertos": 10
+   },
+   {
+    "comuna": 11,
+    "riesgo": 0.24332700002052846,
+    "poblacion": 0.22875718108644477,
+    "habitantes": 43425,
+    "n_hex": 29,
+    "n_hex_cubiertos": 7
+   },
+   {
+    "comuna": 15,
+    "riesgo": 0.32497944124203565,
+    "poblacion": 0.21246555625264377,
+    "habitantes": 38791,
+    "n_hex": 28,
+    "n_hex_cubiertos": 6
+   },
+   {
+    "comuna": 14,
+    "riesgo": 0.3829558523483893,
+    "poblacion": 0.19348965946789262,
+    "habitantes": 43832,
+    "n_hex": 31,
+    "n_hex_cubiertos": 6
+   },
+   {
+    "comuna": 13,
+    "riesgo": 0.331785621259923,
+    "poblacion": 0.16492408236675893,
+    "habitantes": 38059,
+    "n_hex": 28,
+    "n_hex_cubiertos": 5
+   },
+   {
+    "comuna": 7,
+    "riesgo": 0.14742351756465452,
+    "poblacion": 0.1633924535974031,
+    "habitantes": 36043,
+    "n_hex": 25,
+    "n_hex_cubiertos": 4
+   },
+   {
+    "comuna": 9,
+    "riesgo": 0.26069433319964275,
+    "poblacion": 0.16031737018795575,
+    "habitantes": 25939,
+    "n_hex": 32,
+    "n_hex_cubiertos": 5
+   },
+   {
+    "comuna": 5,
+    "riesgo": 0.17569819149858673,
+    "poblacion": 0.15807395015055117,
+    "habitantes": 28296,
+    "n_hex": 12,
+    "n_hex_cubiertos": 2
+   },
+   {
+    "comuna": 2,
+    "riesgo": 0.3121975114257459,
+    "poblacion": 0.15377415763743424,
+    "habitantes": 24286,
+    "n_hex": 13,
+    "n_hex_cubiertos": 2
+   },
+   {
+    "comuna": 8,
+    "riesgo": 0.15074054808585197,
+    "poblacion": 0.13595038260532108,
+    "habitantes": 25455,
+    "n_hex": 44,
+    "n_hex_cubiertos": 5
+   }
+  ]
+ },
+ "curva": [
+  {
+   "k": 5,
+   "estado": "Infeasible"
+  },
+  {
+   "k": 10,
+   "estado": "Optimal",
+   "peor_comuna": 11,
+   "peor": 0.02335226235196505,
+   "mejor_comuna": 3,
+   "mejor": 0.27782724719982543,
+   "brecha": 0.2544749848478604,
+   "mediana": 0.03812992029579966,
+   "sin_cubrir": 12
+  },
+  {
+   "k": 15,
+   "estado": "Optimal",
+   "peor_comuna": 11,
+   "peor": 0.02335226235196505,
+   "mejor_comuna": 3,
+   "mejor": 0.6074530434583909,
+   "brecha": 0.5841007811064258,
+   "mediana": 0.03812992029579966,
+   "sin_cubrir": 11
+  },
+  {
+   "k": 20,
+   "estado": "Optimal",
+   "peor_comuna": 4,
+   "peor": 0.02929226514664582,
+   "mejor_comuna": 3,
+   "mejor": 0.6074530434583909,
+   "brecha": 0.5781607783117451,
+   "mediana": 0.06838380226776264,
+   "sin_cubrir": 9
+  },
+  {
+   "k": 30,
+   "estado": "Optimal",
+   "peor_comuna": 4,
+   "peor": 0.02929226514664582,
+   "mejor_comuna": 3,
+   "mejor": 0.7926439801233094,
+   "brecha": 0.7633517149766635,
+   "mediana": 0.11957434719574453,
+   "sin_cubrir": 5
+  },
+  {
+   "k": 40,
+   "estado": "Optimal",
+   "peor_comuna": 9,
+   "peor": 0.034100137088464655,
+   "mejor_comuna": 3,
+   "mejor": 0.8444772674354015,
+   "brecha": 0.8103771303469369,
+   "mediana": 0.19349097774487206,
+   "sin_cubrir": 4
+  },
+  {
+   "k": 50,
+   "estado": "Optimal",
+   "peor_comuna": 9,
+   "peor": 0.034100137088464655,
+   "mejor_comuna": 3,
+   "mejor": 0.8444772674354015,
+   "brecha": 0.8103771303469369,
+   "mediana": 0.22780032580297932,
+   "sin_cubrir": 3
+  },
+  {
+   "k": 60,
+   "estado": "Optimal",
+   "peor_comuna": 12,
+   "peor": 0.03812992029579966,
+   "mejor_comuna": 3,
+   "mejor": 0.8963219907473592,
+   "brecha": 0.8581920704515595,
+   "mediana": 0.26382625524178305,
+   "sin_cubrir": 2
+  },
+  {
+   "k": 75,
+   "estado": "Optimal",
+   "peor_comuna": 9,
+   "peor": 0.07064660388305324,
+   "mejor_comuna": 3,
+   "mejor": 0.8963219907473592,
+   "brecha": 0.825675386864306,
+   "mediana": 0.3547455506920967,
+   "sin_cubrir": 1
+  },
+  {
+   "k": 90,
+   "estado": "Optimal",
+   "peor_comuna": 9,
+   "peor": 0.07064660388305324,
+   "mejor_comuna": 3,
+   "mejor": 0.9481599412252918,
+   "brecha": 0.8775133373422386,
+   "mediana": 0.4383142266909,
+   "sin_cubrir": 1
+  },
+  {
+   "k": 110,
+   "estado": "Optimal",
+   "peor_comuna": 11,
+   "peor": 0.18304474733718148,
+   "mejor_comuna": 3,
+   "mejor": 0.9481599412252918,
+   "brecha": 0.7651151938881103,
+   "mediana": 0.4724978888101254,
+   "sin_cubrir": 0
+  }
+ ],
+ "planes": {
+  "10": [
+   {
+    "comuna": 3,
+    "riesgo": 0.32290074567070326,
+    "poblacion": 0.27782724719982543,
+    "habitantes": 52103,
+    "n_hex": 13,
+    "n_hex_cubiertos": 3
+   },
+   {
+    "comuna": 2,
+    "riesgo": 0.3121975114257459,
+    "poblacion": 0.15377415763743424,
+    "habitantes": 24286,
+    "n_hex": 13,
+    "n_hex_cubiertos": 2
+   },
+   {
+    "comuna": 1,
+    "riesgo": 0.18192654293431362,
+    "poblacion": 0.10418979216380138,
+    "habitantes": 21451,
+    "n_hex": 36,
+    "n_hex_cubiertos": 3
+   },
+   {
+    "comuna": 6,
+    "riesgo": 0.07311919803281224,
+    "poblacion": 0.07142048037392526,
+    "habitantes": 12575,
+    "n_hex": 14,
+    "n_hex_cubiertos": 1
+   },
+   {
+    "comuna": 13,
+    "riesgo": 0.22200076030811533,
+    "poblacion": 0.06838380226776264,
+    "habitantes": 15781,
+    "n_hex": 28,
+    "n_hex_cubiertos": 2
+   },
+   {
+    "comuna": 5,
+    "riesgo": 0.07733828986051497,
+    "poblacion": 0.06607244438606473,
+    "habitantes": 11827,
+    "n_hex": 12,
+    "n_hex_cubiertos": 1
+   },
+   {
+    "comuna": 14,
+    "riesgo": 0.18922439575477484,
+    "poblacion": 0.06449787522027167,
+    "habitantes": 14611,
+    "n_hex": 31,
+    "n_hex_cubiertos": 2
+   },
+   {
+    "comuna": 12,
+    "riesgo": 0.06471109553908914,
+    "poblacion": 0.03812992029579966,
+    "habitantes": 7630,
+    "n_hex": 29,
+    "n_hex_cubiertos": 1
+   },
+   {
+    "comuna": 9,
+    "riesgo": 0.0473539319884251,
+    "poblacion": 0.03654646679458859,
+    "habitantes": 5913,
+    "n_hex": 32,
+    "n_hex_cubiertos": 1
+   },
+   {
+    "comuna": 8,
+    "riesgo": 0.03950442663976773,
+    "poblacion": 0.03553781731497888,
+    "habitantes": 6654,
+    "n_hex": 44,
+    "n_hex_cubiertos": 1
+   },
+   {
+    "comuna": 15,
+    "riesgo": 0.03710232136943589,
+    "poblacion": 0.03193651674453466,
+    "habitantes": 5831,
+    "n_hex": 28,
+    "n_hex_cubiertos": 1
+   },
+   {
+    "comuna": 7,
+    "riesgo": 0.032451160229741,
+    "poblacion": 0.03190125354670271,
+    "habitantes": 7037,
+    "n_hex": 25,
+    "n_hex_cubiertos": 1
+   },
+   {
+    "comuna": 4,
+    "riesgo": 0.04871648025626123,
+    "poblacion": 0.02929226514664582,
+    "habitantes": 6393,
+    "n_hex": 42,
+    "n_hex_cubiertos": 1
+   },
+   {
+    "comuna": 10,
+    "riesgo": 0.02476972169712025,
+    "poblacion": 0.02694580488545528,
+    "habitantes": 4474,
+    "n_hex": 25,
+    "n_hex_cubiertos": 1
+   },
+   {
+    "comuna": 11,
+    "riesgo": 0.018426383517548127,
+    "poblacion": 0.02335226235196505,
+    "habitantes": 4433,
+    "n_hex": 29,
+    "n_hex_cubiertos": 1
+   }
+  ],
+  "15": [
+   {
+    "comuna": 3,
+    "riesgo": 0.6629526716050298,
+    "poblacion": 0.6074530434583909,
+    "habitantes": 113920,
+    "n_hex": 13,
+    "n_hex_cubiertos": 7
+   },
+   {
+    "comuna": 5,
+    "riesgo": 0.39647825997717606,
+    "poblacion": 0.3419552526046355,
+    "habitantes": 61212,
+    "n_hex": 12,
+    "n_hex_cubiertos": 4
+   },
+   {
+    "comuna": 2,
+    "riesgo": 0.6396617007327192,
+    "poblacion": 0.3075545941274329,
+    "habitantes": 48573,
+    "n_hex": 13,
+    "n_hex_cubiertos": 4
+   },
+   {
+    "comuna": 1,
+    "riesgo": 0.32408885121306397,
+    "poblacion": 0.2075939670371791,
+    "habitantes": 42741,
+    "n_hex": 36,
+    "n_hex_cubiertos": 6
+   },
+   {
+    "comuna": 6,
+    "riesgo": 0.07311919803281224,
+    "poblacion": 0.07142048037392526,
+    "habitantes": 12575,
+    "n_hex": 14,
+    "n_hex_cubiertos": 1
+   },
+   {
+    "comuna": 13,
+    "riesgo": 0.22200076030811533,
+    "poblacion": 0.06838380226776264,
+    "habitantes": 15781,
+    "n_hex": 28,
+    "n_hex_cubiertos": 2
+   },
+   {
+    "comuna": 14,
+    "riesgo": 0.18922439575477484,
+    "poblacion": 0.06449787522027167,
+    "habitantes": 14611,
+    "n_hex": 31,
+    "n_hex_cubiertos": 2
+   },
+   {
+    "comuna": 12,
+    "riesgo": 0.06471109553908914,
+    "poblacion": 0.03812992029579966,
+    "habitantes": 7630,
+    "n_hex": 29,
+    "n_hex_cubiertos": 1
+   },
+   {
+    "comuna": 9,
+    "riesgo": 0.0473539319884251,
+    "poblacion": 0.03654646679458859,
+    "habitantes": 5913,
+    "n_hex": 32,
+    "n_hex_cubiertos": 1
+   },
+   {
+    "comuna": 8,
+    "riesgo": 0.03950442663976773,
+    "poblacion": 0.03553781731497888,
+    "habitantes": 6654,
+    "n_hex": 44,
+    "n_hex_cubiertos": 1
+   },
+   {
+    "comuna": 15,
+    "riesgo": 0.03710232136943589,
+    "poblacion": 0.03193651674453466,
+    "habitantes": 5831,
+    "n_hex": 28,
+    "n_hex_cubiertos": 1
+   },
+   {
+    "comuna": 7,
+    "riesgo": 0.032451160229741,
+    "poblacion": 0.03190125354670271,
+    "habitantes": 7037,
+    "n_hex": 25,
+    "n_hex_cubiertos": 1
+   },
+   {
+    "comuna": 4,
+    "riesgo": 0.04871648025626123,
+    "poblacion": 0.02929226514664582,
+    "habitantes": 6393,
+    "n_hex": 42,
+    "n_hex_cubiertos": 1
+   },
+   {
+    "comuna": 10,
+    "riesgo": 0.02476972169712025,
+    "poblacion": 0.02694580488545528,
+    "habitantes": 4474,
+    "n_hex": 25,
+    "n_hex_cubiertos": 1
+   },
+   {
+    "comuna": 11,
+    "riesgo": 0.018426383517548127,
+    "poblacion": 0.02335226235196505,
+    "habitantes": 4433,
+    "n_hex": 29,
+    "n_hex_cubiertos": 1
+   }
+  ],
+  "20": [
+   {
+    "comuna": 3,
+    "riesgo": 0.6629526716050298,
+    "poblacion": 0.6074530434583909,
+    "habitantes": 113920,
+    "n_hex": 13,
+    "n_hex_cubiertos": 7
+   },
+   {
+    "comuna": 1,
+    "riesgo": 0.675882618731669,
+    "poblacion": 0.46681236128220555,
+    "habitantes": 96110,
+    "n_hex": 36,
+    "n_hex_cubiertos": 13
+   },
+   {
+    "comuna": 5,
+    "riesgo": 0.39647825997717606,
+    "poblacion": 0.3419552526046355,
+    "habitantes": 61212,
+    "n_hex": 12,
+    "n_hex_cubiertos": 4
+   },
+   {
+    "comuna": 2,
+    "riesgo": 0.6396617007327192,
+    "poblacion": 0.3075545941274329,
+    "habitantes": 48573,
+    "n_hex": 13,
+    "n_hex_cubiertos": 4
+   },
+   {
+    "comuna": 7,
+    "riesgo": 0.09822600684374656,
+    "poblacion": 0.11957434719574453,
+    "habitantes": 26377,
+    "n_hex": 25,
+    "n_hex_cubiertos": 3
+   },
+   {
+    "comuna": 10,
+    "riesgo": 0.13663652154722372,
+    "poblacion": 0.10046709983130377,
+    "habitantes": 16680,
+    "n_hex": 25,
+    "n_hex_cubiertos": 3
+   },
+   {
+    "comuna": 6,
+    "riesgo": 0.07311919803281224,
+    "poblacion": 0.07142048037392526,
+    "habitantes": 12575,
+    "n_hex": 14,
+    "n_hex_cubiertos": 1
+   },
+   {
+    "comuna": 13,
+    "riesgo": 0.22200076030811533,
+    "poblacion": 0.06838380226776264,
+    "habitantes": 15781,
+    "n_hex": 28,
+    "n_hex_cubiertos": 2
+   },
+   {
+    "comuna": 14,
+    "riesgo": 0.18922439575477484,
+    "poblacion": 0.06449787522027167,
+    "habitantes": 14611,
+    "n_hex": 31,
+    "n_hex_cubiertos": 2
+   },
+   {
+    "comuna": 11,
+    "riesgo": 0.04798652240003324,
+    "poblacion": 0.045708328824468535,
+    "habitantes": 8677,
+    "n_hex": 29,
+    "n_hex_cubiertos": 1
+   },
+   {
+    "comuna": 12,
+    "riesgo": 0.06471109553908914,
+    "poblacion": 0.03812992029579966,
+    "habitantes": 7630,
+    "n_hex": 29,
+    "n_hex_cubiertos": 1
+   },
+   {
+    "comuna": 9,
+    "riesgo": 0.0473539319884251,
+    "poblacion": 0.03654646679458859,
+    "habitantes": 5913,
+    "n_hex": 32,
+    "n_hex_cubiertos": 1
+   },
+   {
+    "comuna": 8,
+    "riesgo": 0.03950442663976773,
+    "poblacion": 0.03553781731497888,
+    "habitantes": 6654,
+    "n_hex": 44,
+    "n_hex_cubiertos": 1
+   },
+   {
+    "comuna": 15,
+    "riesgo": 0.03710232136943589,
+    "poblacion": 0.03193651674453466,
+    "habitantes": 5831,
+    "n_hex": 28,
+    "n_hex_cubiertos": 1
+   },
+   {
+    "comuna": 4,
+    "riesgo": 0.04871648025626123,
+    "poblacion": 0.02929226514664582,
+    "habitantes": 6393,
+    "n_hex": 42,
+    "n_hex_cubiertos": 1
+   }
+  ],
+  "30": [
+   {
+    "comuna": 3,
+    "riesgo": 0.8305470353694363,
+    "poblacion": 0.7926439801233094,
+    "habitantes": 148650,
+    "n_hex": 13,
+    "n_hex_cubiertos": 9
+   },
+   {
+    "comuna": 5,
+    "riesgo": 0.6728969194588763,
+    "poblacion": 0.6178666027572601,
+    "habitantes": 110601,
+    "n_hex": 12,
+    "n_hex_cubiertos": 7
+   },
+   {
+    "comuna": 1,
+    "riesgo": 0.7248602506813939,
+    "poblacion": 0.4991224647144366,
+    "habitantes": 102762,
+    "n_hex": 36,
+    "n_hex_cubiertos": 14
+   },
+   {
+    "comuna": 2,
+    "riesgo": 0.6396617007327192,
+    "poblacion": 0.3075545941274329,
+    "habitantes": 48573,
+    "n_hex": 13,
+    "n_hex_cubiertos": 4
+   },
+   {
+    "comuna": 15,
+    "riesgo": 0.4116023685416919,
+    "poblacion": 0.2894823774794725,
+    "habitantes": 52852,
+    "n_hex": 28,
+    "n_hex_cubiertos": 7
+   },
+   {
+    "comuna": 6,
+    "riesgo": 0.21720682293598986,
+    "poblacion": 0.14284738292022764,
+    "habitantes": 25152,
+    "n_hex": 14,
+    "n_hex_cubiertos": 2
+   },
+   {
+    "comuna": 14,
+    "riesgo": 0.3419812290478734,
+    "poblacion": 0.12898996126014362,
+    "habitantes": 29221,
+    "n_hex": 31,
+    "n_hex_cubiertos": 4
+   },
+   {
+    "comuna": 7,
+    "riesgo": 0.09822600684374656,
+    "poblacion": 0.11957434719574453,
+    "habitantes": 26377,
+    "n_hex": 25,
+    "n_hex_cubiertos": 3
+   },
+   {
+    "comuna": 8,
+    "riesgo": 0.10350302926991069,
+    "poblacion": 0.10654144422480244,
+    "habitantes": 19949,
+    "n_hex": 44,
+    "n_hex_cubiertos": 3
+   },
+   {
+    "comuna": 10,
+    "riesgo": 0.13663652154722372,
+    "poblacion": 0.10046709983130377,
+    "habitantes": 16680,
+    "n_hex": 25,
+    "n_hex_cubiertos": 3
+   },
+   {
+    "comuna": 13,
+    "riesgo": 0.22200076030811533,
+    "poblacion": 0.06838380226776264,
+    "habitantes": 15781,
+    "n_hex": 28,
+    "n_hex_cubiertos": 2
+   },
+   {
+    "comuna": 11,
+    "riesgo": 0.04798652240003324,
+    "poblacion": 0.045708328824468535,
+    "habitantes": 8677,
+    "n_hex": 29,
+    "n_hex_cubiertos": 1
+   },
+   {
+    "comuna": 12,
+    "riesgo": 0.06471109553908914,
+    "poblacion": 0.03812992029579966,
+    "habitantes": 7630,
+    "n_hex": 29,
+    "n_hex_cubiertos": 1
+   },
+   {
+    "comuna": 9,
+    "riesgo": 0.12715666769229952,
+    "poblacion": 0.034100137088464655,
+    "habitantes": 5517,
+    "n_hex": 32,
+    "n_hex_cubiertos": 1
+   },
+   {
+    "comuna": 4,
+    "riesgo": 0.04871648025626123,
+    "poblacion": 0.02929226514664582,
+    "habitantes": 6393,
+    "n_hex": 42,
+    "n_hex_cubiertos": 1
+   }
+  ],
+  "40": [
+   {
+    "comuna": 3,
+    "riesgo": 0.8713825137806905,
+    "poblacion": 0.8444772674354015,
+    "habitantes": 158371,
+    "n_hex": 13,
+    "n_hex_cubiertos": 10
+   },
+   {
+    "comuna": 1,
+    "riesgo": 0.8742467339542206,
+    "poblacion": 0.7073665037341055,
+    "habitantes": 145637,
+    "n_hex": 36,
+    "n_hex_cubiertos": 18
+   },
+   {
+    "comuna": 5,
+    "riesgo": 0.6728969194588763,
+    "poblacion": 0.6178666027572601,
+    "habitantes": 110601,
+    "n_hex": 12,
+    "n_hex_cubiertos": 7
+   },
+   {
+    "comuna": 2,
+    "riesgo": 0.7688768833222058,
+    "poblacion": 0.4613896731588534,
+    "habitantes": 72868,
+    "n_hex": 13,
+    "n_hex_cubiertos": 6
+   },
+   {
+    "comuna": 15,
+    "riesgo": 0.4116023685416919,
+    "poblacion": 0.2894823774794725,
+    "habitantes": 52852,
+    "n_hex": 28,
+    "n_hex_cubiertos": 7
+   },
+   {
+    "comuna": 8,
+    "riesgo": 0.2068976586203581,
+    "poblacion": 0.21309969112769173,
+    "habitantes": 39900,
+    "n_hex": 44,
+    "n_hex_cubiertos": 6
+   },
+   {
+    "comuna": 7,
+    "riesgo": 0.18456462191280995,
+    "poblacion": 0.19527617910100428,
+    "habitantes": 43076,
+    "n_hex": 25,
+    "n_hex_cubiertos": 5
+   },
+   {
+    "comuna": 14,
+    "riesgo": 0.41955210757398037,
+    "poblacion": 0.19349097774487206,
+    "habitantes": 43832,
+    "n_hex": 31,
+    "n_hex_cubiertos": 6
+   },
+   {
+    "comuna": 6,
+    "riesgo": 0.21720682293598986,
+    "poblacion": 0.14284738292022764,
+    "habitantes": 25152,
+    "n_hex": 14,
+    "n_hex_cubiertos": 2
+   },
+   {
+    "comuna": 4,
+    "riesgo": 0.17476009873121415,
+    "poblacion": 0.12856989703483826,
+    "habitantes": 28060,
+    "n_hex": 42,
+    "n_hex_cubiertos": 5
+   },
+   {
+    "comuna": 10,
+    "riesgo": 0.13663652154722372,
+    "poblacion": 0.10046709983130377,
+    "habitantes": 16680,
+    "n_hex": 25,
+    "n_hex_cubiertos": 3
+   },
+   {
+    "comuna": 13,
+    "riesgo": 0.22200076030811533,
+    "poblacion": 0.06838380226776264,
+    "habitantes": 15781,
+    "n_hex": 28,
+    "n_hex_cubiertos": 2
+   },
+   {
+    "comuna": 11,
+    "riesgo": 0.04798652240003324,
+    "poblacion": 0.045708328824468535,
+    "habitantes": 8677,
+    "n_hex": 29,
+    "n_hex_cubiertos": 1
+   },
+   {
+    "comuna": 12,
+    "riesgo": 0.06471109553908914,
+    "poblacion": 0.03812992029579966,
+    "habitantes": 7630,
+    "n_hex": 29,
+    "n_hex_cubiertos": 1
+   },
+   {
+    "comuna": 9,
+    "riesgo": 0.12715666769229952,
+    "poblacion": 0.034100137088464655,
+    "habitantes": 5517,
+    "n_hex": 32,
+    "n_hex_cubiertos": 1
+   }
+  ],
+  "50": [
+   {
+    "comuna": 3,
+    "riesgo": 0.8713825137806905,
+    "poblacion": 0.8444772674354015,
+    "habitantes": 158371,
+    "n_hex": 13,
+    "n_hex_cubiertos": 10
+   },
+   {
+    "comuna": 1,
+    "riesgo": 0.9135261772445639,
+    "poblacion": 0.7940209286120975,
+    "habitantes": 163478,
+    "n_hex": 36,
+    "n_hex_cubiertos": 21
+   },
+   {
+    "comuna": 5,
+    "riesgo": 0.6728969194588763,
+    "poblacion": 0.6178666027572601,
+    "habitantes": 110601,
+    "n_hex": 12,
+    "n_hex_cubiertos": 7
+   },
+   {
+    "comuna": 2,
+    "riesgo": 0.8893833800460125,
+    "poblacion": 0.538291824909168,
+    "habitantes": 85014,
+    "n_hex": 13,
+    "n_hex_cubiertos": 7
+   },
+   {
+    "comuna": 14,
+    "riesgo": 0.5579395988904375,
+    "poblacion": 0.2902434581893494,
+    "habitantes": 65750,
+    "n_hex": 31,
+    "n_hex_cubiertos": 9
+   },
+   {
+    "comuna": 15,
+    "riesgo": 0.4532596688760861,
+    "poblacion": 0.2894900069288319,
+    "habitantes": 52853,
+    "n_hex": 28,
+    "n_hex_cubiertos": 7
+   },
+   {
+    "comuna": 7,
+    "riesgo": 0.32426377094265046,
+    "poblacion": 0.28291023466922033,
+    "habitantes": 62407,
+    "n_hex": 25,
+    "n_hex_cubiertos": 7
+   },
+   {
+    "comuna": 8,
+    "riesgo": 0.22193775558824003,
+    "poblacion": 0.22780032580297932,
+    "habitantes": 42653,
+    "n_hex": 44,
+    "n_hex_cubiertos": 7
+   },
+   {
+    "comuna": 4,
+    "riesgo": 0.3068424502776606,
+    "poblacion": 0.22470356864914365,
+    "habitantes": 49040,
+    "n_hex": 42,
+    "n_hex_cubiertos": 9
+   },
+   {
+    "comuna": 13,
+    "riesgo": 0.356984062026782,
+    "poblacion": 0.159496971773821,
+    "habitantes": 36807,
+    "n_hex": 28,
+    "n_hex_cubiertos": 4
+   },
+   {
+    "comuna": 6,
+    "riesgo": 0.21720682293598986,
+    "poblacion": 0.14284738292022764,
+    "habitantes": 25152,
+    "n_hex": 14,
+    "n_hex_cubiertos": 2
+   },
+   {
+    "comuna": 10,
+    "riesgo": 0.13663652154722372,
+    "poblacion": 0.10046709983130377,
+    "habitantes": 16680,
+    "n_hex": 25,
+    "n_hex_cubiertos": 3
+   },
+   {
+    "comuna": 11,
+    "riesgo": 0.04798652240003324,
+    "poblacion": 0.045708328824468535,
+    "habitantes": 8677,
+    "n_hex": 29,
+    "n_hex_cubiertos": 1
+   },
+   {
+    "comuna": 12,
+    "riesgo": 0.06471109553908914,
+    "poblacion": 0.03812992029579966,
+    "habitantes": 7630,
+    "n_hex": 29,
+    "n_hex_cubiertos": 1
+   },
+   {
+    "comuna": 9,
+    "riesgo": 0.12715666769229952,
+    "poblacion": 0.034100137088464655,
+    "habitantes": 5517,
+    "n_hex": 32,
+    "n_hex_cubiertos": 1
+   }
+  ],
+  "60": [
+   {
+    "comuna": 3,
+    "riesgo": 0.9271637842651438,
+    "poblacion": 0.8963219907473592,
+    "habitantes": 168094,
+    "n_hex": 13,
+    "n_hex_cubiertos": 11
+   },
+   {
+    "comuna": 1,
+    "riesgo": 0.9135261772445639,
+    "poblacion": 0.7940209286120975,
+    "habitantes": 163478,
+    "n_hex": 36,
+    "n_hex_cubiertos": 21
+   },
+   {
+    "comuna": 5,
+    "riesgo": 0.7712568210969482,
+    "poblacion": 0.7098681085217465,
+    "habitantes": 127070,
+    "n_hex": 12,
+    "n_hex_cubiertos": 8
+   },
+   {
+    "comuna": 2,
+    "riesgo": 0.8893833800460125,
+    "poblacion": 0.538291824909168,
+    "habitantes": 85014,
+    "n_hex": 13,
+    "n_hex_cubiertos": 7
+   },
+   {
+    "comuna": 7,
+    "riesgo": 0.4972249788082284,
+    "poblacion": 0.41437064348925123,
+    "habitantes": 91406,
+    "n_hex": 25,
+    "n_hex_cubiertos": 10
+   },
+   {
+    "comuna": 14,
+    "riesgo": 0.6156464100784216,
+    "poblacion": 0.32248673354772006,
+    "habitantes": 73054,
+    "n_hex": 31,
+    "n_hex_cubiertos": 10
+   },
+   {
+    "comuna": 15,
+    "riesgo": 0.4532596688760861,
+    "poblacion": 0.2894900069288319,
+    "habitantes": 52853,
+    "n_hex": 28,
+    "n_hex_cubiertos": 7
+   },
+   {
+    "comuna": 4,
+    "riesgo": 0.3644912014068321,
+    "poblacion": 0.26382625524178305,
+    "habitantes": 57579,
+    "n_hex": 42,
+    "n_hex_cubiertos": 11
+   },
+   {
+    "comuna": 8,
+    "riesgo": 0.2614421822280078,
+    "poblacion": 0.2633381431179582,
+    "habitantes": 49307,
+    "n_hex": 44,
+    "n_hex_cubiertos": 8
+   },
+   {
+    "comuna": 10,
+    "riesgo": 0.2556790140203536,
+    "poblacion": 0.21112843186183802,
+    "habitantes": 35052,
+    "n_hex": 25,
+    "n_hex_cubiertos": 5
+   },
+   {
+    "comuna": 11,
+    "riesgo": 0.20540076828818832,
+    "poblacion": 0.18304474733718148,
+    "habitantes": 34748,
+    "n_hex": 29,
+    "n_hex_cubiertos": 6
+   },
+   {
+    "comuna": 13,
+    "riesgo": 0.356984062026782,
+    "poblacion": 0.159496971773821,
+    "habitantes": 36807,
+    "n_hex": 28,
+    "n_hex_cubiertos": 4
+   },
+   {
+    "comuna": 6,
+    "riesgo": 0.21720682293598986,
+    "poblacion": 0.14284738292022764,
+    "habitantes": 25152,
+    "n_hex": 14,
+    "n_hex_cubiertos": 2
+   },
+   {
+    "comuna": 9,
+    "riesgo": 0.1745105996807246,
+    "poblacion": 0.07064660388305324,
+    "habitantes": 11430,
+    "n_hex": 32,
+    "n_hex_cubiertos": 2
+   },
+   {
+    "comuna": 12,
+    "riesgo": 0.06471109553908914,
+    "poblacion": 0.03812992029579966,
+    "habitantes": 7630,
+    "n_hex": 29,
+    "n_hex_cubiertos": 1
+   }
+  ],
+  "75": [
+   {
+    "comuna": 3,
+    "riesgo": 0.9271637842651438,
+    "poblacion": 0.8963219907473592,
+    "habitantes": 168094,
+    "n_hex": 13,
+    "n_hex_cubiertos": 11
+   },
+   {
+    "comuna": 1,
+    "riesgo": 0.9135261772445639,
+    "poblacion": 0.7940209286120975,
+    "habitantes": 163478,
+    "n_hex": 36,
+    "n_hex_cubiertos": 21
+   },
+   {
+    "comuna": 5,
+    "riesgo": 0.7712568210969482,
+    "poblacion": 0.7098681085217465,
+    "habitantes": 127070,
+    "n_hex": 12,
+    "n_hex_cubiertos": 8
+   },
+   {
+    "comuna": 2,
+    "riesgo": 0.9752464705819373,
+    "poblacion": 0.6152109360901794,
+    "habitantes": 97161,
+    "n_hex": 13,
+    "n_hex_cubiertos": 8
+   },
+   {
+    "comuna": 6,
+    "riesgo": 0.5558421861475349,
+    "poblacion": 0.4285585068844447,
+    "habitantes": 75459,
+    "n_hex": 14,
+    "n_hex_cubiertos": 6
+   },
+   {
+    "comuna": 7,
+    "riesgo": 0.4972249788082284,
+    "poblacion": 0.41437064348925123,
+    "habitantes": 91406,
+    "n_hex": 25,
+    "n_hex_cubiertos": 10
+   },
+   {
+    "comuna": 15,
+    "riesgo": 0.5871662392092241,
+    "poblacion": 0.3968309124702341,
+    "habitantes": 72451,
+    "n_hex": 28,
+    "n_hex_cubiertos": 10
+   },
+   {
+    "comuna": 14,
+    "riesgo": 0.6701499115509787,
+    "poblacion": 0.3547455506920967,
+    "habitantes": 80362,
+    "n_hex": 31,
+    "n_hex_cubiertos": 11
+   },
+   {
+    "comuna": 13,
+    "riesgo": 0.5481099158286783,
+    "poblacion": 0.3244475209294032,
+    "habitantes": 74872,
+    "n_hex": 28,
+    "n_hex_cubiertos": 9
+   },
+   {
+    "comuna": 4,
+    "riesgo": 0.4088505908884521,
+    "poblacion": 0.3014108064407608,
+    "habitantes": 65781,
+    "n_hex": 42,
+    "n_hex_cubiertos": 13
+   },
+   {
+    "comuna": 8,
+    "riesgo": 0.33205223852668997,
+    "poblacion": 0.2780355339409103,
+    "habitantes": 52059,
+    "n_hex": 44,
+    "n_hex_cubiertos": 9
+   },
+   {
+    "comuna": 10,
+    "riesgo": 0.2556790140203536,
+    "poblacion": 0.21112843186183802,
+    "habitantes": 35052,
+    "n_hex": 25,
+    "n_hex_cubiertos": 5
+   },
+   {
+    "comuna": 11,
+    "riesgo": 0.20540076828818832,
+    "poblacion": 0.18304474733718148,
+    "habitantes": 34748,
+    "n_hex": 29,
+    "n_hex_cubiertos": 6
+   },
+   {
+    "comuna": 12,
+    "riesgo": 0.24485849780715052,
+    "poblacion": 0.17023347796559055,
+    "habitantes": 34066,
+    "n_hex": 29,
+    "n_hex_cubiertos": 5
+   },
+   {
+    "comuna": 9,
+    "riesgo": 0.1745105996807246,
+    "poblacion": 0.07064660388305324,
+    "habitantes": 11430,
+    "n_hex": 32,
+    "n_hex_cubiertos": 2
+   }
+  ],
+  "90": [
+   {
+    "comuna": 3,
+    "riesgo": 0.9700945879566314,
+    "poblacion": 0.9481599412252918,
+    "habitantes": 177815,
+    "n_hex": 13,
+    "n_hex_cubiertos": 12
+   },
+   {
+    "comuna": 1,
+    "riesgo": 0.9618293453791714,
+    "poblacion": 0.8517822128285847,
+    "habitantes": 175370,
+    "n_hex": 36,
+    "n_hex_cubiertos": 23
+   },
+   {
+    "comuna": 5,
+    "riesgo": 0.7712568210969482,
+    "poblacion": 0.7098681085217465,
+    "habitantes": 127070,
+    "n_hex": 12,
+    "n_hex_cubiertos": 8
+   },
+   {
+    "comuna": 2,
+    "riesgo": 0.9752464705819373,
+    "poblacion": 0.6152109360901794,
+    "habitantes": 97161,
+    "n_hex": 13,
+    "n_hex_cubiertos": 8
+   },
+   {
+    "comuna": 6,
+    "riesgo": 0.7074844255005086,
+    "poblacion": 0.5714531617711904,
+    "habitantes": 100619,
+    "n_hex": 14,
+    "n_hex_cubiertos": 8
+   },
+   {
+    "comuna": 15,
+    "riesgo": 0.6822692823499854,
+    "poblacion": 0.48270450417339716,
+    "habitantes": 88129,
+    "n_hex": 28,
+    "n_hex_cubiertos": 12
+   },
+   {
+    "comuna": 7,
+    "riesgo": 0.5479725907806853,
+    "poblacion": 0.45818696131981584,
+    "habitantes": 101072,
+    "n_hex": 25,
+    "n_hex_cubiertos": 11
+   },
+   {
+    "comuna": 13,
+    "riesgo": 0.6302873892988252,
+    "poblacion": 0.4383142266909,
+    "habitantes": 101148,
+    "n_hex": 28,
+    "n_hex_cubiertos": 11
+   },
+   {
+    "comuna": 14,
+    "riesgo": 0.7155907358323207,
+    "poblacion": 0.3869846113725117,
+    "habitantes": 87665,
+    "n_hex": 31,
+    "n_hex_cubiertos": 12
+   },
+   {
+    "comuna": 8,
+    "riesgo": 0.4478252553502589,
+    "poblacion": 0.32825197589184013,
+    "habitantes": 61461,
+    "n_hex": 44,
+    "n_hex_cubiertos": 11
+   },
+   {
+    "comuna": 4,
+    "riesgo": 0.4503569045342301,
+    "poblacion": 0.3201944101616209,
+    "habitantes": 69881,
+    "n_hex": 42,
+    "n_hex_cubiertos": 14
+   },
+   {
+    "comuna": 10,
+    "riesgo": 0.34208495241847,
+    "poblacion": 0.2865634623131972,
+    "habitantes": 47576,
+    "n_hex": 25,
+    "n_hex_cubiertos": 6
+   },
+   {
+    "comuna": 12,
+    "riesgo": 0.3252649160196723,
+    "poblacion": 0.24650855715772896,
+    "habitantes": 49330,
+    "n_hex": 29,
+    "n_hex_cubiertos": 7
+   },
+   {
+    "comuna": 11,
+    "riesgo": 0.20540076828818832,
+    "poblacion": 0.18304474733718148,
+    "habitantes": 34748,
+    "n_hex": 29,
+    "n_hex_cubiertos": 6
+   },
+   {
+    "comuna": 9,
+    "riesgo": 0.1745105996807246,
+    "poblacion": 0.07064660388305324,
+    "habitantes": 11430,
+    "n_hex": 32,
+    "n_hex_cubiertos": 2
+   }
+  ],
+  "110": [
+   {
+    "comuna": 3,
+    "riesgo": 0.9700945879566314,
+    "poblacion": 0.9481599412252918,
+    "habitantes": 177815,
+    "n_hex": 13,
+    "n_hex_cubiertos": 12
+   },
+   {
+    "comuna": 5,
+    "riesgo": 0.9074158929997564,
+    "poblacion": 0.8678815740522494,
+    "habitantes": 155355,
+    "n_hex": 12,
+    "n_hex_cubiertos": 10
+   },
+   {
+    "comuna": 1,
+    "riesgo": 0.9618293453791714,
+    "poblacion": 0.8517822128285847,
+    "habitantes": 175370,
+    "n_hex": 36,
+    "n_hex_cubiertos": 23
+   },
+   {
+    "comuna": 6,
+    "riesgo": 0.7703018281555297,
+    "poblacion": 0.642864310159361,
+    "habitantes": 113193,
+    "n_hex": 14,
+    "n_hex_cubiertos": 9
+   },
+   {
+    "comuna": 2,
+    "riesgo": 0.9752464705819373,
+    "poblacion": 0.6152109360901794,
+    "habitantes": 97161,
+    "n_hex": 13,
+    "n_hex_cubiertos": 8
+   },
+   {
+    "comuna": 7,
+    "riesgo": 0.6548607216300185,
+    "poblacion": 0.5896158514721631,
+    "habitantes": 130064,
+    "n_hex": 25,
+    "n_hex_cubiertos": 14
+   },
+   {
+    "comuna": 15,
+    "riesgo": 0.7060940547569622,
+    "poblacion": 0.5017522498468198,
+    "habitantes": 91607,
+    "n_hex": 28,
+    "n_hex_cubiertos": 13
+   },
+   {
+    "comuna": 13,
+    "riesgo": 0.6779997038847233,
+    "poblacion": 0.4724978888101254,
+    "habitantes": 109037,
+    "n_hex": 28,
+    "n_hex_cubiertos": 12
+   },
+   {
+    "comuna": 14,
+    "riesgo": 0.801000862904318,
+    "poblacion": 0.45148405936715064,
+    "habitantes": 102276,
+    "n_hex": 31,
+    "n_hex_cubiertos": 14
+   },
+   {
+    "comuna": 4,
+    "riesgo": 0.5977531229208998,
+    "poblacion": 0.4348432717831337,
+    "habitantes": 94902,
+    "n_hex": 42,
+    "n_hex_cubiertos": 18
+   },
+   {
+    "comuna": 8,
+    "riesgo": 0.5394988870237326,
+    "poblacion": 0.3784821079710298,
+    "habitantes": 70866,
+    "n_hex": 44,
+    "n_hex_cubiertos": 13
+   },
+   {
+    "comuna": 12,
+    "riesgo": 0.42814067788826465,
+    "poblacion": 0.36240685301330555,
+    "habitantes": 72523,
+    "n_hex": 29,
+    "n_hex_cubiertos": 10
+   },
+   {
+    "comuna": 10,
+    "riesgo": 0.4204738864088293,
+    "poblacion": 0.3518102781616477,
+    "habitantes": 58408,
+    "n_hex": 25,
+    "n_hex_cubiertos": 8
+   },
+   {
+    "comuna": 9,
+    "riesgo": 0.3679183003633547,
+    "poblacion": 0.24995042470349904,
+    "habitantes": 40441,
+    "n_hex": 32,
+    "n_hex_cubiertos": 8
+   },
+   {
+    "comuna": 11,
+    "riesgo": 0.20540076828818832,
+    "poblacion": 0.18304474733718148,
+    "habitantes": 34748,
+    "n_hex": 29,
+    "n_hex_cubiertos": 6
+   }
+  ]
+ }
+}
