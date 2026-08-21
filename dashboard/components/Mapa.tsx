@@ -8,7 +8,7 @@ import type {
   Superficie, TipoDelito, Turno,
 } from "@/lib/types";
 import {
-  claveDelitos, claveRiesgo, esDemografica, riesgoEsDelTipo, superficieInfo, tipoInfo,
+  claveDelitos, claveRiesgo, riesgoEsDelTipo, superficieInfo, tipoInfo,
 } from "@/lib/types";
 import { claseDe, cortesPorCuantil, leerToken, paletaEdad, paletaRiesgo } from "@/lib/escala";
 import { num, num1, num2, num3 } from "@/lib/formato";
@@ -146,9 +146,15 @@ export default function Mapa({
     const inactivo = leerToken("--risk-nulo", "#e2e8f0");
     const info = superficieInfo(superficie);
 
-    if (esDemografica(superficie)) {
+    /* La rama la decide la **unidad del dato**, no si es demografía: la
+       densidad también es demográfica y sin embargo se dibuja por barrio,
+       porque población y superficie existen a ese grano. */
+    if (info.unidad === "comuna") {
       const campo = info.campo!;
-      const valores = datos.comunasGeo.features.map((f) => f.properties[campo]);
+      // `?? NaN` y no `?? 0`: un valor faltante tiene que quedar fuera del
+      // cálculo de quintiles (cortesPorCuantil descarta los no finitos), no
+      // entrar como un cero que corre todos los cortes hacia abajo
+      const valores = datos.comunasGeo.features.map((f) => f.properties[campo] ?? NaN);
       const cortes = cortesPorCuantil(valores);
       const paleta = paletaEdad();
 
@@ -156,7 +162,7 @@ export default function Mapa({
         const p = (f?.properties ?? {}) as DemoComuna;
         const fuera = comuna !== null && p.comuna !== comuna;
         return {
-          fillColor: fuera ? inactivo : paleta[claseDe(p[campo], cortes)],
+          fillColor: fuera ? inactivo : paleta[claseDe(p[campo] ?? 0, cortes)],
           fillOpacity: fuera ? 0.25 : comuna === p.comuna ? 0.95 : 0.8,
           color: comuna === p.comuna ? leerToken("--brand", "#1e40af") : lineaBase,
           weight: comuna === p.comuna ? 2.5 : 0.9,
@@ -188,18 +194,30 @@ export default function Mapa({
       return;
     }
 
+    /* Las dos superficies que se dibujan por barrio —riesgo y densidad—
+       comparten capa y solo cambian de dónde sale el valor y con qué rampa se
+       pinta. La densidad no está en `barrios_riesgo.geojson`: vive en
+       `demografia.json` y se cruza por nombre acá, en vez de duplicarla en el
+       geojson, que es lo que garantiza que no se desincronicen. */
+    const porDensidad = superficie === "densidad";
+    const densidadDe = new Map(
+      datos.demografia.barrios.map((b) => [b.nombre, b.densidad]));
+
     const clave = claveRiesgo(turno, tipo);
     const claveD = claveDelitos(tipo);
-    const valores = datos.barrios.features.map((f) => f.properties[clave] as number);
+    const valorDe = (p: BarrioProps): number =>
+      porDensidad ? (densidadDe.get(p.nombre) ?? 0) : (p[clave] as number);
+
+    const valores = datos.barrios.features.map((f) => valorDe(f.properties));
     const cortes = cortesPorCuantil(valores);
-    const paleta = paletaRiesgo();
+    const paleta = porDensidad ? paletaEdad() : paletaRiesgo();
 
     const estilo = (f?: Feature): L.PathOptions => {
       const p = (f?.properties ?? {}) as BarrioProps;
       const fuera = comuna !== null && p.comuna !== comuna;
       const activo = barrioActivo === p.nombre;
       return {
-        fillColor: fuera ? inactivo : paleta[claseDe(p[clave] as number, cortes)],
+        fillColor: fuera ? inactivo : paleta[claseDe(valorDe(p), cortes)],
         fillOpacity: fuera ? 0.25 : activo ? 0.95 : 0.78,
         color: activo ? leerToken("--brand", "#1e40af") : lineaBase,
         weight: activo ? 2.5 : 0.7,
@@ -218,11 +236,18 @@ export default function Mapa({
           : `Riesgo ${TURNO_LABEL[turno]}${tipo === "todos" ? "" : " (agregado)"}`;
         const etiquetaDelitos =
           tipo === "todos" ? "Delitos 2025" : `${tipoInfo(tipo).label} 2025`;
+        const dens = densidadDe.get(p.nombre);
+        const lineaDensidad = dens == null ? ""
+          : `Densidad: <strong class="tabular">${num(dens)}</strong> hab/km²<br/>`;
         layer.bindTooltip(
           `<strong>${p.nombre}</strong><br/>` +
             `<span style="color:var(--text-secondary)">Comuna ${p.comuna ?? "—"} · ${p.n_hex} celdas</span><br/>` +
+            // cuando lo que se pinta es la densidad, va primera: el tooltip
+            // tiene que empezar por el número que explica el color
+            (porDensidad ? lineaDensidad : "") +
             `${etiquetaRiesgo}: <strong class="tabular">${num3(p[clave] as number)}</strong><br/>` +
             `${etiquetaDelitos}: <strong class="tabular">${num(p[claveD] as number)}</strong><br/>` +
+            (porDensidad ? "" : lineaDensidad) +
             `<span style="color:var(--text-secondary)">${num(p.poblacion as number)} hab.</span>`,
           { className: "sige-tip", sticky: true, direction: "top" },
         );

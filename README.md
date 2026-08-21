@@ -1128,9 +1128,17 @@ Dos decisiones de interfaz que salen de los datos:
 
 La tabla de barrios suma una columna **Habitantes**, pegada a la de "Cada 100k" y antes que ella: es su denominador, y verlos al lado explica de una por qué el ranking por conteo y el ranking por tasa no se parecen — Palermo tiene 226.534 habitantes y Puerto Madero 6.726, un rango de 34 a 1.
 
-### La edad en el mapa, y por qué se dibujan comunas y no barrios
+### La demografía en el mapa, y por qué cada superficie usa una unidad distinta
 
-El mapa dibujaba siempre riesgo por barrio; ahora el selector **"Superficie del mapa"** lo cambia entre eso y dos superficies de edad (65 y más, 0 a 14). No es un modo de color: **cambia la geometría que se dibuja**, de 48 polígonos a 15.
+El mapa dibujaba siempre riesgo por barrio; ahora el selector **"Superficie del mapa"** lo cambia entre eso, la densidad de población y dos superficies de edad (65 y más, 0 a 14). No es un modo de color: **cambia la geometría que se dibuja**.
+
+| Superficie | Se dibuja por | Por qué |
+|---|---|---|
+| Riesgo | barrio (48) | el modelo predice por hexágono y se agrega a barrio |
+| Densidad | **barrio** (48) | población y superficie existen a ese grano |
+| Edad · 65 y más / 0 a 14 | **comuna** (15) | el Censo 2022 no está publicado más fino |
+
+La regla es una sola: **cada superficie se dibuja en la unidad más fina que su dato realmente tenga**, y el título del mapa la nombra. Por eso la rama del código no pregunta "¿esto es demografía?" sino "¿en qué unidad vive este dato?" — la densidad es demografía y aun así va por barrio.
 
 Esa es la decisión de fondo. La edad solo existe por comuna, así que pintar los 48 barrios con el valor de su comuna mostraría 48 formas donde hay 15 datos, y los límites internos invitarían a leer una diferencia entre Palermo y Colegiales que en el dato no está. Dibujar la unidad que el dato tiene evita esa lectura sin necesidad de ninguna advertencia. No había dataset de comunas con geometría en el repo: se disuelven los barrios (`unary_union`), que es exacto porque cada barrio pertenece a una sola comuna, y sale `comunas.geojson` — 68 KB con 5 m de tolerancia de simplificación, que a este zoom no se distingue y baja el archivo a la mitad.
 
@@ -1139,6 +1147,10 @@ Esa es la decisión de fondo. La edad solo existe por comuna, así que pintar lo
 Con una superficie demográfica el mapa **deja de responder al turno y al tipo de delito**, que siguen arriba y siguen filtrando el resto del tablero. Va dicho en una franja bajo el mapa: sin eso, mover el turno y ver el mapa quieto se lee como que el tablero se rompió — el mismo problema que ya tenía el filtro por tipo con Vialidad y Homicidios.
 
 Lo que se ve: el sur (comunas 4 y 8) concentra los chicos y el norte y centro los mayores, con la Comuna 8 en 22,2% de 0 a 14 contra 11,1% de la Comuna 2, y dado vuelta en los mayores. Es la inversión más nítida que muestra el tablero, y no sale del modelo.
+
+La densidad **no vive en `barrios_riesgo.geojson`**: está en `demografia.json` y se cruza por nombre en el momento de pintar. Duplicarla en el geojson sería más directo, pero es exactamente cómo dos copias del mismo número terminan desincronizándose — el problema que este README ya tiene documentado tres veces. El tooltip del barrio la muestra siempre, y la pone **primero** cuando es lo que da el color: un tooltip tiene que empezar por el número que explica lo que se está viendo.
+
+Lo que se ve en densidad: el rango entre barrios es de **34 a 1** en población (Palermo 226.534, Puerto Madero 6.726) pero de **24 a 1** en densidad (32.512 hab/km² contra 1.334). Son dos mapas distintos, y esa es justamente la razón por la que el tablero rankea por tasa cada 100.000 y no por conteo.
 
 ## Módulo 3D — la Ciudad construida (`pipeline/ingest_tejido_urbano.py`, `build_base_3d.py`, `dashboard/app/3d/`)
 

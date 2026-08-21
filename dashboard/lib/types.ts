@@ -53,22 +53,30 @@ export const tipoInfo = (t: TipoDelito) => TIPOS.find((x) => x.key === t)!;
  *  filtro de tipo — cambia la geometría que se dibuja, no solo el color.
  */
 
-export type Superficie = "riesgo" | "mayores" | "chicos";
+export type Superficie = "riesgo" | "densidad" | "mayores" | "chicos";
 
 export const SUPERFICIES: {
   key: Superficie; label: string; corto: string; descripcion: string;
-  /** Unidad espacial real del dato. La leyenda y el título la nombran. */
+  /** Unidad espacial real del dato, que es la que se dibuja. Cada superficie
+   *  usa la más fina que exista para ella: la densidad llega a barrio porque
+   *  población y superficie están por barrio; la edad se queda en comuna. */
   unidad: "barrio" | "comuna";
-  /** Campo de `DemoComuna` a pintar. Vacío para el riesgo, que sale de otro lado. */
-  campo?: "pct_65" | "pct_0_14";
+  /** Campo demográfico a pintar. Vacío para el riesgo, que sale de otro lado. */
+  campo?: "densidad" | "pct_65" | "pct_0_14";
+  /** Cómo se escriben los cortes de la leyenda. */
+  formato: "riesgo" | "pct" | "entero";
 }[] = [
   { key: "riesgo", label: "Riesgo por barrio", corto: "Riesgo", unidad: "barrio",
+    formato: "riesgo",
     descripcion: "Score del modelo por barrio y turno" },
+  { key: "densidad", label: "Densidad de población", corto: "Densidad", unidad: "barrio",
+    campo: "densidad", formato: "entero",
+    descripcion: "Habitantes por km², Censo 2010 · por barrio" },
   { key: "mayores", label: "Edad · 65 y más", corto: "65 y más", unidad: "comuna",
-    campo: "pct_65",
+    campo: "pct_65", formato: "pct",
     descripcion: "% de población de 65 años y más, Censo 2022 · solo hay dato por comuna" },
   { key: "chicos", label: "Edad · 0 a 14", corto: "0 a 14", unidad: "comuna",
-    campo: "pct_0_14",
+    campo: "pct_0_14", formato: "pct",
     descripcion: "% de población de 0 a 14 años, Censo 2022 · solo hay dato por comuna" },
 ];
 

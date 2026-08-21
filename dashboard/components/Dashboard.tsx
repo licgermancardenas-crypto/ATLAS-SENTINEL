@@ -249,8 +249,10 @@ export default function Dashboard() {
   // los cortes de la leyenda salen del mismo conjunto que pinta el mapa: los 48
   // barrios para el riesgo, las 15 comunas para la edad. Calcularlos siempre
   // sobre barrios dejaría la escala diciendo una cosa y el mapa otra.
-  const cortes = demografica
-    ? cortesPorCuantil(datos.comunasGeo.features.map((f) => f.properties[supInfo.campo!]))
+  const cortes = supInfo.unidad === "comuna"
+    ? cortesPorCuantil(datos.comunasGeo.features.map((f) => f.properties[supInfo.campo!] ?? NaN))
+    : superficie === "densidad"
+    ? cortesPorCuantil(datos.demografia.barrios.map((b) => b.densidad ?? NaN))
     : cortesPorCuantil(props.map((b) => b[clave] as number));
 
   // la cascada de frecuencias sí puede seguir la selección territorial, porque
@@ -312,7 +314,7 @@ export default function Dashboard() {
             <div className="px-3 py-2 border-b border-line flex items-center justify-between gap-3 flex-wrap">
               <div className="min-w-0">
                 <h2 className="text-xs font-semibold uppercase tracking-[0.07em] text-ink-2">
-                  {demografica ? `${supInfo.label} · por comuna`
+                  {demografica ? `${supInfo.label} · por ${supInfo.unidad}`
                     : superficiePropia ? `Riesgo de ${tipoInfo(tipo).label.toLowerCase()} por barrio`
                     : "Riesgo por barrio"}
                 </h2>
@@ -320,7 +322,7 @@ export default function Dashboard() {
                   {demografica ? supInfo.descripcion : capaInfo.descripcion}
                 </p>
               </div>
-              <Leyenda cortes={cortes} demografica={demografica} />
+              <Leyenda cortes={cortes} demografica={demografica} formato={supInfo.formato} />
             </div>
             <div className="flex-1 min-h-0">
               <Mapa
@@ -412,9 +414,12 @@ export default function Dashboard() {
    la misma rampa, un mapa de "% de mayores de 65" sale del color del peligro y
    se lee como uno. Los cortes son quintiles en los dos casos, pero sobre
    conjuntos distintos — 48 barrios o 15 comunas. */
-function Leyenda({ cortes, demografica }: { cortes: number[]; demografica: boolean }) {
+function Leyenda({
+  cortes, demografica, formato,
+}: { cortes: number[]; demografica: boolean; formato: "riesgo" | "pct" | "entero" }) {
   const vars = demografica ? VAR_EDAD : VAR_RIESGO;
-  const fmt = (v: number) => (demografica ? `${num1(v)}%` : num3(v));
+  const fmt = (v: number) =>
+    formato === "pct" ? `${num1(v)}%` : formato === "entero" ? num(v) : num3(v);
   return (
     <div className="flex items-center gap-2 shrink-0">
       <span className="text-[10px] text-ink-muted">{demografica ? "menos" : "bajo"}</span>
@@ -444,10 +449,14 @@ function AvisoSuperficie({
      tipo, que siguen puestos arriba y siguen filtrando el resto del tablero.
      Sin este cartel, mover el turno y ver el mapa quieto se lee como un bug. */
   if (esDemografica(superficie)) {
+    const info = superficieInfo(superficie);
     return (
       <Aviso>
-        El mapa dibuja demografía por comuna: no cambia con el turno ni con el tipo de delito,
-        que siguen filtrando el resto del tablero. El Censo 2022 no está publicado por barrio.
+        El mapa dibuja demografía por {info.unidad}: no cambia con el turno ni con el tipo de
+        delito, que siguen filtrando el resto del tablero.{" "}
+        {info.unidad === "comuna"
+          ? "El Censo 2022 no está publicado por barrio."
+          : "La densidad divide la población del Censo 2010 por la superficie del polígono."}
       </Aviso>
     );
   }
