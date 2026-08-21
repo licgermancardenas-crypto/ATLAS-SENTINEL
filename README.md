@@ -1137,6 +1137,7 @@ El mapa dibujaba siempre riesgo por barrio; ahora el selector **"Superficie del 
 | Riesgo | barrio (48) | el modelo predice por hexágono y se agrega a barrio |
 | Densidad | **barrio** (48) | población y superficie existen a ese grano |
 | Hogares con NBI | **barrio** (48) | el NBI está por radio censal y se agrega exacto |
+| Hacinamiento crítico | **comuna** (15) | no está publicado por radio, y no hay cómo bajarlo |
 | Edad · 65 y más / 0 a 14 | **comuna** (15) | el Censo 2022 no está publicado más fino |
 
 La regla es una sola: **cada superficie se dibuja en la unidad más fina que su dato realmente tenga**, y el título del mapa la nombra. Por eso la rama del código no pregunta "¿esto es demografía?" sino "¿en qué unidad vive este dato?" — la densidad es demografía y aun así va por barrio.
@@ -1164,6 +1165,14 @@ Control: sumando `hogares_con_nbi` y `hogares_total` por comuna, el resultado co
 Los hogares **no se reconcilian** contra un archivo oficial por barrio, porque no existe: quedan como la suma de radios. La consecuencia es que el hogar del radio de borde Belgrano/Núñez cuenta de un lado distinto que sus habitantes; sobre 1.150.134 hogares no mueve ningún porcentaje, y la alternativa —inventar un reparto— sería peor que la inconsistencia.
 
 Ciudad: **5,98%** de los hogares (68.776 de 1.150.134). Por barrio va de Constitución (24,3%), La Boca (21,2%) y Monserrat (19,2%) a Versalles (0,8%).
+
+### Hacinamiento, la única capa que no se puede bajar de comuna
+
+`socioeconomico_comuna.parquet` trae las tres categorías —sin hacinamiento, no crítico (2 a 3 personas por cuarto) y crítico (más de 3)— y suman 100. **No están en `radios_censales`**, así que a diferencia del NBI acá no hay agregación posible: el dato nace por comuna y ahí se queda. Es la razón por la que el README de Capa 0 anota "hacinamiento por comuna (no hay a nivel radio)" desde el principio.
+
+El promedio de Ciudad se pondera **por hogares y no por comuna**: la 8 tiene 58.204 hogares y la 2 bastante menos, y pesar las quince igual daría un número que no le corresponde a nadie. Da **1,53%** de hogares con hacinamiento crítico. Por comuna va de 5,1% (Comuna 8) a 0,4% (comunas 2, 12 y 13) — un rango de 13 a 1, más marcado que el de NBI.
+
+Va con la misma advertencia que el NBI y una propia. En la auditoría de equidad, el hacinamiento es **la única variable cuya correlación con el riesgo predicho cambia de signo** al controlar por historial delictivo (0,05 → −0,28). Está anotado como señal a vigilar y no como hallazgo, y el tablero repite esa distinción: con quince comunas la correlación parcial tiene muy pocos grados de libertad y no alcanza para concluir en ningún sentido.
 
 **El mapa de NBI no es un mapa de riesgo, y el tablero lo dice donde se cometería el error** — en la franja bajo el mapa, con el número de la auditoría de equidad: la correlación entre NBI y riesgo predicho por comuna cae de 0,41 a 0,14 al controlar por historial delictivo. Es también la razón por la que las superficies demográficas usan una rampa azul y no la ámbar del riesgo.
 

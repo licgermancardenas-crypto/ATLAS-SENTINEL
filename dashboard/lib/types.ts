@@ -53,7 +53,8 @@ export const tipoInfo = (t: TipoDelito) => TIPOS.find((x) => x.key === t)!;
  *  filtro de tipo — cambia la geometría que se dibuja, no solo el color.
  */
 
-export type Superficie = "riesgo" | "densidad" | "nbi" | "mayores" | "chicos";
+export type Superficie =
+  | "riesgo" | "densidad" | "nbi" | "hacinamiento" | "mayores" | "chicos";
 
 export const SUPERFICIES: {
   key: Superficie; label: string; corto: string; descripcion: string;
@@ -62,7 +63,7 @@ export const SUPERFICIES: {
    *  población y superficie están por barrio; la edad se queda en comuna. */
   unidad: "barrio" | "comuna";
   /** Campo demográfico a pintar. Vacío para el riesgo, que sale de otro lado. */
-  campo?: "densidad" | "pct_nbi" | "pct_65" | "pct_0_14";
+  campo?: "densidad" | "pct_nbi" | "pct_hacinamiento_critico" | "pct_65" | "pct_0_14";
   /** Cómo se escriben los cortes de la leyenda. */
   formato: "riesgo" | "pct" | "entero";
 }[] = [
@@ -75,6 +76,9 @@ export const SUPERFICIES: {
   { key: "nbi", label: "Hogares con NBI", corto: "NBI", unidad: "barrio",
     campo: "pct_nbi", formato: "pct",
     descripcion: "% de hogares con Necesidades Básicas Insatisfechas, Censo 2010 · por barrio" },
+  { key: "hacinamiento", label: "Hacinamiento crítico", corto: "Hacinamiento", unidad: "comuna",
+    campo: "pct_hacinamiento_critico", formato: "pct",
+    descripcion: "% de hogares con más de 3 personas por cuarto, Censo 2010 · solo hay dato por comuna" },
   { key: "mayores", label: "Edad · 65 y más", corto: "65 y más", unidad: "comuna",
     campo: "pct_65", formato: "pct",
     descripcion: "% de población de 65 años y más, Censo 2022 · solo hay dato por comuna" },
@@ -327,6 +331,10 @@ export interface DemoComuna extends Omit<DemoBarrio, "nombre"> {
   envejecimiento: number;
   /** ((0-14 + 65+) / 15-64) × 100. */
   dependencia: number;
+  /** Los tres suman 100. Hacinamiento crítico es más de 3 personas por cuarto. */
+  pct_sin_hacinamiento: number;
+  pct_hacinamiento_no_critico: number;
+  pct_hacinamiento_critico: number;
 }
 
 export type ComunasGeoJSON = FeatureCollection<Polygon | MultiPolygon, DemoComuna>;
@@ -339,6 +347,7 @@ export interface Demografia {
   nbi: {
     anio: number; hogares: number; hogares_nbi: number; pct: number; fuente: string;
   };
+  hacinamiento: { anio: number; pct_critico: number; fuente: string };
   edad: {
     anio: number; total: number;
     hab_0_14: number; hab_15_64: number; hab_65: number;
@@ -351,6 +360,8 @@ export interface Demografia {
     edad_derivada: string;
     dos_censos: string;
     nbi: string;
+    hacinamiento: string;
+    hacinamiento_senal_debil: string;
     nbi_no_es_riesgo: string;
     denominador: string;
   };

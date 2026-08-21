@@ -600,6 +600,10 @@ def exportar_demografia() -> None:
     edad = pd.read_parquet(demo)
     sb = pd.read_parquet(sexo_b)
     sc = pd.read_parquet(PROCESSED / "socio_comuna.parquet")
+    # Hacinamiento es el único indicador socioeconómico que **solo** existe por
+    # comuna: no está en `radios_censales`, así que no hay forma de bajarlo a
+    # barrio sin inventarlo. Se lee directo del archivo de GCBA.
+    hac = pd.read_parquet(PROCESSED / "socioeconomico_comuna.parquet").set_index("comuna")
     km2_barrio, km2_comuna = _areas_km2()
 
     comuna_de = (pd.read_parquet(PROCESSED / "barrios.parquet")
@@ -651,6 +655,11 @@ def exportar_demografia() -> None:
             "hab_65": int(e["hab_65"]),
             "envejecimiento": float(e["envejecimiento"]),
             "dependencia": float(e["dependencia"]),
+            # los tres suman 100: se guardan los tres para que el tooltip pueda
+            # mostrar el reparto y no solo la punta crítica
+            "pct_sin_hacinamiento": float(hac.loc[c, "pct_sin_hacinamiento"]),
+            "pct_hacinamiento_no_critico": float(hac.loc[c, "pct_hacinamiento_no_critico"]),
+            "pct_hacinamiento_critico": float(hac.loc[c, "pct_hacinamiento_critico"]),
         })
 
     # el agregado de Ciudad se suma desde las comunas en vez de leer la fila
@@ -663,6 +672,10 @@ def exportar_demografia() -> None:
     mujeres = sum(c["mujeres"] for c in comunas)
     hogares = sum(c["hogares"] for c in comunas)
     hogares_nbi = sum(c["hogares_nbi"] for c in comunas)
+    # el promedio de Ciudad se pondera por hogares y no por comuna: la 8 tiene
+    # el doble de hogares que la 2 y pesar las quince igual daría un número que
+    # no le corresponde a nadie
+    hac_critico = sum(c["pct_hacinamiento_critico"] * c["hogares"] for c in comunas) / hogares
     km2 = float(km2_comuna.sum())
 
     miles = lambda n: f"{n:,}".replace(",", ".")
@@ -677,6 +690,10 @@ def exportar_demografia() -> None:
             "anio": ANIO_POBLACION, "hogares": hogares, "hogares_nbi": hogares_nbi,
             "pct": round(hogares_nbi / hogares * 100, 2),
             "fuente": "Censo 2010 · radios censales",
+        },
+        "hacinamiento": {
+            "anio": ANIO_POBLACION, "pct_critico": round(hac_critico, 2),
+            "fuente": "Censo 2010 · GCBA, solo por comuna",
         },
         "edad": {
             "anio": ANIO_EDAD, "total": pob22,
@@ -710,6 +727,17 @@ def exportar_demografia() -> None:
                 "2010 y mide pobreza estructural, no ingreso: no se mueve con la inflación ni "
                 "con el ciclo económico, y por eso tampoco refleja los cambios de los últimos "
                 "quince años. El porcentaje se calcula sobre hogares, no sobre personas.",
+            "hacinamiento":
+                "Un hogar tiene hacinamiento crítico cuando viven más de tres personas por "
+                "cuarto, y no crítico entre dos y tres. Es el único indicador socioeconómico "
+                "del tablero que solo existe por comuna: no está publicado por radio censal, "
+                "así que no se puede bajar a barrio sin inventarlo.",
+            "hacinamiento_senal_debil":
+                "En la auditoría de equidad, el hacinamiento es la única variable cuya "
+                "correlación con el riesgo predicho cambia de signo al controlar por historial "
+                "delictivo (de 0,05 a −0,28). Está anotado como señal a vigilar, no como "
+                "hallazgo: con quince comunas la correlación parcial tiene muy pocos grados de "
+                "libertad y no alcanza para concluir en ningún sentido.",
             "nbi_no_es_riesgo":
                 "El mapa de NBI no es un mapa de riesgo, y el proyecto lo tiene medido: la "
                 "correlación entre NBI y el riesgo predicho por comuna cae de 0,41 a 0,14 al "

@@ -174,13 +174,25 @@ export default function Mapa({
         style: estilo,
         onEachFeature: (f, layer) => {
           const p = f.properties as DemoComuna;
+          const edad =
+            `0 a 14: <strong class="tabular">${num1(p.pct_0_14)}%</strong><br/>` +
+            `15 a 64: <strong class="tabular">${num1(p.pct_15_64)}%</strong><br/>` +
+            `65 y más: <strong class="tabular">${num1(p.pct_65)}%</strong><br/>` +
+            `<span style="color:var(--text-secondary)">Envejecimiento ${num(p.envejecimiento)}</span><br/>`;
+          const hacinamiento =
+            `Hacinamiento crítico: <strong class="tabular">${num1(p.pct_hacinamiento_critico)}%</strong><br/>` +
+            `<span style="color:var(--text-secondary)">no crítico ${num1(p.pct_hacinamiento_no_critico)}%` +
+            ` · sin hacinamiento ${num1(p.pct_sin_hacinamiento)}%</span><br/>`;
+          // mismo criterio que en el tooltip del barrio: primero el bloque que
+          // explica el color, después el otro
+          const esHacinamiento = campo === "pct_hacinamiento_critico";
           layer.bindTooltip(
             `<strong>Comuna ${p.comuna}</strong><br/>` +
-              `<span style="color:var(--text-secondary)">Censo 2022 · ${num(p.poblacion_2022)} hab.</span><br/>` +
-              `0 a 14: <strong class="tabular">${num1(p.pct_0_14)}%</strong><br/>` +
-              `15 a 64: <strong class="tabular">${num1(p.pct_15_64)}%</strong><br/>` +
-              `65 y más: <strong class="tabular">${num1(p.pct_65)}%</strong><br/>` +
-              `<span style="color:var(--text-secondary)">Envejecimiento ${num(p.envejecimiento)}</span>`,
+              `<span style="color:var(--text-secondary)">` +
+              (esHacinamiento ? `Censo 2010 · ${num(p.hogares)} hogares`
+                              : `Censo 2022 · ${num(p.poblacion_2022)} hab.`) +
+              `</span><br/>` +
+              (esHacinamiento ? hacinamiento + edad : edad + hacinamiento),
             { className: "sige-tip", sticky: true, direction: "top" },
           );
           layer.on({

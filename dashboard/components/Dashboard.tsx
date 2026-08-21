@@ -455,7 +455,9 @@ function AvisoSuperficie({
       <Aviso>
         El mapa dibuja demografía por {info.unidad}: no cambia con el turno ni con el tipo de
         delito, que siguen filtrando el resto del tablero.{" "}
-        {info.unidad === "comuna"
+        {superficie === "hacinamiento"
+          ? "Hacinamiento crítico es más de 3 personas por cuarto. No está publicado por radio censal, así que no se puede bajar a barrio. En la auditoría de equidad es la única variable que cambia de signo al controlar por historial delictivo — anotada como señal a vigilar, no como hallazgo: con 15 comunas no alcanza para concluir."
+          : info.unidad === "comuna"
           ? "El Censo 2022 no está publicado por barrio."
           : superficie === "nbi"
           ? "NBI mide pobreza estructural del Censo 2010, sobre hogares y no sobre personas. Y no es un mapa de riesgo: la correlación entre NBI y riesgo predicho por comuna cae de 0,41 a 0,14 al controlar por historial delictivo."
