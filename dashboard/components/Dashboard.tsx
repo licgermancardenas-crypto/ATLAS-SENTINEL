@@ -3,16 +3,18 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import type { BarrioProps, Capa, DatosDashboard, TipoDelito, Turno } from "@/lib/types";
+import type { BarrioProps, Capa, DatosDashboard, Superficie, TipoDelito, Turno } from "@/lib/types";
 import {
-  CAPAS, claveDelitos, claveRiesgo, riesgoEsDelTipo, tasaInflada, TIPOS, tipoInfo, TURNOS,
+  CAPAS, claveDelitos, claveRiesgo, esDemografica, riesgoEsDelTipo, SUPERFICIES,
+  superficieInfo, tasaInflada, TIPOS, tipoInfo, TURNOS,
 } from "@/lib/types";
 import { cargarDatos } from "@/lib/data";
-import { delta, num, num3, pct, pp, tasa100k } from "@/lib/formato";
-import { cortesPorCuantil, ETIQUETAS_CLASE, VAR_RIESGO } from "@/lib/escala";
+import { delta, num, num1, num3, pct, pp, tasa100k } from "@/lib/formato";
+import { cortesPorCuantil, ETIQUETAS_CLASE, VAR_EDAD, VAR_RIESGO } from "@/lib/escala";
 import { KpiRow } from "./Kpi";
 import {
-  ChipsActivos, ControlK, SelectorCapa, SelectorComuna, SelectorTipo, SelectorTurno, ToggleTema,
+  ChipsActivos, ControlK, SelectorCapa, SelectorComuna, SelectorSuperficie, SelectorTipo,
+  SelectorTurno, ToggleTema,
 } from "./Controles";
 import { BarrasComuna, CurvaCobertura, SensibilidadAlRadio, SerieAnual } from "./Graficos";
 import TablaBarrios from "./TablaBarrios";
@@ -59,6 +61,8 @@ export default function Dashboard() {
   const [comuna, setComuna] = useState<number | null>(() => leerNum("comuna", null));
   const [capa, setCapa] = useState<Capa>(
     () => leerURL("capa", CAPAS.map((c) => c.key), "patrullas"));
+  const [superficie, setSuperficie] = useState<Superficie>(
+    () => leerURL("superficie", SUPERFICIES.map((s) => s.key), "riesgo"));
   const [tipo, setTipo] = useState<TipoDelito>(
     () => leerURL("tipo", TIPOS.map((t) => t.key), "todos"));
   const [kPatrullas, setKPatrullas] = useState(() => leerNum("k", 75) ?? 75);
@@ -85,11 +89,12 @@ export default function Dashboard() {
     if (comuna !== null) p.set("comuna", String(comuna));
     if (barrio) p.set("barrio", barrio);
     if (capa !== "patrullas") p.set("capa", capa);
+    if (superficie !== "riesgo") p.set("superficie", superficie);
     if (kPatrullas !== 75) p.set("k", String(kPatrullas));
     if (tema !== "light") p.set("tema", tema);
     const q = p.toString();
     window.history.replaceState(null, "", q ? `?${q}` : window.location.pathname);
-  }, [turno, tipo, comuna, barrio, capa, kPatrullas, tema]);
+  }, [turno, tipo, comuna, barrio, capa, superficie, kPatrullas, tema]);
 
   // al elegir un barrio conviene fijar también su comuna: si no, el mapa
   // resalta un polígono y la tabla sigue mostrando los otros 47. Va en el
@@ -236,9 +241,17 @@ export default function Dashboard() {
   }
 
   const clave = claveRiesgo(turno, tipo);
-  const cortes = cortesPorCuantil(props.map((b) => b[clave] as number));
   const capaInfo = CAPAS.find((c) => c.key === capa)!;
   const superficiePropia = riesgoEsDelTipo(tipo);
+  const supInfo = superficieInfo(superficie);
+  const demografica = esDemografica(superficie);
+
+  // los cortes de la leyenda salen del mismo conjunto que pinta el mapa: los 48
+  // barrios para el riesgo, las 15 comunas para la edad. Calcularlos siempre
+  // sobre barrios dejaría la escala diciendo una cosa y el mapa otra.
+  const cortes = demografica
+    ? cortesPorCuantil(datos.comunasGeo.features.map((f) => f.properties[supInfo.campo!]))
+    : cortesPorCuantil(props.map((b) => b[clave] as number));
 
   // la cascada de frecuencias sí puede seguir la selección territorial, porque
   // es un total dividido por tiempo. Los perfiles de hora y día no, y por eso
@@ -273,6 +286,7 @@ export default function Dashboard() {
           <SelectorTurno valor={turno} onChange={setTurno} />
           <SelectorTipo valor={tipo} onChange={setTipo} />
           <SelectorComuna valor={comuna} onChange={(c) => { setComuna(c); setBarrio(null); }} comunas={datos.comunas} />
+          <SelectorSuperficie valor={superficie} onChange={setSuperficie} />
           <SelectorCapa valor={capa} onChange={setCapa} />
           {capa === "patrullas" && <ControlK valor={kPatrullas} onChange={setKPatrullas} disponibles={ks} />}
           <div className="ml-auto flex items-end gap-2">
@@ -298,20 +312,24 @@ export default function Dashboard() {
             <div className="px-3 py-2 border-b border-line flex items-center justify-between gap-3 flex-wrap">
               <div className="min-w-0">
                 <h2 className="text-xs font-semibold uppercase tracking-[0.07em] text-ink-2">
-                  {superficiePropia ? `Riesgo de ${tipoInfo(tipo).label.toLowerCase()} por barrio` : "Riesgo por barrio"}
+                  {demografica ? `${supInfo.label} · por comuna`
+                    : superficiePropia ? `Riesgo de ${tipoInfo(tipo).label.toLowerCase()} por barrio`
+                    : "Riesgo por barrio"}
                 </h2>
-                <p className="text-[11px] text-ink-muted truncate">{capaInfo.descripcion}</p>
+                <p className="text-[11px] text-ink-muted truncate">
+                  {demografica ? supInfo.descripcion : capaInfo.descripcion}
+                </p>
               </div>
-              <Leyenda cortes={cortes} />
+              <Leyenda cortes={cortes} demografica={demografica} />
             </div>
             <div className="flex-1 min-h-0">
               <Mapa
-                datos={datos} turno={turno} capa={capa} tipo={tipo} comuna={comuna}
+                datos={datos} turno={turno} capa={capa} superficie={superficie} tipo={tipo} comuna={comuna}
                 barrioActivo={barrio} kPatrullas={kPatrullas} tema={tema}
                 onBarrio={elegirBarrio}
               />
             </div>
-            <AvisoSuperficie tipo={tipo} capa={capa} />
+            <AvisoSuperficie tipo={tipo} capa={capa} superficie={superficie} />
             {capa !== "ninguna" && <LeyendaPuntos capa={capa} k={kPatrullas} />}
           </section>
 
@@ -390,18 +408,25 @@ export default function Dashboard() {
   );
 }
 
-function Leyenda({ cortes }: { cortes: number[] }) {
+/* La rampa de la edad es azul y la del riesgo ámbar, y no es decoración: con
+   la misma rampa, un mapa de "% de mayores de 65" sale del color del peligro y
+   se lee como uno. Los cortes son quintiles en los dos casos, pero sobre
+   conjuntos distintos — 48 barrios o 15 comunas. */
+function Leyenda({ cortes, demografica }: { cortes: number[]; demografica: boolean }) {
+  const vars = demografica ? VAR_EDAD : VAR_RIESGO;
+  const fmt = (v: number) => (demografica ? `${num1(v)}%` : num3(v));
   return (
     <div className="flex items-center gap-2 shrink-0">
-      <span className="text-[10px] text-ink-muted">bajo</span>
-      <div className="flex" role="img" aria-label="Escala de riesgo en cinco clases por quintiles">
-        {VAR_RIESGO.map((v, i) => (
+      <span className="text-[10px] text-ink-muted">{demografica ? "menos" : "bajo"}</span>
+      <div className="flex" role="img"
+           aria-label={`Escala de ${demografica ? "edad" : "riesgo"} en cinco clases por quintiles`}>
+        {vars.map((v, i) => (
           <span key={v} className="w-6 h-3 first:rounded-l-sm last:rounded-r-sm"
                 style={{ background: `var(${v})` }}
-                title={`${ETIQUETAS_CLASE[i]}${cortes[i] !== undefined ? ` · hasta ${num3(cortes[i])}` : ""}`} />
+                title={`${ETIQUETAS_CLASE[i]}${cortes[i] !== undefined ? ` · hasta ${fmt(cortes[i])}` : ""}`} />
         ))}
       </div>
-      <span className="text-[10px] text-ink-muted">alto</span>
+      <span className="text-[10px] text-ink-muted">{demografica ? "más" : "alto"}</span>
     </div>
   );
 }
@@ -412,7 +437,20 @@ function Leyenda({ cortes }: { cortes: number[] }) {
    los Módulos A/B/C se resuelven sobre el modelo agregado. El README lo tiene
    medido: hurto y lesiones comparten solo el 60% de las ubicaciones. */
 
-function AvisoSuperficie({ tipo, capa }: { tipo: TipoDelito; capa: Capa }) {
+function AvisoSuperficie({
+  tipo, capa, superficie,
+}: { tipo: TipoDelito; capa: Capa; superficie: Superficie }) {
+  /* Con una superficie demográfica el mapa deja de responder al turno y al
+     tipo, que siguen puestos arriba y siguen filtrando el resto del tablero.
+     Sin este cartel, mover el turno y ver el mapa quieto se lee como un bug. */
+  if (esDemografica(superficie)) {
+    return (
+      <Aviso>
+        El mapa dibuja demografía por comuna: no cambia con el turno ni con el tipo de delito,
+        que siguen filtrando el resto del tablero. El Censo 2022 no está publicado por barrio.
+      </Aviso>
+    );
+  }
   if (tipo === "todos") return null;
   const info = tipoInfo(tipo);
   const mensaje = !info.superficie
@@ -421,6 +459,10 @@ function AvisoSuperficie({ tipo, capa }: { tipo: TipoDelito; capa: Capa }) {
     ? `El mapa muestra la superficie de ${info.label.toLowerCase()}, pero las ubicaciones propuestas se optimizan sobre el modelo agregado — no son el plan óptimo para ${info.label.toLowerCase()}.`
     : null;
   if (!mensaje) return null;
+  return <Aviso>{mensaje}</Aviso>;
+}
+
+function Aviso({ children }: { children: React.ReactNode }) {
   return (
     <p className="px-3 py-1.5 border-t border-line text-[11px] leading-snug text-ink-2
                   flex items-start gap-1.5 bg-[var(--warn-wash,transparent)]">
@@ -428,7 +470,7 @@ function AvisoSuperficie({ tipo, capa }: { tipo: TipoDelito; capa: Capa }) {
            strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-[2px]" aria-hidden="true">
         <circle cx="12" cy="12" r="10" /><path d="M12 8v5M12 16h.01" />
       </svg>
-      <span>{mensaje}</span>
+      <span>{children}</span>
     </p>
   );
 }

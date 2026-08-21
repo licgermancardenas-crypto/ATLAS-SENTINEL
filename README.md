@@ -1128,6 +1128,18 @@ Dos decisiones de interfaz que salen de los datos:
 
 La tabla de barrios suma una columna **Habitantes**, pegada a la de "Cada 100k" y antes que ella: es su denominador, y verlos al lado explica de una por qué el ranking por conteo y el ranking por tasa no se parecen — Palermo tiene 226.534 habitantes y Puerto Madero 6.726, un rango de 34 a 1.
 
+### La edad en el mapa, y por qué se dibujan comunas y no barrios
+
+El mapa dibujaba siempre riesgo por barrio; ahora el selector **"Superficie del mapa"** lo cambia entre eso y dos superficies de edad (65 y más, 0 a 14). No es un modo de color: **cambia la geometría que se dibuja**, de 48 polígonos a 15.
+
+Esa es la decisión de fondo. La edad solo existe por comuna, así que pintar los 48 barrios con el valor de su comuna mostraría 48 formas donde hay 15 datos, y los límites internos invitarían a leer una diferencia entre Palermo y Colegiales que en el dato no está. Dibujar la unidad que el dato tiene evita esa lectura sin necesidad de ninguna advertencia. No había dataset de comunas con geometría en el repo: se disuelven los barrios (`unary_union`), que es exacto porque cada barrio pertenece a una sola comuna, y sale `comunas.geojson` — 68 KB con 5 m de tolerancia de simplificación, que a este zoom no se distingue y baja el archivo a la mitad.
+
+**La rampa de color es azul-índigo y no la ámbar del riesgo.** Con la misma rampa, un mapa de "% de mayores de 65" sale del color del peligro y se lee como uno. Los cortes son quintiles en los dos casos, pero calculados sobre el conjunto que efectivamente se pinta —48 barrios o 15 comunas—, no siempre sobre barrios: si no, la leyenda diría una cosa y el mapa otra.
+
+Con una superficie demográfica el mapa **deja de responder al turno y al tipo de delito**, que siguen arriba y siguen filtrando el resto del tablero. Va dicho en una franja bajo el mapa: sin eso, mover el turno y ver el mapa quieto se lee como que el tablero se rompió — el mismo problema que ya tenía el filtro por tipo con Vialidad y Homicidios.
+
+Lo que se ve: el sur (comunas 4 y 8) concentra los chicos y el norte y centro los mayores, con la Comuna 8 en 22,2% de 0 a 14 contra 11,1% de la Comuna 2, y dado vuelta en los mayores. Es la inversión más nítida que muestra el tablero, y no sale del modelo.
+
 ## Módulo 3D — la Ciudad construida (`pipeline/ingest_tejido_urbano.py`, `build_base_3d.py`, `dashboard/app/3d/`)
 
 El tablero venía mostrando riesgo sobre polígonos planos. Este módulo lo muestra sobre la ciudad real, en volumen, con las capas operativas encima. La ruta es `/3d`.

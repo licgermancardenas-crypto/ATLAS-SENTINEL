@@ -44,4 +44,13 @@ export function paletaRiesgo(): string[] {
   return VAR_RIESGO.map((v) => leerToken(v));
 }
 
+/** Rampa aparte para las superficies demográficas. Reusar la del riesgo haría
+ *  que un mapa de "% de mayores de 65" saliera del mismo color que uno de
+ *  peligro, y el dato no dice eso. */
+export const VAR_EDAD = ["--edad-1", "--edad-2", "--edad-3", "--edad-4", "--edad-5"] as const;
+
+export function paletaEdad(): string[] {
+  return VAR_EDAD.map((v) => leerToken(v));
+}
+
 export const ETIQUETAS_CLASE = ["Muy bajo", "Bajo", "Medio", "Alto", "Muy alto"];

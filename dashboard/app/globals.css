@@ -50,6 +50,14 @@
   --risk-4: #dc6803;
   --risk-5: #9a3412;
   --risk-nulo: #e2e8f0;
+  /* Escala de edad: azul-índigo, deliberadamente lejos del ámbar del riesgo.
+     Si compartieran rampa, un mapa de "% de mayores de 65" se leería como un
+     mapa de peligro, que es justo lo que el dato no dice. */
+  --edad-1: #dfe4ff;
+  --edad-2: #c7d2fe;
+  --edad-3: #93a5fc;
+  --edad-4: #5b63e0;
+  --edad-5: #312e81;
 
   /* capas operativas del mapa */
   --pt-existente: #64748b;
@@ -94,6 +102,11 @@
     --risk-4: #d0822c;
     --risk-5: #f0a659;
     --risk-nulo: #1c2634;
+  --edad-1: #1b1c38;
+  --edad-2: #2c2f66;
+  --edad-3: #454a9c;
+  --edad-4: #7278d6;
+  --edad-5: #aeb4f7;
 
     --pt-existente: #93a3b8;
     --pt-propuesto: #6ea1ff;
@@ -130,6 +143,11 @@
   --risk-4: #d0822c;
   --risk-5: #f0a659;
   --risk-nulo: #1c2634;
+  --edad-1: #1b1c38;
+  --edad-2: #2c2f66;
+  --edad-3: #454a9c;
+  --edad-4: #7278d6;
+  --edad-5: #aeb4f7;
   --pt-existente: #93a3b8;
   --pt-propuesto: #6ea1ff;
   --pt-alerta: #f87171;

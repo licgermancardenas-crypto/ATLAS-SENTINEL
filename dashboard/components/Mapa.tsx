@@ -4,11 +4,14 @@ import { useEffect, useRef } from "react";
 import L from "leaflet";
 import type { Feature } from "geojson";
 import type {
-  BarrioProps, BarriosGeoJSON, Capa, DatosDashboard, TipoDelito, Turno,
+  BarrioProps, BarriosGeoJSON, Capa, ComunasGeoJSON, DatosDashboard, DemoComuna,
+  Superficie, TipoDelito, Turno,
 } from "@/lib/types";
-import { claveDelitos, claveRiesgo, riesgoEsDelTipo, tipoInfo } from "@/lib/types";
-import { claseDe, cortesPorCuantil, leerToken, paletaRiesgo } from "@/lib/escala";
-import { num, num2, num3 } from "@/lib/formato";
+import {
+  claveDelitos, claveRiesgo, esDemografica, riesgoEsDelTipo, superficieInfo, tipoInfo,
+} from "@/lib/types";
+import { claseDe, cortesPorCuantil, leerToken, paletaEdad, paletaRiesgo } from "@/lib/escala";
+import { num, num1, num2, num3 } from "@/lib/formato";
 
 /* Se usa Leaflet directo y no react-leaflet: el mapa se repinta ante cambios de
    filtro decenas de veces, y manejar las capas a mano evita reconstruir el
@@ -36,6 +39,7 @@ interface Props {
   datos: DatosDashboard;
   turno: Turno;
   capa: Capa;
+  superficie: Superficie;
   tipo: TipoDelito;
   comuna: number | null;
   barrioActivo: string | null;
@@ -45,12 +49,13 @@ interface Props {
 }
 
 export default function Mapa({
-  datos, turno, capa, tipo, comuna, barrioActivo, kPatrullas, tema, onBarrio,
+  datos, turno, capa, superficie, tipo, comuna, barrioActivo, kPatrullas, tema, onBarrio,
 }: Props) {
   const nodo = useRef<HTMLDivElement>(null);
   const mapa = useRef<L.Map | null>(null);
   const capaBase = useRef<L.TileLayer | null>(null);
   const capaBarrios = useRef<L.GeoJSON | null>(null);
+  const capaComunas = useRef<L.GeoJSON | null>(null);
   const capaPuntos = useRef<L.LayerGroup | null>(null);
   // El callback vive en un ref para que los handlers que Leaflet ya tiene
   // enganchados llamen siempre a la versión actual, sin tener que reconstruir la
@@ -118,18 +123,76 @@ export default function Mapa({
     capaBase.current.bringToBack();
   }, [tema]);
 
-  /* --- coropleta de barrios --- */
+  /* --- coropleta: riesgo por barrio, o demografía por comuna ---
+   *
+   *  Las dos superficies se dibujan en el mismo efecto porque son excluyentes
+   *  y comparten limpieza: quedarse con las dos capas montadas deja el mapa
+   *  pintado dos veces, con la de abajo asomando por los bordes simplificados.
+   *
+   *  Y son geometrías distintas a propósito. La edad solo existe por comuna;
+   *  pintando los 48 barrios con el valor de su comuna, el mapa mostraría 48
+   *  formas donde hay 15 datos e invitaría a leer una diferencia entre Palermo
+   *  y Colegiales que en el dato no está. */
   useEffect(() => {
     const m = mapa.current;
     if (!m) return;
+
+    capaBarrios.current?.remove();
+    capaBarrios.current = null;
+    capaComunas.current?.remove();
+    capaComunas.current = null;
+
+    const lineaBase = leerToken("--border-strong", "#999");
+    const inactivo = leerToken("--risk-nulo", "#e2e8f0");
+    const info = superficieInfo(superficie);
+
+    if (esDemografica(superficie)) {
+      const campo = info.campo!;
+      const valores = datos.comunasGeo.features.map((f) => f.properties[campo]);
+      const cortes = cortesPorCuantil(valores);
+      const paleta = paletaEdad();
+
+      const estilo = (f?: Feature): L.PathOptions => {
+        const p = (f?.properties ?? {}) as DemoComuna;
+        const fuera = comuna !== null && p.comuna !== comuna;
+        return {
+          fillColor: fuera ? inactivo : paleta[claseDe(p[campo], cortes)],
+          fillOpacity: fuera ? 0.25 : comuna === p.comuna ? 0.95 : 0.8,
+          color: comuna === p.comuna ? leerToken("--brand", "#1e40af") : lineaBase,
+          weight: comuna === p.comuna ? 2.5 : 0.9,
+          opacity: fuera ? 0.4 : 1,
+        };
+      };
+
+      capaComunas.current = L.geoJSON(datos.comunasGeo as ComunasGeoJSON, {
+        style: estilo,
+        onEachFeature: (f, layer) => {
+          const p = f.properties as DemoComuna;
+          layer.bindTooltip(
+            `<strong>Comuna ${p.comuna}</strong><br/>` +
+              `<span style="color:var(--text-secondary)">Censo 2022 · ${num(p.poblacion_2022)} hab.</span><br/>` +
+              `0 a 14: <strong class="tabular">${num1(p.pct_0_14)}%</strong><br/>` +
+              `15 a 64: <strong class="tabular">${num1(p.pct_15_64)}%</strong><br/>` +
+              `65 y más: <strong class="tabular">${num1(p.pct_65)}%</strong><br/>` +
+              `<span style="color:var(--text-secondary)">Envejecimiento ${num(p.envejecimiento)}</span>`,
+            { className: "sige-tip", sticky: true, direction: "top" },
+          );
+          layer.on({
+            mouseover: (e) => (e.target as L.Path).setStyle({ weight: 2, fillOpacity: 0.95 }),
+            mouseout: (e) => (e.target as L.Path).setStyle(estilo(f)),
+          });
+        },
+      }).addTo(m);
+      capaComunas.current.bringToBack();
+      capaBase.current?.bringToBack();
+      return;
+    }
 
     const clave = claveRiesgo(turno, tipo);
     const claveD = claveDelitos(tipo);
     const valores = datos.barrios.features.map((f) => f.properties[clave] as number);
     const cortes = cortesPorCuantil(valores);
     const paleta = paletaRiesgo();
-    const lineaBase = leerToken("--border-strong", "#999");
-    const inactivo = leerToken("--risk-nulo", "#e2e8f0");
 
     const estilo = (f?: Feature): L.PathOptions => {
       const p = (f?.properties ?? {}) as BarrioProps;
@@ -144,7 +207,6 @@ export default function Mapa({
       };
     };
 
-    capaBarrios.current?.remove();
     capaBarrios.current = L.geoJSON(datos.barrios as BarriosGeoJSON, {
       style: estilo,
       onEachFeature: (f, layer) => {
@@ -160,7 +222,8 @@ export default function Mapa({
           `<strong>${p.nombre}</strong><br/>` +
             `<span style="color:var(--text-secondary)">Comuna ${p.comuna ?? "—"} · ${p.n_hex} celdas</span><br/>` +
             `${etiquetaRiesgo}: <strong class="tabular">${num3(p[clave] as number)}</strong><br/>` +
-            `${etiquetaDelitos}: <strong class="tabular">${num(p[claveD] as number)}</strong>`,
+            `${etiquetaDelitos}: <strong class="tabular">${num(p[claveD] as number)}</strong><br/>` +
+            `<span style="color:var(--text-secondary)">${num(p.poblacion as number)} hab.</span>`,
           { className: "sige-tip", sticky: true, direction: "top" },
         );
         layer.on({
@@ -172,7 +235,7 @@ export default function Mapa({
     }).addTo(m);
     capaBarrios.current.bringToBack();
     capaBase.current?.bringToBack();
-  }, [datos, turno, tipo, comuna, barrioActivo]);
+  }, [datos, turno, tipo, comuna, barrioActivo, superficie]);
 
   /* --- capa operativa --- */
   useEffect(() => {
@@ -236,13 +299,16 @@ export default function Mapa({
   /* --- encuadre al filtrar por comuna --- */
   useEffect(() => {
     const m = mapa.current;
-    const capaB = capaBarrios.current;
+    // con una superficie demográfica no hay capa de barrios montada: el
+    // encuadre sale de la de comunas, que además ya es un polígono por comuna
+    const capaB = capaBarrios.current ?? capaComunas.current;
     if (!m || !capaB) return;
     if (comuna === null) { m.flyToBounds(LIMITES, { duration: 0.5 }); return; }
     const seleccion: L.LatLngBounds[] = [];
     capaB.eachLayer((l) => {
       const f = (l as L.GeoJSON).feature;
-      const p = (f && "properties" in f ? f.properties : undefined) as BarrioProps | undefined;
+      const p = (f && "properties" in f ? f.properties : undefined) as
+        { comuna?: number | null } | undefined;
       if (p?.comuna === comuna) seleccion.push((l as L.Polygon).getBounds());
     });
     if (seleccion.length) {
@@ -250,6 +316,9 @@ export default function Mapa({
       seleccion.slice(1).forEach((x) => b.extend(x));
       m.flyToBounds(b.pad(0.15), { duration: 0.5 });
     }
+    // sin `superficie` en las dependencias a propósito: el efecto lee la capa
+    // vigente al correr, y volver a encuadrar al cambiar de superficie le
+    // pisaría el zoom a quien ya se había acercado a mirar algo
   }, [comuna]);
 
   return <div ref={nodo} className="h-full w-full" role="application"

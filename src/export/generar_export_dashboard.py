@@ -701,6 +701,45 @@ def exportar_demografia() -> None:
     print(f"demografia.json: {len(barrios)} barrios, {len(comunas)} comunas, "
           f"{miles(pob10)} hab. {ANIO_POBLACION} / {miles(pob22)} hab. {ANIO_EDAD}")
 
+    _comunas_geojson(comunas)
+
+
+def _comunas_geojson(comunas: list[dict]) -> None:
+    """Los 15 polígonos de comuna, para pintar la edad en el mapa.
+
+    **Por qué un polígono nuevo y no reusar el de barrios.** La edad solo
+    existe por comuna. Pintando los 48 barrios con el valor de su comuna, el
+    mapa muestra 48 formas donde hay 15 datos: los límites internos invitan a
+    leer una diferencia entre Palermo y Colegiales que en el dato no está.
+    Dibujar la unidad que el dato tiene evita esa lectura sin ninguna
+    advertencia.
+
+    No hay dataset de comunas con geometría en el repo: se disuelven los
+    barrios, que es exacto porque cada barrio pertenece a una sola comuna.
+    """
+    from shapely.ops import unary_union
+
+    b = pd.read_parquet(PROCESSED / "barrios.parquet")
+    geoms = b["geometry_wkt"].apply(wkt.loads)
+    por_comuna = b["comuna"].astype(int)
+
+    features = []
+    for c in comunas:
+        union = unary_union(list(geoms[por_comuna == c["comuna"]]))
+        # ~5 m de tolerancia. A este zoom no se distingue y baja el archivo a
+        # la mitad; con `preserve_topology` no se abren huecos entre comunas.
+        union = union.simplify(0.00005, preserve_topology=True)
+        features.append({
+            "type": "Feature",
+            "geometry": mapping(union),
+            "properties": {k: v for k, v in c.items()},
+        })
+
+    destino = OUT / "comunas.geojson"
+    destino.write_text(json.dumps({"type": "FeatureCollection", "features": features}),
+                       encoding="utf-8")
+    print(f"comunas.geojson: {len(features)} polígonos, {destino.stat().st_size // 1024} KB")
+
 def exportar_resumen() -> None:
     """Los números de las tarjetas de KPI. Van acá y no hardcodeados en el
     front, para que haya un solo lugar donde corregirlos — el proyecto ya tuvo

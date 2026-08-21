@@ -44,6 +44,39 @@ export const TIPOS: {
 
 export const tipoInfo = (t: TipoDelito) => TIPOS.find((x) => x.key === t)!;
 
+/* ---------------------------------------------------------- qué pinta el mapa
+ *
+ *  Hasta acá el mapa dibujaba siempre riesgo por barrio y lo único elegible
+ *  era la capa de puntos encima. La demografía agrega superficies que no son
+ *  riesgo y que además **viven en otra unidad espacial**: la edad solo existe
+ *  por comuna. Por eso la superficie es un estado propio y no un modo del
+ *  filtro de tipo — cambia la geometría que se dibuja, no solo el color.
+ */
+
+export type Superficie = "riesgo" | "mayores" | "chicos";
+
+export const SUPERFICIES: {
+  key: Superficie; label: string; corto: string; descripcion: string;
+  /** Unidad espacial real del dato. La leyenda y el título la nombran. */
+  unidad: "barrio" | "comuna";
+  /** Campo de `DemoComuna` a pintar. Vacío para el riesgo, que sale de otro lado. */
+  campo?: "pct_65" | "pct_0_14";
+}[] = [
+  { key: "riesgo", label: "Riesgo por barrio", corto: "Riesgo", unidad: "barrio",
+    descripcion: "Score del modelo por barrio y turno" },
+  { key: "mayores", label: "Edad · 65 y más", corto: "65 y más", unidad: "comuna",
+    campo: "pct_65",
+    descripcion: "% de población de 65 años y más, Censo 2022 · solo hay dato por comuna" },
+  { key: "chicos", label: "Edad · 0 a 14", corto: "0 a 14", unidad: "comuna",
+    campo: "pct_0_14",
+    descripcion: "% de población de 0 a 14 años, Censo 2022 · solo hay dato por comuna" },
+];
+
+export const superficieInfo = (s: Superficie) => SUPERFICIES.find((x) => x.key === s)!;
+
+/** Si lo que se está dibujando es demografía y no el modelo. */
+export const esDemografica = (s: Superficie) => s !== "riesgo";
+
 /** Capa operativa que se superpone al mapa. Solo una a la vez: son propuestas
  *  de módulos distintos y mezclarlas en pantalla no significa nada. */
 export type Capa = "ninguna" | "patrullas" | "camaras" | "controles";
@@ -281,6 +314,8 @@ export interface DemoComuna extends Omit<DemoBarrio, "nombre"> {
   dependencia: number;
 }
 
+export type ComunasGeoJSON = FeatureCollection<Polygon | MultiPolygon, DemoComuna>;
+
 export interface Demografia {
   poblacion: {
     anio: number; total: number; varones: number; mujeres: number;
@@ -334,6 +369,7 @@ export interface DatosDashboard {
   perfil: PerfilTemporal;
   pronostico: Pronostico;
   demografia: Demografia;
+  comunasGeo: ComunasGeoJSON;
   resumen: Resumen;
 }
 

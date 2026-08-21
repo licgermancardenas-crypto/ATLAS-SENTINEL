@@ -1,7 +1,7 @@
 "use client";
 
-import type { Capa, ComunaResumen, TipoDelito, Turno } from "@/lib/types";
-import { CAPAS, TIPOS, TURNOS } from "@/lib/types";
+import type { Capa, ComunaResumen, Superficie, TipoDelito, Turno } from "@/lib/types";
+import { CAPAS, SUPERFICIES, TIPOS, TURNOS } from "@/lib/types";
 import { num } from "@/lib/formato";
 
 /* Los filtros van todos arriba y siempre visibles: en un tablero, esconder un
@@ -202,6 +202,39 @@ export function ChipsActivos({
       )}
       {comuna !== null && <Chip texto={`Comuna ${comuna}`} onQuitar={onLimpiarComuna} />}
       {barrio && <Chip texto={barrio} onQuitar={onLimpiarBarrio} />}
+    </div>
+  );
+}
+
+
+/* Qué superficie pinta el mapa. Va en un select y no en chips porque comparte
+   fila con los otros filtros y tres chips de texto largo la desbordan.
+
+   La opción demográfica lleva "(por comuna)" en la etiqueta por la misma razón
+   por la que los tipos sin superficie de riesgo llevan "(sin superficie)": al
+   elegirla cambia la geometría del mapa —15 polígonos en vez de 48— y sin
+   avisarlo eso se lee como que el mapa se rompió. */
+export function SelectorSuperficie({
+  valor, onChange,
+}: { valor: Superficie; onChange: (s: Superficie) => void }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <label htmlFor="f-superficie" className="text-[10px] uppercase tracking-[0.08em] text-ink-muted font-medium">
+        Superficie del mapa
+      </label>
+      <select
+        id="f-superficie"
+        value={valor}
+        onChange={(e) => onChange(e.target.value as Superficie)}
+        className="h-[34px] px-2 text-xs bg-surface-2 border border-line rounded text-ink cursor-pointer
+                   hover:border-line-strong transition-colors duration-150 min-w-[11rem]"
+      >
+        {SUPERFICIES.map((s) => (
+          <option key={s.key} value={s.key}>
+            {s.label}{s.unidad === "comuna" ? " (por comuna)" : ""}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }

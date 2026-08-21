@@ -1,6 +1,7 @@
 import type { FeatureCollection } from "geojson";
 import type {
-  BarriosGeoJSON, ComunaResumen, CurvaK, DatosDashboard, Demografia, FilaSerie, PerfilTemporal,
+  BarriosGeoJSON, ComunaResumen, ComunasGeoJSON, CurvaK, DatosDashboard, Demografia,
+  FilaSerie, PerfilTemporal,
   Pronostico, PuntoModuloA, PuntoModuloB, PuntoModuloC, Resumen, SensibilidadRadio,
 } from "./types";
 
@@ -23,7 +24,8 @@ async function traer<T>(ruta: string): Promise<T> {
 export async function cargarDatos(): Promise<DatosDashboard> {
   const [
     barrios, comunas, moduloA, moduloB, moduloC,
-    comisarias, camaras, curvaK, radio, serie, perfil, pronostico, demografia, resumen,
+    comisarias, camaras, curvaK, radio, serie, perfil, pronostico, demografia, comunasGeo,
+    resumen,
   ] = await Promise.all([
     traer<BarriosGeoJSON>("/data/barrios_riesgo.geojson"),
     traer<ComunaResumen[]>("/data/comunas_resumen.json"),
@@ -38,8 +40,9 @@ export async function cargarDatos(): Promise<DatosDashboard> {
     traer<PerfilTemporal>("/data/perfil_temporal.json"),
     traer<Pronostico>("/data/pronostico.json"),
     traer<Demografia>("/data/demografia.json"),
+    traer<ComunasGeoJSON>("/data/comunas.geojson"),
     traer<Resumen>("/data/resumen.json"),
   ]);
   return { barrios, comunas, moduloA, moduloB, moduloC, comisarias, camaras,
-           curvaK, radio, serie, perfil, pronostico, demografia, resumen };
+           curvaK, radio, serie, perfil, pronostico, demografia, comunasGeo, resumen };
 }
