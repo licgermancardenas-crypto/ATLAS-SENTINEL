@@ -87,7 +87,7 @@ Nivel de ingreso y tasa de desempleo tampoco existen desglosados por comuna/barr
 
 Series históricas diarias del Servicio Meteorológico Nacional **no son automatizables**: su único endpoint público estable solo da tiempo actual + pronóstico a 5 días, y la página de descarga de históricos está detrás de Cloudflare. Se usa NASA POWER como reemplazo (satelital, no estación puntual) — ver `pipeline/ingest_clima.py`.
 
-Segmentación de población por edad/sexo **tampoco existe por zona**: el único dataset de estructura etaria de GCBA (`estructura-demografica/est_pob_sexo...`) es serie histórica 1855-presente a nivel ciudad completa, sin ningún desglose espacial — no sirve para diferenciar riesgo entre zonas y no se ingesta. Censo 2022 por radio tampoco está publicado en este portal (solo 2001 y 2010 a esa granularidad); si hace falta, habría que cruzar con el Portal Geoestadístico de INDEC, que usa otra cartografía/códigos.
+Segmentación de población por edad/sexo **no existe por zona en este portal**: el único dataset de estructura etaria de GCBA (`estructura-demografica/est_pob_sexo...`) es serie histórica 1855-presente a nivel ciudad completa, sin ningún desglose espacial. Eso vale para GCBA y no para todas las fuentes: **el sexo sí está por radio censal** (dentro de `radios_censales.parquet`, se agrega a barrio en `ingest_demografia.py`) y **la edad está por comuna en el Censo 2022 de INDEC** — ver la sección "Demografía" más abajo. Censo 2022 por radio tampoco está publicado en este portal (solo 2001 y 2010 a esa granularidad); si hace falta, habría que cruzar con el Portal Geoestadístico de INDEC, que usa otra cartografía/códigos.
 
 ### Lecciones de esta fase
 
@@ -109,7 +109,7 @@ Grilla H3-8 generada sobre CABA (unión de los 48 barrios, no existe un dataset 
 
 Datasets ya cruzados con hex_id (`src/etl/assign_hex_puntual.py`, `assign_hex_calles.py`): delitos, siniestros_hechos, cámaras, alumbrado, cajeros, comisarías (ubicación puntual), escuelas, hospitales, universidades, estadios, ecobici/molinetes (estaciones), calles (por el punto medio del tramo, ya calculado en `pipeline/ingest_calles.py`), accesos_autopistas (+ tramo de calle troncal más cercano, reproyectado a EPSG:5347 para que la distancia sea en metros reales). Eventos masivos también pasó por el script pero solo 129 de 2.898 filas tienen hex_id (las de 2019, únicas con lat/lon) — el resto (2023-2026) solo tiene barrio, que es un tipo de cruce distinto (join por nombre, no point-in-hex), pendiente.
 
-Pendiente, y son operaciones distintas a point-in-hex (no encajan en `asignar_hex_id`): **espacios_verdes** y **comisarias.parquet** (el de zonas de patrullaje) necesitan overlay de polígono contra la grilla (% de área, no un punto); **población por hex** (denominador per cápita) sale de prorratear `poblacion_comuna`/`poblacion_barrio` por área, aunque ya se puede aproximar sin prorratear porque `hex_maestra` ya tiene `radio_censal_id` — un join directo contra `radios_censales.poblacion_total` alcanza para una primera versión.
+**Cerrados después** (son operaciones distintas a point-in-hex, no encajan en `asignar_hex_id`): **espacios_verdes** y **comisarias.parquet** (el de zonas de patrullaje) por overlay de polígono, y **población por hex** prorrateada por área — los tres los resuelve `src/etl/overlay_poligonos.py`, ver su sección más abajo. Queda pendiente solo el cruce por nombre de barrio de eventos masivos 2023-2026.
 
 ## EDA retroactivo (`src/validation/eda_delitos.py`)
 
@@ -1066,6 +1066,67 @@ Cuatro decisiones, y las cuatro salen de cosas que este README ya tenía medidas
 **4. El eje arranca en cero.** Con el eje recortado al rango de los datos, el +1,1% de 2026 se dibujaría como una pendiente dramática — exactamente la lectura que la sección de arriba dice que no hay que hacer.
 
 Con homicidios (5 por mes proyectados, banda 0–10) el panel reemplaza la variación por una advertencia de ruido, mismo criterio y mismo umbral que el panel de "cuándo ocurren": abajo de 1.000 casos al año el signo se da vuelta con dos o tres hechos. La salvedad de fondo —pronostica delito registrado, no delito— viaja en el propio JSON y se muestra al pie del panel, para que no dependa de que alguien abra las salvedades generales.
+
+## Demografía: quién vive en cada zona (`pipeline/ingest_demografia.py`, `dashboard/components/Poblacion.tsx`)
+
+La población ya se usaba desde antes —es el denominador de la tasa cada 100.000— pero solo existía por detrás: el tablero no la mostraba en ninguna pantalla y el desglose no estaba ingestado. El panel **"Quién vive acá"** la pone adelante, con densidad, sexo y estructura etaria, y sigue el filtro de comuna y de barrio.
+
+**La afirmación anterior de este README quedó a medias y se corrige acá.** Decía que "segmentación de población por edad/sexo tampoco existe por zona". Es cierto para el portal de GCBA, y sigue siéndolo. Pero mirando bien:
+
+- **Sexo sí existe, y está adentro del repo desde el principio**: `radios_censales.parquet` trae `poblacion_varones` y `poblacion_mujeres` en los 3.554 radios. Nunca se había agregado a barrio.
+- **Edad existe por comuna**, en el Censo 2022 de INDEC, que no estaba consultado. No por barrio: a esa granularidad el Censo 2022 no está publicado.
+
+### La edad hay que derivarla, y se verifica
+
+INDEC no publica los grupos de edad por comuna. Publica cuatro indicadores:
+
+| Cuadro | Qué trae |
+|---|---|
+| 7 | % de población de 65 años y más |
+| 8 | índice de envejecimiento = (65+ / 0-14) × 100 |
+| 9 | índice de dependencia = ((0-14 + 65+) / 15-64) × 100 |
+| 10 | % de población de 80 años y más |
+
+Los tres grandes grupos salen de los dos primeros: `p0_14 = p65 / (envejecimiento/100)` y `p15_64 = 100 − p65 − p0_14`. El tercero queda **libre para controlar**: se recalcula el índice de dependencia desde los grupos derivados y se compara contra el publicado.
+
+| | desvío contra el índice publicado |
+|---|---|
+| máximo (Comuna 13) | 0,65 puntos |
+| mediana | 0,09 puntos |
+
+Es del tamaño del redondeo con el que INDEC publica (el 65+ con un decimal, los índices como enteros), así que la derivación es correcta. El script aborta si el desvío pasa de 1,5 puntos, que es lo que pasaría si INDEC cambiara la definición de alguno de los índices.
+
+Resultado, Censo 2022: la Ciudad es **14,9% / 67,8% / 17,4%**. La Comuna 8 (Lugano, Soldati, Riachuelo) tiene 22,2% de chicos de 0 a 14 y 11,1% de mayores — la más joven. La Comuna 2 (Recoleta) tiene 11,1% y 20,3% — dada vuelta. Índice de envejecimiento de 50 contra 183.
+
+### Dos censos que no se pueden sumar
+
+Población y sexo son Censo 2010; la edad, Censo 2022. Entre los dos hay **231.556 personas** (2.890.151 → 3.121.707, +8,0%). Multiplicar la población de 2010 por el 17,4% de mayores de 2022 da un número que no existe, así que cada bloque del JSON lleva su año adentro y el tablero lo repite pegado a cada tarjeta, no en una nota general.
+
+**El denominador de las tasas no se cambia por el de 2022**, aunque sea más nuevo: abajo de comuna no existe, y NBI y hacinamiento son del Censo 2010. Cambiarlo movería todas las tasas del tablero y las dejaría comparándose contra un socioeconómico de otro año.
+
+### Dos inconsistencias de agregación, encontradas al construir el panel
+
+Las dos son el mismo error de fondo —dos reglas distintas para el mismo número— y las dos se veían recién al poner los números juntos en una pantalla.
+
+1. **Comuna 13: 231.331 o 230.767.** Agrupar los radios por su propia columna `comuna` no da lo mismo que sumar los barrios de esa comuna: unos pocos radios de borde caen distinto. El tablero ya calculaba sus comunas sumando barrios, así que la demografía hace lo mismo.
+2. **Belgrano: 126.921 o 126.267.** Asignar radios a barrios por centroide da el total exacto de la Ciudad pero no el de cada barrio: un radio de 654 personas sobre el límite con Núñez cae de un lado por centroide y del otro en el archivo oficial de GCBA. Ahora **el total lo manda el censo y los radios solo aportan la proporción** de varones y mujeres; las mujeres se calculan por resta para que los dos sumen exacto.
+
+Sin esa segunda corrección, el tablero mostraba 126.921 habitantes de Belgrano en el panel nuevo y 126.267 en la columna de al lado de la tabla.
+
+### Gotcha: el certificado de censo.gob.ar
+
+`censo.gob.ar` sirve la cadena de certificados incompleta —le falta el intermedio— y `requests` corta con `CERTIFICATE_VERIFY_FAILED` mientras que `curl` en la misma máquina baja el archivo sin problema: curl usa el almacén de Windows, que va a buscar el intermedio faltante por AIA, y OpenSSL no. Se resuelve con `truststore`, que hace que Python use ese mismo almacén. La otra salida —`verify=False`— apagaría la verificación entera para tapar un intermedio que en realidad es verificable, y no se hace.
+
+### El panel
+
+Cuatro tarjetas con la misma forma que los KPI de arriba: **habitantes**, **densidad**, **mujeres cada 100 varones** e **% de mayores de 65**. La barra de edad va apilada y no en tres barras sueltas, con la diferencia en puntos porcentuales contra la Ciudad al lado de cada grupo, y hay un ranking de barrios por habitantes o por densidad que filtra el tablero al hacer clic.
+
+Dos decisiones de interfaz que salen de los datos:
+
+- **Al elegir un barrio, la edad que se muestra es la de su comuna**, y la tarjeta lo dice en ámbar ("no hay dato por barrio"). La alternativa era no mostrar nada; mostrar la comuna informa más siempre que quede claro de qué unidad es el número.
+- **"117 mujeres cada 100 varones" en vez de "54% mujeres"**, por lo mismo que la tasa cada 100.000 reemplazó al riesgo medio por celda: es la unidad que alguien puede dimensionar sin contexto, y encima es el índice que publica INDEC.
+
+La tabla de barrios suma una columna **Habitantes**, pegada a la de "Cada 100k" y antes que ella: es su denominador, y verlos al lado explica de una por qué el ranking por conteo y el ranking por tasa no se parecen — Palermo tiene 226.534 habitantes y Puerto Madero 6.726, un rango de 34 a 1.
 
 ## Módulo 3D — la Ciudad construida (`pipeline/ingest_tejido_urbano.py`, `build_base_3d.py`, `dashboard/app/3d/`)
 

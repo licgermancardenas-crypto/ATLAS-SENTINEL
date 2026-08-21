@@ -19,3 +19,4 @@ statsmodels==0.14.6
 prophet==1.4.0
 # CPU: pip install torch --index-url https://download.pytorch.org/whl/cpu
 torch==2.13.0
+truststore

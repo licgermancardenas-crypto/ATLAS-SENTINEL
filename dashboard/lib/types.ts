@@ -244,6 +244,63 @@ export interface Pronostico {
   salvedad: string;
 }
 
+/* -------------------------------------------------------------- demografía
+ *
+ *  Dos censos conviven acá y no se pueden mezclar en una cuenta. Población,
+ *  sexo y densidad son Censo 2010 —el mismo de los radios censales, y por lo
+ *  tanto el mismo de NBI y hacinamiento—. La estructura etaria es Censo 2022,
+ *  el único que la publica con desglose espacial, y solo llega hasta la
+ *  comuna: por barrio no existe. Por eso `DemoBarrio` no tiene campos de edad
+ *  en vez de tenerlos en null — que no exista es parte del tipo.
+ */
+
+export interface DemoBarrio {
+  nombre: string;
+  comuna: number | null;
+  poblacion: number;
+  varones: number;
+  mujeres: number;
+  area_km2: number | null;
+  densidad: number | null;
+}
+
+export interface DemoComuna extends Omit<DemoBarrio, "nombre"> {
+  comuna: number;
+  /** Población del Censo 2022, la que corresponde a los porcentajes de edad. */
+  poblacion_2022: number;
+  pct_0_14: number;
+  pct_15_64: number;
+  pct_65: number;
+  pct_80: number;
+  hab_0_14: number;
+  hab_15_64: number;
+  hab_65: number;
+  /** (65+ / 0-14) × 100. Arriba de 100 hay más viejos que chicos. */
+  envejecimiento: number;
+  /** ((0-14 + 65+) / 15-64) × 100. */
+  dependencia: number;
+}
+
+export interface Demografia {
+  poblacion: {
+    anio: number; total: number; varones: number; mujeres: number;
+    area_km2: number; densidad: number; fuente: string;
+  };
+  edad: {
+    anio: number; total: number;
+    hab_0_14: number; hab_15_64: number; hab_65: number;
+    pct_0_14: number; pct_15_64: number; pct_65: number; fuente: string;
+  };
+  barrios: DemoBarrio[];
+  comunas: DemoComuna[];
+  notas: {
+    edad_solo_comuna: string;
+    edad_derivada: string;
+    dos_censos: string;
+    denominador: string;
+  };
+}
+
 export interface Resumen {
   periodo: { desde: number; hasta: number };
   delitos_ultimo_anio: number;
@@ -276,6 +333,7 @@ export interface DatosDashboard {
   serie: FilaSerie[];
   perfil: PerfilTemporal;
   pronostico: Pronostico;
+  demografia: Demografia;
   resumen: Resumen;
 }
 

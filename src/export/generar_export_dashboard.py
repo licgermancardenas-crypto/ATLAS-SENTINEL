@@ -26,6 +26,10 @@ Salidas en dashboard/public/data/:
 - perfil_temporal.json     cuándo ocurren: por hora, por día de la semana y por
                            turno, cortado por tipo. Es lo que alimenta los
                            indicadores de frecuencia del tablero.
+- demografia.json          cuanta gente vive en cada barrio y comuna, con el
+                           corte por sexo (Censo 2010) y la estructura etaria
+                           por comuna (Censo 2022). Dos censos distintos, cada
+                           uno con su anio adentro.
 - pronostico.json          el pronóstico mensual de Ciudad para 2026 con los
                            cuatro modelos del backtest, sus bandas y el error
                            medido de cada uno. Va con el backtest adentro
@@ -553,6 +557,149 @@ def exportar_pronostico() -> None:
     print(f"pronostico.json: {len(modelos)} modelos, {len(tipos)} tipos, "
           f"{salida['backtest']['n_origenes']} orígenes de backtest")
 
+# ──────────────────────────────────────────────── demografía (población, sexo, edad)
+
+# Los dos censos que entran acá, y por qué no se pueden fusionar en un número.
+# La población por barrio y el corte por sexo son Censo 2010 (es el año de
+# `radios_censales`, que también es el de NBI y hacinamiento). La estructura
+# etaria es Censo 2022, el único que la publica por comuna. Entre los dos hay
+# 231.556 personas de diferencia. Cada bloque del JSON lleva su año adentro y
+# el tablero lo muestra pegado al número, en vez de dejar que alguien sume
+# 2.890.151 habitantes con un 17,3% de mayores de 65 y crea que el resultado
+# es una cuenta de 2022.
+ANIO_POBLACION = 2010
+ANIO_EDAD = 2022
+
+
+def _areas_km2() -> tuple[pd.Series, pd.Series]:
+    """Superficie por barrio y por comuna, para la densidad."""
+    b = pd.read_parquet(PROCESSED / "barrios.parquet")
+    km2 = b["area_m2"] / 1e6
+    por_barrio = pd.Series(km2.values, index=b["nombre"])
+    por_comuna = km2.groupby(b["comuna"].astype(int)).sum()
+    return por_barrio, por_comuna
+
+
+def exportar_demografia() -> None:
+    """Cuánta gente vive en cada zona, de qué sexo y de qué edad.
+
+    Va en un archivo aparte y no dentro de `barrios_riesgo.geojson` por dos
+    razones. La primera es de peso: el geojson son 135 KB de polígonos que el
+    mapa necesita en el primer render, y la demografía no la necesita nadie
+    hasta que se abre el panel. La segunda es que la edad **no existe por
+    barrio** — solo por comuna — así que meterla en el geojson obligaría a
+    dejar 48 campos en null y a que cada componente decidiera por su cuenta
+    qué hacer con eso.
+    """
+    demo = PROCESSED / "demografia_comuna.parquet"
+    sexo_b = PROCESSED / "sexo_barrio.parquet"
+    if not (demo.exists() and sexo_b.exists()):
+        print("demografia.json: falta correr pipeline/ingest_demografia.py — se omite")
+        return
+
+    edad = pd.read_parquet(demo)
+    sb = pd.read_parquet(sexo_b)
+    sc = pd.read_parquet(PROCESSED / "sexo_comuna.parquet")
+    km2_barrio, km2_comuna = _areas_km2()
+
+    comuna_de = (pd.read_parquet(PROCESSED / "barrios.parquet")
+                 .set_index("nombre")["comuna"].astype(int))
+
+    barrios = []
+    for r in sb.sort_values("poblacion_total", ascending=False).itertuples():
+        area = float(km2_barrio.get(r.barrio, float("nan")))
+        util = area == area and area > 0
+        barrios.append({
+            "nombre": r.barrio,
+            "comuna": int(comuna_de.get(r.barrio, 0)) or None,
+            "poblacion": int(r.poblacion_total),
+            "varones": int(r.poblacion_varones),
+            "mujeres": int(r.poblacion_mujeres),
+            "area_km2": round(area, 2) if util else None,
+            "densidad": round(r.poblacion_total / area) if util else None,
+        })
+
+    edad = edad.set_index("comuna")
+    comunas = []
+    for r in sc.sort_values("poblacion_total", ascending=False).itertuples():
+        c = int(r.comuna)
+        area = float(km2_comuna.get(c, float("nan")))
+        util = area == area and area > 0
+        e = edad.loc[c]
+        comunas.append({
+            "comuna": c,
+            "poblacion": int(r.poblacion_total),
+            "varones": int(r.poblacion_varones),
+            "mujeres": int(r.poblacion_mujeres),
+            "area_km2": round(area, 2) if util else None,
+            "densidad": round(r.poblacion_total / area) if util else None,
+            # el bloque de edad es del otro censo, por eso lleva su propia
+            # población y no reusa la de arriba
+            "poblacion_2022": int(e["poblacion_2022"]),
+            "pct_0_14": round(float(e["pct_0_14"]), 1),
+            "pct_15_64": round(float(e["pct_15_64"]), 1),
+            "pct_65": round(float(e["pct_65"]), 1),
+            "pct_80": round(float(e["pct_80"]), 1),
+            "hab_0_14": int(e["hab_0_14"]),
+            "hab_15_64": int(e["hab_15_64"]),
+            "hab_65": int(e["hab_65"]),
+            "envejecimiento": float(e["envejecimiento"]),
+            "dependencia": float(e["dependencia"]),
+        })
+
+    # el agregado de Ciudad se suma desde las comunas en vez de leer la fila
+    # "Total" de INDEC: así, si alguna vez una comuna queda afuera, el total
+    # del tablero baja con ella en lugar de seguir diciendo el número entero
+    hab = {g: sum(c[f"hab_{g}"] for c in comunas) for g in ["0_14", "15_64", "65"]}
+    pob22 = sum(c["poblacion_2022"] for c in comunas)
+    pob10 = sum(c["poblacion"] for c in comunas)
+    varones = sum(c["varones"] for c in comunas)
+    mujeres = sum(c["mujeres"] for c in comunas)
+    km2 = float(km2_comuna.sum())
+
+    miles = lambda n: f"{n:,}".replace(",", ".")
+
+    salida = {
+        "poblacion": {
+            "anio": ANIO_POBLACION, "total": pob10, "varones": varones, "mujeres": mujeres,
+            "area_km2": round(km2, 1), "densidad": round(pob10 / km2),
+            "fuente": "Censo 2010 · radios censales",
+        },
+        "edad": {
+            "anio": ANIO_EDAD, "total": pob22,
+            "hab_0_14": hab["0_14"], "hab_15_64": hab["15_64"], "hab_65": hab["65"],
+            "pct_0_14": round(hab["0_14"] / pob22 * 100, 1),
+            "pct_15_64": round(hab["15_64"] / pob22 * 100, 1),
+            "pct_65": round(hab["65"] / pob22 * 100, 1),
+            "fuente": "Censo 2022 · INDEC, derivada de los índices por comuna",
+        },
+        "barrios": barrios,
+        "comunas": comunas,
+        "notas": {
+            "edad_solo_comuna":
+                "La estructura etaria solo existe por comuna. El Censo 2022 no está publicado "
+                "por radio censal ni por barrio, así que al elegir un barrio se muestra la edad "
+                "de su comuna, no la del barrio.",
+            "edad_derivada":
+                "INDEC no publica los grupos de edad por comuna: publica el % de 65 años y más "
+                "y el índice de envejecimiento. Los tres grandes grupos se despejan de esos dos "
+                "y se verifican recalculando el índice de dependencia contra el publicado — el "
+                "desvío máximo sobre las 15 comunas es de 0,65 puntos, que es redondeo.",
+            "dos_censos":
+                f"Población y sexo son del Censo {ANIO_POBLACION}; la edad, del Censo {ANIO_EDAD}. "
+                f"La Ciudad pasó de {miles(pob10)} a {miles(pob22)} habitantes entre los dos "
+                "(+8,0%), así que los porcentajes de edad no se pueden aplicar a la población "
+                "de 2010 para sacar cantidades de personas.",
+            "denominador":
+                "Las tasas de delito del tablero siguen usando la población de 2010: es la única "
+                "que existe por barrio y la única comparable con NBI y hacinamiento, que son del "
+                "mismo censo.",
+        },
+    }
+    (OUT / "demografia.json").write_text(json.dumps(salida, ensure_ascii=False),
+                                         encoding="utf-8")
+    print(f"demografia.json: {len(barrios)} barrios, {len(comunas)} comunas, "
+          f"{miles(pob10)} hab. {ANIO_POBLACION} / {miles(pob22)} hab. {ANIO_EDAD}")
 
 def exportar_resumen() -> None:
     """Los números de las tarjetas de KPI. Van acá y no hardcodeados en el
@@ -609,6 +756,7 @@ def main() -> None:
     exportar_serie_delitos()
     exportar_perfil_temporal()
     exportar_pronostico()
+    exportar_demografia()
     exportar_resumen()
     print(f"\nTodo en {OUT}")
 

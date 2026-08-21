@@ -6,7 +6,7 @@ import { claveDelitos, claveRiesgo, riesgoEsDelTipo, tasaInflada, tipoInfo } fro
 import { num, num3, tasa100k } from "@/lib/formato";
 import { claseDe, cortesPorCuantil, ETIQUETAS_CLASE, VAR_RIESGO } from "@/lib/escala";
 
-type Columna = "nombre" | "comuna" | "riesgo" | "delitos" | "tasa" | "n_hex";
+type Columna = "nombre" | "comuna" | "riesgo" | "delitos" | "poblacion" | "tasa" | "n_hex";
 
 /* La tasa cada 100.000 divide por población residente, así que en los barrios
    donde entra mucha gente que no vive ahí queda inflada. El asterisco marca el
@@ -54,6 +54,10 @@ export default function TablaBarrios({
       numerica: true },
     { key: "delitos", label: tipo === "todos" ? "Delitos 2025" : `${tipoInfo(tipo).label} 2025`,
       numerica: true },
+    // habitantes va pegado a la tasa y antes que ella: es su denominador, y
+    // verlo al lado explica de una por qué el ranking por conteo y el ranking
+    // por tasa no se parecen
+    { key: "poblacion", label: "Habitantes", numerica: true },
     { key: "tasa", label: "Cada 100k", numerica: true },
     { key: "n_hex", label: "Celdas", numerica: true },
   ];
@@ -148,6 +152,9 @@ export default function TablaBarrios({
                   <td className="border-b border-line px-3 py-1.5 text-right tabular text-ink-2">{b.comuna ?? "—"}</td>
                   <td className="border-b border-line px-3 py-1.5 text-right tabular font-medium">{num3(v)}</td>
                   <td className="border-b border-line px-3 py-1.5 text-right tabular text-ink-2">{num(b[claveD] as number)}</td>
+                  <td className="border-b border-line px-3 py-1.5 text-right tabular text-ink-2">
+                    {b.poblacion == null ? "—" : num(b.poblacion as number)}
+                  </td>
                   <td className="border-b border-line px-3 py-1.5 text-right tabular text-ink-2">
                     <TasaCelda barrio={b} claveD={claveD} />
                   </td>

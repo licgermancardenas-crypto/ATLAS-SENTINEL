@@ -18,6 +18,7 @@ import { BarrasComuna, CurvaCobertura, SensibilidadAlRadio, SerieAnual } from ".
 import TablaBarrios from "./TablaBarrios";
 import Salvedades from "./Salvedades";
 import Pronostico from "./Pronostico";
+import Poblacion from "./Poblacion";
 import Cuando from "./Cuando";
 
 // Leaflet toca `window` al importarse, así que no puede renderizar en el servidor
@@ -341,6 +342,13 @@ export default function Dashboard() {
             </section>
           </div>
         </div>
+
+        {/* la demografía va a lo ancho y arriba de la tabla: es el denominador
+            de la tasa que esa tabla muestra, y leerlo después es leerlo tarde */}
+        <Poblacion
+          datos={datos.demografia} comuna={comuna} barrio={barrio}
+          onComuna={setComuna} onBarrio={elegirBarrio}
+        />
 
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
           <section className="card overflow-hidden max-h-[30rem] flex flex-col">
