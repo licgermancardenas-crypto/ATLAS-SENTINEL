@@ -592,14 +592,14 @@ def exportar_demografia() -> None:
     qué hacer con eso.
     """
     demo = PROCESSED / "demografia_comuna.parquet"
-    sexo_b = PROCESSED / "sexo_barrio.parquet"
+    sexo_b = PROCESSED / "socio_barrio.parquet"
     if not (demo.exists() and sexo_b.exists()):
         print("demografia.json: falta correr pipeline/ingest_demografia.py — se omite")
         return
 
     edad = pd.read_parquet(demo)
     sb = pd.read_parquet(sexo_b)
-    sc = pd.read_parquet(PROCESSED / "sexo_comuna.parquet")
+    sc = pd.read_parquet(PROCESSED / "socio_comuna.parquet")
     km2_barrio, km2_comuna = _areas_km2()
 
     comuna_de = (pd.read_parquet(PROCESSED / "barrios.parquet")
@@ -617,6 +617,9 @@ def exportar_demografia() -> None:
             "mujeres": int(r.poblacion_mujeres),
             "area_km2": round(area, 2) if util else None,
             "densidad": round(r.poblacion_total / area) if util else None,
+            "hogares": int(r.hogares_total),
+            "hogares_nbi": int(r.hogares_con_nbi),
+            "pct_nbi": float(r.pct_hogares_nbi),
         })
 
     edad = edad.set_index("comuna")
@@ -633,6 +636,9 @@ def exportar_demografia() -> None:
             "mujeres": int(r.poblacion_mujeres),
             "area_km2": round(area, 2) if util else None,
             "densidad": round(r.poblacion_total / area) if util else None,
+            "hogares": int(r.hogares_total),
+            "hogares_nbi": int(r.hogares_con_nbi),
+            "pct_nbi": float(r.pct_hogares_nbi),
             # el bloque de edad es del otro censo, por eso lleva su propia
             # población y no reusa la de arriba
             "poblacion_2022": int(e["poblacion_2022"]),
@@ -655,6 +661,8 @@ def exportar_demografia() -> None:
     pob10 = sum(c["poblacion"] for c in comunas)
     varones = sum(c["varones"] for c in comunas)
     mujeres = sum(c["mujeres"] for c in comunas)
+    hogares = sum(c["hogares"] for c in comunas)
+    hogares_nbi = sum(c["hogares_nbi"] for c in comunas)
     km2 = float(km2_comuna.sum())
 
     miles = lambda n: f"{n:,}".replace(",", ".")
@@ -663,6 +671,11 @@ def exportar_demografia() -> None:
         "poblacion": {
             "anio": ANIO_POBLACION, "total": pob10, "varones": varones, "mujeres": mujeres,
             "area_km2": round(km2, 1), "densidad": round(pob10 / km2),
+            "fuente": "Censo 2010 · radios censales",
+        },
+        "nbi": {
+            "anio": ANIO_POBLACION, "hogares": hogares, "hogares_nbi": hogares_nbi,
+            "pct": round(hogares_nbi / hogares * 100, 2),
             "fuente": "Censo 2010 · radios censales",
         },
         "edad": {
@@ -690,6 +703,18 @@ def exportar_demografia() -> None:
                 f"La Ciudad pasó de {miles(pob10)} a {miles(pob22)} habitantes entre los dos "
                 "(+8,0%), así que los porcentajes de edad no se pueden aplicar a la población "
                 "de 2010 para sacar cantidades de personas.",
+            "nbi":
+                "NBI es Necesidades Básicas Insatisfechas: un hogar tiene NBI si le falta alguna "
+                "de cinco condiciones básicas (hacinamiento, vivienda precaria, sin baño, un "
+                "chico sin escolarizar, o mucha carga por miembro que trabaja). Es del Censo "
+                "2010 y mide pobreza estructural, no ingreso: no se mueve con la inflación ni "
+                "con el ciclo económico, y por eso tampoco refleja los cambios de los últimos "
+                "quince años. El porcentaje se calcula sobre hogares, no sobre personas.",
+            "nbi_no_es_riesgo":
+                "El mapa de NBI no es un mapa de riesgo, y el proyecto lo tiene medido: la "
+                "correlación entre NBI y el riesgo predicho por comuna cae de 0,41 a 0,14 al "
+                "controlar por historial delictivo. La mayor parte de esa relación es indirecta. "
+                "Ver la auditoría de equidad en el README.",
             "denominador":
                 "Las tasas de delito del tablero siguen usando la población de 2010: es la única "
                 "que existe por barrio y la única comparable con NBI y hacinamiento, que son del "

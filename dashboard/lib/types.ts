@@ -53,7 +53,7 @@ export const tipoInfo = (t: TipoDelito) => TIPOS.find((x) => x.key === t)!;
  *  filtro de tipo — cambia la geometría que se dibuja, no solo el color.
  */
 
-export type Superficie = "riesgo" | "densidad" | "mayores" | "chicos";
+export type Superficie = "riesgo" | "densidad" | "nbi" | "mayores" | "chicos";
 
 export const SUPERFICIES: {
   key: Superficie; label: string; corto: string; descripcion: string;
@@ -62,7 +62,7 @@ export const SUPERFICIES: {
    *  población y superficie están por barrio; la edad se queda en comuna. */
   unidad: "barrio" | "comuna";
   /** Campo demográfico a pintar. Vacío para el riesgo, que sale de otro lado. */
-  campo?: "densidad" | "pct_65" | "pct_0_14";
+  campo?: "densidad" | "pct_nbi" | "pct_65" | "pct_0_14";
   /** Cómo se escriben los cortes de la leyenda. */
   formato: "riesgo" | "pct" | "entero";
 }[] = [
@@ -72,6 +72,9 @@ export const SUPERFICIES: {
   { key: "densidad", label: "Densidad de población", corto: "Densidad", unidad: "barrio",
     campo: "densidad", formato: "entero",
     descripcion: "Habitantes por km², Censo 2010 · por barrio" },
+  { key: "nbi", label: "Hogares con NBI", corto: "NBI", unidad: "barrio",
+    campo: "pct_nbi", formato: "pct",
+    descripcion: "% de hogares con Necesidades Básicas Insatisfechas, Censo 2010 · por barrio" },
   { key: "mayores", label: "Edad · 65 y más", corto: "65 y más", unidad: "comuna",
     campo: "pct_65", formato: "pct",
     descripcion: "% de población de 65 años y más, Censo 2022 · solo hay dato por comuna" },
@@ -303,6 +306,10 @@ export interface DemoBarrio {
   mujeres: number;
   area_km2: number | null;
   densidad: number | null;
+  hogares: number;
+  hogares_nbi: number;
+  /** % de hogares con NBI, calculado sobre conteos y no promediando radios. */
+  pct_nbi: number;
 }
 
 export interface DemoComuna extends Omit<DemoBarrio, "nombre"> {
@@ -329,6 +336,9 @@ export interface Demografia {
     anio: number; total: number; varones: number; mujeres: number;
     area_km2: number; densidad: number; fuente: string;
   };
+  nbi: {
+    anio: number; hogares: number; hogares_nbi: number; pct: number; fuente: string;
+  };
   edad: {
     anio: number; total: number;
     hab_0_14: number; hab_15_64: number; hab_65: number;
@@ -340,6 +350,8 @@ export interface Demografia {
     edad_solo_comuna: string;
     edad_derivada: string;
     dos_censos: string;
+    nbi: string;
+    nbi_no_es_riesgo: string;
     denominador: string;
   };
 }

@@ -31,6 +31,10 @@ es de 0,09 — compatible con que INDEC publica el 65+ con un decimal y los
 índices redondeados a entero. O sea que la derivación es correcta y lo que
 queda es ruido de redondeo, no error de método.
 
+**NBI: existe por radio, y se agrega ponderando por hogares.** Es el otro
+dato socioeconómico con desglose fino del repo, y hasta ahora solo se usaba
+promediado a comuna en la auditoría de equidad.
+
 **Sexo: exacto, no aproximado.** `radios_censales.parquet` (Censo 2010) trae
 varones y mujeres por radio. Asignando cada radio a su barrio por punto en
 polígono, la suma por barrio da **idéntica** a `poblacion_barrio.parquet` —
@@ -140,8 +144,18 @@ def demografia_comuna() -> pd.DataFrame:
     return d
 
 
-def sexo_por_barrio() -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Varones y mujeres por barrio y por comuna, agregando radios censales."""
+def socio_por_barrio() -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Sexo y NBI por barrio y por comuna, agregando radios censales.
+
+    **El NBI se calcula desde los conteos, nunca promediando la columna.**
+    `radios_censales.pct_hogares_nbi` es una **fracción** (0 a 0,89) mientras
+    que `socioeconomico_comuna.pct_hogares_nbi` es un **porcentaje** (15,9):
+    mismo nombre de columna, dos escalas. Y aunque estuvieran en la misma, el
+    promedio simple de radios le daría el mismo peso a uno de 40 hogares que a
+    uno de 400. Sumando `hogares_con_nbi` y `hogares_total` y dividiendo, el
+    resultado por comuna coincide con el archivo oficial dentro de 0,05 puntos
+    en las quince — que es su redondeo.
+    """
     radios = pd.read_parquet(PROCESSED_DIR / "radios_censales.parquet")
     barrios = pd.read_parquet(PROCESSED_DIR / "barrios.parquet")
 
@@ -166,7 +180,8 @@ def sexo_por_barrio() -> tuple[pd.DataFrame, pd.DataFrame]:
             how="left").drop(columns="index_right")
         j.loc[huerfanos, "nombre"] = cercano["nombre"].values
 
-    cols = ["poblacion_total", "poblacion_varones", "poblacion_mujeres"]
+    cols = ["poblacion_total", "poblacion_varones", "poblacion_mujeres",
+            "hogares_total", "hogares_con_nbi"]
     por_barrio = j.groupby("nombre")[cols].sum().reset_index().rename(columns={"nombre": "barrio"})
 
     # **El total manda el censo; los radios solo aportan la proporción.**
@@ -195,6 +210,13 @@ def sexo_por_barrio() -> tuple[pd.DataFrame, pd.DataFrame]:
                                        - por_barrio["poblacion_varones"])
     por_barrio = por_barrio.drop(columns=["clave", "poblacion"])
 
+    # Los hogares NO se reajustan: no hay archivo oficial de hogares por barrio
+    # contra el cual reconciliarlos, así que quedan como la suma de radios. La
+    # consecuencia es que el hogar del radio de borde Belgrano/Núñez cuenta de
+    # un lado distinto que sus habitantes. Sobre 1.150.134 hogares es
+    # irrelevante para el porcentaje, y la alternativa —inventar un reparto—
+    # sería peor que la inconsistencia.
+
     # La comuna se arma sumando **barrios**, no agrupando por la columna
     # `comuna` del propio radio. Los dos caminos difieren en unos pocos radios
     # de borde —la comuna 13 daba 231.331 por un lado y 230.767 por el otro— y
@@ -204,6 +226,11 @@ def sexo_por_barrio() -> tuple[pd.DataFrame, pd.DataFrame]:
     comuna_de = barrios.set_index("nombre")["comuna"].astype(int)
     por_comuna = (por_barrio.assign(comuna=por_barrio["barrio"].map(comuna_de))
                   .groupby("comuna")[cols].sum().reset_index())
+
+    # el porcentaje se deriva recién acá, de los conteos ya agregados, para que
+    # barrio y comuna salgan de la misma cuenta y no de promediar la de abajo
+    for d in (por_barrio, por_comuna):
+        d["pct_hogares_nbi"] = (d["hogares_con_nbi"] / d["hogares_total"] * 100).round(2)
     return por_barrio, por_comuna
 
 
@@ -220,18 +247,21 @@ def main() -> None:
         raise SystemExit(f"La derivación de grupos de edad no cierra: desvío de {peor:.2f} puntos")
     edad.to_parquet(PROCESSED_DIR / "demografia_comuna.parquet", index=False)
 
-    barrio, comuna = sexo_por_barrio()
+    barrio, comuna = socio_por_barrio()
     censo = pd.read_parquet(PROCESSED_DIR / "poblacion_barrio.parquet")["poblacion"].sum()
     total = barrio["poblacion_total"].sum()
-    print(f"Sexo por barrio (Censo 2010): {len(barrio)} barrios, {total:,} habitantes "
+    nbi = barrio["hogares_con_nbi"].sum() / barrio["hogares_total"].sum() * 100
+    print(f"Sexo y NBI por barrio (Censo 2010): {len(barrio)} barrios, {total:,} habitantes "
           f"({barrio['poblacion_varones'].sum():,} varones, "
           f"{barrio['poblacion_mujeres'].sum():,} mujeres)")
+    print(f"  {barrio['hogares_total'].sum():,} hogares, "
+          f"{barrio['hogares_con_nbi'].sum():,} con NBI ({nbi:.2f}%)")
     print(f"  control contra poblacion_barrio.parquet: {total - censo:+,}")
     if total != censo:
         raise SystemExit(f"La suma de radios por barrio no da el censo por barrio ({total-censo:+,})")
 
-    barrio.to_parquet(PROCESSED_DIR / "sexo_barrio.parquet", index=False)
-    comuna.to_parquet(PROCESSED_DIR / "sexo_comuna.parquet", index=False)
+    barrio.to_parquet(PROCESSED_DIR / "socio_barrio.parquet", index=False)
+    comuna.to_parquet(PROCESSED_DIR / "socio_comuna.parquet", index=False)
 
 
 if __name__ == "__main__":

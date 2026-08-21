@@ -194,23 +194,27 @@ export default function Mapa({
       return;
     }
 
-    /* Las dos superficies que se dibujan por barrio —riesgo y densidad—
+    /* Todas las superficies que se dibujan por barrio —riesgo, densidad, NBI—
        comparten capa y solo cambian de dónde sale el valor y con qué rampa se
-       pinta. La densidad no está en `barrios_riesgo.geojson`: vive en
-       `demografia.json` y se cruza por nombre acá, en vez de duplicarla en el
-       geojson, que es lo que garantiza que no se desincronicen. */
-    const porDensidad = superficie === "densidad";
-    const densidadDe = new Map(
-      datos.demografia.barrios.map((b) => [b.nombre, b.densidad]));
+       pinta. Las demográficas no están en `barrios_riesgo.geojson`: viven en
+       `demografia.json` y se cruzan por nombre acá, en vez de duplicarlas en
+       el geojson, que es lo que garantiza que no se desincronicen. */
+    /* Acá abajo `info.unidad` ya es "barrio" —la rama de comuna retornó— así
+       que el campo solo puede ser uno de los dos que existen en `DemoBarrio`.
+       El tipo de `campo` es la unión de todas las superficies y TypeScript no
+       puede deducir el recorte desde el `return` de arriba, así que se afirma
+       acá, en el único lugar donde el invariante está a la vista. */
+    const campoDemo = info.campo as "densidad" | "pct_nbi" | undefined;
+    const demoDe = new Map(datos.demografia.barrios.map((b) => [b.nombre, b]));
 
     const clave = claveRiesgo(turno, tipo);
     const claveD = claveDelitos(tipo);
     const valorDe = (p: BarrioProps): number =>
-      porDensidad ? (densidadDe.get(p.nombre) ?? 0) : (p[clave] as number);
+      campoDemo ? (demoDe.get(p.nombre)?.[campoDemo] ?? 0) : (p[clave] as number);
 
     const valores = datos.barrios.features.map((f) => valorDe(f.properties));
     const cortes = cortesPorCuantil(valores);
-    const paleta = porDensidad ? paletaEdad() : paletaRiesgo();
+    const paleta = campoDemo ? paletaEdad() : paletaRiesgo();
 
     const estilo = (f?: Feature): L.PathOptions => {
       const p = (f?.properties ?? {}) as BarrioProps;
@@ -236,18 +240,25 @@ export default function Mapa({
           : `Riesgo ${TURNO_LABEL[turno]}${tipo === "todos" ? "" : " (agregado)"}`;
         const etiquetaDelitos =
           tipo === "todos" ? "Delitos 2025" : `${tipoInfo(tipo).label} 2025`;
-        const dens = densidadDe.get(p.nombre);
-        const lineaDensidad = dens == null ? ""
-          : `Densidad: <strong class="tabular">${num(dens)}</strong> hab/km²<br/>`;
+        /* El tooltip siempre trae densidad y NBI; lo que cambia es el orden:
+           el número que explica el color va primero. Un tooltip que empieza
+           por otra cosa obliga a buscar el dato que uno estaba mirando. */
+        const d = demoDe.get(p.nombre);
+        const lineaDensidad = d?.densidad == null ? ""
+          : `Densidad: <strong class="tabular">${num(d.densidad)}</strong> hab/km²<br/>`;
+        const lineaNbi = d == null ? ""
+          : `Hogares con NBI: <strong class="tabular">${num1(d.pct_nbi)}%</strong> ` +
+            `<span style="color:var(--text-secondary)">(${num(d.hogares_nbi)} de ${num(d.hogares)})</span><br/>`;
+        const destacada = campoDemo === "pct_nbi" ? lineaNbi
+          : campoDemo === "densidad" ? lineaDensidad : "";
+        const resto = [lineaDensidad, lineaNbi].filter((x) => x !== destacada).join("");
         layer.bindTooltip(
           `<strong>${p.nombre}</strong><br/>` +
             `<span style="color:var(--text-secondary)">Comuna ${p.comuna ?? "—"} · ${p.n_hex} celdas</span><br/>` +
-            // cuando lo que se pinta es la densidad, va primera: el tooltip
-            // tiene que empezar por el número que explica el color
-            (porDensidad ? lineaDensidad : "") +
+            destacada +
             `${etiquetaRiesgo}: <strong class="tabular">${num3(p[clave] as number)}</strong><br/>` +
             `${etiquetaDelitos}: <strong class="tabular">${num(p[claveD] as number)}</strong><br/>` +
-            (porDensidad ? "" : lineaDensidad) +
+            resto +
             `<span style="color:var(--text-secondary)">${num(p.poblacion as number)} hab.</span>`,
           { className: "sige-tip", sticky: true, direction: "top" },
         );

@@ -251,8 +251,9 @@ export default function Dashboard() {
   // sobre barrios dejaría la escala diciendo una cosa y el mapa otra.
   const cortes = supInfo.unidad === "comuna"
     ? cortesPorCuantil(datos.comunasGeo.features.map((f) => f.properties[supInfo.campo!] ?? NaN))
-    : superficie === "densidad"
-    ? cortesPorCuantil(datos.demografia.barrios.map((b) => b.densidad ?? NaN))
+    : supInfo.campo
+    ? cortesPorCuantil(datos.demografia.barrios.map(
+        (b) => (b[supInfo.campo as "densidad" | "pct_nbi"] as number | null) ?? NaN))
     : cortesPorCuantil(props.map((b) => b[clave] as number));
 
   // la cascada de frecuencias sí puede seguir la selección territorial, porque
@@ -456,6 +457,8 @@ function AvisoSuperficie({
         delito, que siguen filtrando el resto del tablero.{" "}
         {info.unidad === "comuna"
           ? "El Censo 2022 no está publicado por barrio."
+          : superficie === "nbi"
+          ? "NBI mide pobreza estructural del Censo 2010, sobre hogares y no sobre personas. Y no es un mapa de riesgo: la correlación entre NBI y riesgo predicho por comuna cae de 0,41 a 0,14 al controlar por historial delictivo."
           : "La densidad divide la población del Censo 2010 por la superficie del polígono."}
       </Aviso>
     );

@@ -1136,6 +1136,7 @@ El mapa dibujaba siempre riesgo por barrio; ahora el selector **"Superficie del 
 |---|---|---|
 | Riesgo | barrio (48) | el modelo predice por hexágono y se agrega a barrio |
 | Densidad | **barrio** (48) | población y superficie existen a ese grano |
+| Hogares con NBI | **barrio** (48) | el NBI está por radio censal y se agrega exacto |
 | Edad · 65 y más / 0 a 14 | **comuna** (15) | el Censo 2022 no está publicado más fino |
 
 La regla es una sola: **cada superficie se dibuja en la unidad más fina que su dato realmente tenga**, y el título del mapa la nombra. Por eso la rama del código no pregunta "¿esto es demografía?" sino "¿en qué unidad vive este dato?" — la densidad es demografía y aun así va por barrio.
@@ -1151,6 +1152,20 @@ Lo que se ve: el sur (comunas 4 y 8) concentra los chicos y el norte y centro lo
 La densidad **no vive en `barrios_riesgo.geojson`**: está en `demografia.json` y se cruza por nombre en el momento de pintar. Duplicarla en el geojson sería más directo, pero es exactamente cómo dos copias del mismo número terminan desincronizándose — el problema que este README ya tiene documentado tres veces. El tooltip del barrio la muestra siempre, y la pone **primero** cuando es lo que da el color: un tooltip tiene que empezar por el número que explica lo que se está viendo.
 
 Lo que se ve en densidad: el rango entre barrios es de **34 a 1** en población (Palermo 226.534, Puerto Madero 6.726) pero de **24 a 1** en densidad (32.512 hab/km² contra 1.334). Son dos mapas distintos, y esa es justamente la razón por la que el tablero rankea por tasa cada 100.000 y no por conteo.
+
+### NBI, y una trampa de unidades
+
+El NBI estaba en el repo desde Capa 0 —`radios_censales.parquet` trae `hogares_con_nbi` y `hogares_total` en los 3.554 radios— pero solo se usaba promediado a comuna en la auditoría de equidad. Agregado a barrio queda en la misma unidad que el resto del tablero.
+
+**Se calcula desde los conteos, nunca promediando la columna.** Dos razones, y la primera es una trampa: `radios_censales.pct_hogares_nbi` es una **fracción** (0 a 0,8889) mientras que `socioeconomico_comuna.pct_hogares_nbi` es un **porcentaje** (15,9). Mismo nombre de columna, dos escalas, y el promedio simple de radios da 0,06 donde la respuesta es 5,98%. La segunda razón vale igual sin la trampa: promediar radios le daría el mismo peso a uno de 40 hogares que a uno de 400.
+
+Control: sumando `hogares_con_nbi` y `hogares_total` por comuna, el resultado coincide con `socioeconomico_comuna.parquet` dentro de **0,05 puntos en las quince** — su redondeo.
+
+Los hogares **no se reconcilian** contra un archivo oficial por barrio, porque no existe: quedan como la suma de radios. La consecuencia es que el hogar del radio de borde Belgrano/Núñez cuenta de un lado distinto que sus habitantes; sobre 1.150.134 hogares no mueve ningún porcentaje, y la alternativa —inventar un reparto— sería peor que la inconsistencia.
+
+Ciudad: **5,98%** de los hogares (68.776 de 1.150.134). Por barrio va de Constitución (24,3%), La Boca (21,2%) y Monserrat (19,2%) a Versalles (0,8%).
+
+**El mapa de NBI no es un mapa de riesgo, y el tablero lo dice donde se cometería el error** — en la franja bajo el mapa, con el número de la auditoría de equidad: la correlación entre NBI y riesgo predicho por comuna cae de 0,41 a 0,14 al controlar por historial delictivo. Es también la razón por la que las superficies demográficas usan una rampa azul y no la ámbar del riesgo.
 
 ## Módulo 3D — la Ciudad construida (`pipeline/ingest_tejido_urbano.py`, `build_base_3d.py`, `dashboard/app/3d/`)
 
