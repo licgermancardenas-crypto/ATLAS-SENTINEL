@@ -189,6 +189,41 @@ export interface CurvaK {
   curva: PuntoCurvaK[];
 }
 
+/* ------------------------------------------------- cobertura de población
+ *
+ *  La curva de cobertura del Módulo A mide **riesgo** cubierto, que es lo
+ *  correcto para priorizar y lo que nadie puede dimensionar. Esta serie mide
+ *  lo mismo en habitantes, sobre los mismos hexágonos y el mismo plan, y
+ *  además guarda qué pasaría si el optimizador maximizara gente en vez de
+ *  riesgo — que no es lo mismo y hasta ahora no estaba a la vista.
+ */
+
+export interface PuntoCoberturaPoblacion {
+  k: number;
+  estado?: string;
+  /** Fracción del riesgo cubierta por el plan que optimiza riesgo. */
+  riesgo: number | null;
+  /** Fracción de la población cubierta por ese mismo plan. */
+  poblacion: number | null;
+  habitantes?: number;
+  /** Lo que cubriría un plan que maximizara población, al mismo K. */
+  poblacion_si_optimiza_poblacion?: number;
+  /** Y cuánto riesgo dejaría sin cubrir ese plan. */
+  riesgo_si_optimiza_poblacion?: number;
+  /** Fracción de ubicaciones compartidas entre los dos planes. */
+  solape_planes?: number;
+}
+
+export interface CoberturaPoblacion {
+  turno: string;
+  radio_m: number;
+  n_demanda: number;
+  n_comisarias: number;
+  poblacion_total: number;
+  actual: { riesgo: number; poblacion: number; habitantes: number };
+  curva: PuntoCoberturaPoblacion[];
+}
+
 export interface FilaRadio {
   radio_m: number;
   cobertura_actual: number;
@@ -401,6 +436,7 @@ export interface DatosDashboard {
   pronostico: Pronostico;
   demografia: Demografia;
   comunasGeo: ComunasGeoJSON;
+  coberturaPob: CoberturaPoblacion;
   resumen: Resumen;
 }
 

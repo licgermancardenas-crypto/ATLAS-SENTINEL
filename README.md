@@ -702,6 +702,38 @@ Salida en `sensibilidad_radio_patrullas.json`.
 
 `TURNO` es un parámetro al inicio del script y `K` se pasa por línea de comandos (`--k 75`), pensados como los sliders de un dashboard futuro. El plan de K=40 conserva el nombre de archivo histórico (`modulo_a_patrullas_Tarde.parquet`) porque es el que citan las tablas de arriba; cualquier otro K va a `modulo_a_patrullas_Tarde_k{K}.parquet` para que un escenario no pise al otro. La curva completa de cobertura vs. K se puede regenerar reusando la matriz de cobertura una sola vez — lo caro es el Dijkstra desde los 476 candidatos (~6s), no resolver el MCLP (<1s por valor de K).
 
+## Cobertura de población, no solo de riesgo (`src/optimization/cobertura_poblacion.py`)
+
+El Módulo A siempre reportó "las 75 comisarías cubren **35,1%**", y ese porcentaje es de **riesgo predicho**. Es la métrica correcta para priorizar y es la que nadie puede dimensionar: no hay forma de saber si 35,1% del riesgo es mucho o poco. La pregunta que sí se dimensiona sola —*cuánta gente vive a menos de 800 m de calle real de una comisaría*— estaba a un cálculo de distancia, porque la demanda del MCLP son los mismos 401 hexágonos para los que `hex_poblacion.parquet` tiene población prorrateada.
+
+**El resultado principal es una brecha de diez puntos.**
+
+| | Riesgo cubierto | Población cubierta | Personas |
+|---|---|---|---|
+| Hoy (75 comisarías) | 35,1% | **25,0%** | 723.292 |
+| Plan optimizado, K=75 | 58,7% | **40,9%** | 1.183.489 |
+
+Tres de cada cuatro habitantes de la Ciudad no viven a 800 m de calle de una comisaría. El plan optimizado mejora las dos cosas, pero la brecha se mantiene: **el riesgo siempre queda más cubierto que la gente**, y no es un defecto del optimizador sino de cómo están repartidas las dos cosas. El microcentro concentra delito con poca gente viviendo ahí; el sur tiene mucha gente y menos delito registrado.
+
+### La decisión de política que estaba escondida en el objetivo
+
+Si el problema es el mismo salvo por lo que se maximiza, vale preguntarse qué pasaría optimizando gente. Se corre el **mismo MCLP** —misma restricción de equidad por comuna, mismo radio, mismos 476 candidatos— cambiando solo la columna del objetivo:
+
+| K=75 | Riesgo cubierto | Población cubierta | Solape de ubicaciones |
+|---|---|---|---|
+| Optimizando riesgo | **58,7%** | 40,9% | — |
+| Optimizando población | 48,0% | **46,8%** | **56%** |
+
+Optimizar por gente suma 5,9 puntos de población y cuesta 10,7 de riesgo, y **cambia casi la mitad de las ubicaciones**. O sea que hay una decisión de política adentro del optimizador —a quién se prioriza— que hasta ahora no estaba a la vista de nadie que mirara el tablero. Ahora está, con los dos números y el solape.
+
+Que la comparación sea legítima depende de que las dos corridas sean el mismo modelo, así que `resolver_mclp` y `cobertura_lograda` tomaron un parámetro `peso` en vez de duplicarse: la formulación es literalmente la misma función y lo único que cambia entre las dos ramas es qué columna se suma. Si mañana cambia la restricción de equidad, las dos la heredan.
+
+### En el tablero
+
+La curva de cobertura pasó a tener **dos series** —riesgo en el azul de marca, población en el índigo de las capas demográficas, que en este tablero ya significa "esto es población"— y **dos líneas de referencia** para lo que cubren hoy las 75 comisarías. Debajo va la lectura en habitantes y la comparación de objetivos. Las dos tarjetas de KPI de cobertura agregaron el porcentaje de población en su nota.
+
+Nota de método: la población por hexágono sale del prorrateo por área de `overlay_poligonos.py` y es Censo 2010, el mismo denominador que la tasa cada 100.000. Un hexágono sin población cruzada haría el script abortar en vez de contarlo como cero — contarlo como cero lo sacaría del numerador y del denominador a la vez, y la cobertura saldría inflada.
+
 ## Módulo B — Ubicación de cámaras nuevas (`src/optimization/modulo_b_camaras.py`)
 
 Weighted Max Coverage resuelto greedy (no MILP — el documento pide un ranking por ganancia marginal, que es justo lo que da el algoritmo greedy clásico). Peso por hexágono = riesgo (promedio de turnos) × boost por baja densidad de alumbrado × boost por alto flujo peatonal (ecobici + molinetes, combinados por percentil porque las escalas no son comparables) × descuento si ya está cubierto por una cámara existente. Candidatos: hexágonos a más de 100m de una cámara actual (224 cámaras reales).

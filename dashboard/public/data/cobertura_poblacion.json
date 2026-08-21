@@ -1,0 +1,120 @@
+{
+ "turno": "Tarde",
+ "radio_m": 800,
+ "n_demanda": 401,
+ "n_comisarias": 75,
+ "poblacion_total": 2890151,
+ "actual": {
+  "riesgo": 0.35092838880283334,
+  "poblacion": 0.2502608065879045,
+  "habitantes": 723292
+ },
+ "curva": [
+  {
+   "k": 5,
+   "estado": "Infeasible",
+   "riesgo": null,
+   "poblacion": null
+  },
+  {
+   "k": 10,
+   "estado": "Optimal",
+   "riesgo": 0.12533786480847778,
+   "poblacion": 0.06954629563798131,
+   "poblacion_si_optimiza_poblacion": 0.09280374335093196,
+   "riesgo_si_optimiza_poblacion": 0.08104761402505067,
+   "solape_planes": 0.3,
+   "habitantes": 200999
+  },
+  {
+   "k": 15,
+   "estado": "Optimal",
+   "riesgo": 0.20654767785285713,
+   "poblacion": 0.12379182083089565,
+   "poblacion_si_optimiza_poblacion": 0.15100201840669772,
+   "riesgo_si_optimiza_poblacion": 0.1450905318805581,
+   "solape_planes": 0.4,
+   "habitantes": 357777
+  },
+  {
+   "k": 20,
+   "estado": "Optimal",
+   "riesgo": 0.2704248332046236,
+   "poblacion": 0.15464120654076866,
+   "poblacion_si_optimiza_poblacion": 0.19333676161585994,
+   "riesgo_si_optimiza_poblacion": 0.20427367396839038,
+   "solape_planes": 0.4,
+   "habitantes": 446936
+  },
+  {
+   "k": 30,
+   "estado": "Optimal",
+   "riesgo": 0.35587082302396,
+   "poblacion": 0.21618745469611425,
+   "poblacion_si_optimiza_poblacion": 0.2564344641322125,
+   "riesgo_si_optimiza_poblacion": 0.255348661069494,
+   "solape_planes": 0.4666666666666667,
+   "habitantes": 624814
+  },
+  {
+   "k": 40,
+   "estado": "Optimal",
+   "riesgo": 0.4181120877662446,
+   "poblacion": 0.2680255705726899,
+   "poblacion_si_optimiza_poblacion": 0.31014494562422873,
+   "riesgo_si_optimiza_poblacion": 0.29672513149269636,
+   "solape_planes": 0.475,
+   "habitantes": 774634
+  },
+  {
+   "k": 50,
+   "estado": "Optimal",
+   "riesgo": 0.47490207423130704,
+   "poblacion": 0.3081604131916989,
+   "poblacion_si_optimiza_poblacion": 0.35959008319334035,
+   "riesgo_si_optimiza_poblacion": 0.3893011327298393,
+   "solape_planes": 0.56,
+   "habitantes": 890630
+  },
+  {
+   "k": 60,
+   "estado": "Optimal",
+   "riesgo": 0.5243317249533771,
+   "poblacion": 0.3524637077208211,
+   "poblacion_si_optimiza_poblacion": 0.40386025266964715,
+   "riesgo_si_optimiza_poblacion": 0.43154648899394116,
+   "solape_planes": 0.5333333333333333,
+   "habitantes": 1018673
+  },
+  {
+   "k": 75,
+   "estado": "Optimal",
+   "riesgo": 0.5865493453820925,
+   "poblacion": 0.4094904696329271,
+   "poblacion_si_optimiza_poblacion": 0.4684656316500824,
+   "riesgo_si_optimiza_poblacion": 0.4801621605530753,
+   "solape_planes": 0.56,
+   "habitantes": 1183489
+  },
+  {
+   "k": 90,
+   "estado": "Optimal",
+   "riesgo": 0.641853216831065,
+   "poblacion": 0.4603484789903846,
+   "poblacion_si_optimiza_poblacion": 0.5300201603016599,
+   "riesgo_si_optimiza_poblacion": 0.5445074522400036,
+   "solape_planes": 0.6222222222222222,
+   "habitantes": 1330477
+  },
+  {
+   "k": 110,
+   "estado": "Optimal",
+   "riesgo": 0.7081793645081319,
+   "poblacion": 0.5272277641459194,
+   "poblacion_si_optimiza_poblacion": 0.6013452365859727,
+   "riesgo_si_optimiza_poblacion": 0.6109557241924068,
+   "solape_planes": 0.6363636363636364,
+   "habitantes": 1523768
+  }
+ ]
+}

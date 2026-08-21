@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import type {
-  ComunaResumen, CurvaK, FilaSerie, SensibilidadRadio, TipoDelito, Turno,
+  CoberturaPoblacion, ComunaResumen, CurvaK, FilaSerie, SensibilidadRadio, TipoDelito, Turno,
 } from "@/lib/types";
 import { claveRiesgo, TIPOS, tipoInfo } from "@/lib/types";
 import { MESES, num, num1, pct, pp } from "@/lib/formato";
@@ -27,11 +27,11 @@ function Marco({ w, h, children, etiqueta }: {
 /* ---------------------------------------------------------------- curva K */
 
 export function CurvaCobertura({
-  curva, kActual, onK,
-}: { curva: CurvaK; kActual: number; onK: (k: number) => void }) {
+  curva, pob, kActual, onK,
+}: { curva: CurvaK; pob: CoberturaPoblacion; kActual: number; onK: (k: number) => void }) {
   const puntos = curva.curva.filter((p) => p.cobertura !== null) as
     { k: number; cobertura: number; reusa_comisaria?: number }[];
-  const w = 420, h = 190;
+  const w = 420, h = 205;
   const maxK = Math.max(...puntos.map((p) => p.k));
   const maxY = 0.8;
   const x = (k: number) => M.izq + (k / maxK) * (w - M.izq - M.der);
@@ -42,11 +42,22 @@ export function CurvaCobertura({
   const actual = curva.cobertura_actual;
   const sel = puntos.reduce((a, b) => (Math.abs(b.k - kActual) < Math.abs(a.k - kActual) ? b : a));
 
+  /* La segunda serie es la misma curva medida en gente en vez de en riesgo.
+     Va en el índigo de las capas demográficas y no en un color cualquiera: en
+     este tablero el índigo ya significa "esto es población". */
+  const pobPuntos = pob.curva.filter((p) => p.poblacion !== null) as
+    { k: number; poblacion: number; habitantes?: number }[];
+  const lineaPob = "M" + pobPuntos.map((p) => `${x(p.k).toFixed(1)},${y(p.poblacion).toFixed(1)}`).join(" L");
+  const selPob = pobPuntos.reduce((a, b) => (Math.abs(b.k - kActual) < Math.abs(a.k - kActual) ? b : a));
+  const azul = "var(--edad-4)";
+
   return (
     <Marco w={w} h={h} etiqueta={
-      `Curva de cobertura: con ${puntos[0].k} patrullas se cubre ${pct(puntos[0].cobertura)} del riesgo y ` +
-      `con ${maxK} se cubre ${pct(puntos[puntos.length - 1].cobertura)}. Las ${curva.n_comisarias} ` +
-      `comisarías actuales cubren ${pct(actual)}.`}>
+      `Dos curvas de cobertura contra la cantidad de patrullas. Con ${maxK} unidades se cubre ` +
+      `${pct(puntos[puntos.length - 1].cobertura)} del riesgo pero ` +
+      `${pct(pobPuntos[pobPuntos.length - 1].poblacion)} de la población. Las ` +
+      `${curva.n_comisarias} comisarías actuales cubren ${pct(actual)} del riesgo y ` +
+      `${pct(pob.actual.poblacion)} de la población.`}>
       {[0, 0.2, 0.4, 0.6, 0.8].map((v) => (
         <g key={v}>
           <line x1={M.izq} y1={y(v)} x2={w - M.der} y2={y(v)} stroke="var(--border)" strokeWidth="1" />
@@ -57,28 +68,46 @@ export function CurvaCobertura({
 
       <path d={area} fill="var(--brand-wash)" />
       <path d={linea} fill="none" stroke="var(--brand)" strokeWidth="2" strokeLinejoin="round" />
+      <path d={lineaPob} fill="none" stroke={azul} strokeWidth="2" strokeLinejoin="round" />
 
-      {/* referencia: lo que cubre hoy la infraestructura fija */}
+      {/* las dos referencias de "hoy": el riesgo y la gente que cubren las 75
+          comisarías donde ya están. Van las dos porque la brecha entre ellas
+          es el punto — 35,1% del riesgo es 25,0% de la población */}
       <line x1={M.izq} y1={y(actual)} x2={w - M.der} y2={y(actual)}
             stroke="var(--accent)" strokeWidth="1.5" strokeDasharray="4 3" />
       <text x={M.izq + 5} y={y(actual) - 5} fontSize="9.5" fill="var(--accent)" className="tabular">
-        {curva.n_comisarias} comisarías hoy · {pct(actual)}
+        hoy · {pct(actual)} del riesgo
+      </text>
+      <line x1={M.izq} y1={y(pob.actual.poblacion)} x2={w - M.der} y2={y(pob.actual.poblacion)}
+            stroke="var(--accent)" strokeWidth="1.5" strokeDasharray="4 3" opacity="0.6" />
+      <text x={M.izq + 5} y={y(pob.actual.poblacion) - 5} fontSize="9.5"
+            fill="var(--accent)" className="tabular" opacity="0.85">
+        hoy · {pct(pob.actual.poblacion)} de la gente
       </text>
 
       <line x1={x(sel.k)} y1={M.arr} x2={x(sel.k)} y2={y(0)} stroke="var(--brand)"
             strokeWidth="1" strokeDasharray="3 3" opacity="0.55" />
       <circle cx={x(sel.k)} cy={y(sel.cobertura)} r="5" fill="var(--brand)"
               stroke="var(--surface-2)" strokeWidth="2" />
+      <circle cx={x(selPob.k)} cy={y(selPob.poblacion)} r="5" fill={azul}
+              stroke="var(--surface-2)" strokeWidth="2" />
 
-      {puntos.map((p) => (
-        <g key={p.k}>
-          <circle cx={x(p.k)} cy={y(p.cobertura)} r="3" fill="var(--brand)" opacity={p.k === sel.k ? 0 : 0.55} />
-          <rect x={x(p.k) - 12} y={M.arr} width="24" height={h - M.arr - M.aba}
-                fill="transparent" className="cursor-pointer" tabIndex={0} role="button"
-                aria-label={`${p.k} patrullas, ${pct(p.cobertura)} de cobertura`}
-                onClick={() => onK(p.k)} onFocus={() => onK(p.k)} />
-        </g>
-      ))}
+      {puntos.map((p) => {
+        const pp = pobPuntos.find((q) => q.k === p.k);
+        return (
+          <g key={p.k}>
+            <circle cx={x(p.k)} cy={y(p.cobertura)} r="3" fill="var(--brand)"
+                    opacity={p.k === sel.k ? 0 : 0.55} />
+            {pp && <circle cx={x(pp.k)} cy={y(pp.poblacion)} r="3" fill={azul}
+                           opacity={pp.k === selPob.k ? 0 : 0.55} />}
+            <rect x={x(p.k) - 12} y={M.arr} width="24" height={h - M.arr - M.aba}
+                  fill="transparent" className="cursor-pointer" tabIndex={0} role="button"
+                  aria-label={`${p.k} patrullas: ${pct(p.cobertura)} del riesgo` +
+                              (pp ? `, ${pct(pp.poblacion)} de la población` : "")}
+                  onClick={() => onK(p.k)} onFocus={() => onK(p.k)} />
+          </g>
+        );
+      })}
 
       {[0, 30, 60, 90, maxK].map((k) => (
         <text key={k} x={x(k)} y={h - 12} textAnchor="middle" fontSize="10"
@@ -88,6 +117,52 @@ export function CurvaCobertura({
         patrullas desplegadas
       </text>
     </Marco>
+  );
+}
+
+/* La brecha entre las dos curvas no es un detalle de presentación: es una
+   decisión de política que hasta ahora vivía adentro del optimizador sin estar
+   a la vista de nadie que mirara el tablero. */
+
+export function BrechaCobertura({
+  pob, kActual,
+}: { pob: CoberturaPoblacion; kActual: number }) {
+  const p = pob.curva.find((q) => q.k === kActual) ?? pob.curva.find((q) => q.poblacion !== null);
+  if (!p || p.poblacion === null || p.riesgo === null) return null;
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex gap-4 flex-wrap text-[10.5px]">
+        <span className="inline-flex items-center gap-1.5 text-ink-2">
+          <span className="w-3 h-[2px] rounded" style={{ background: "var(--brand)" }} />
+          riesgo cubierto
+        </span>
+        <span className="inline-flex items-center gap-1.5 text-ink-2">
+          <span className="w-3 h-[2px] rounded" style={{ background: "var(--edad-4)" }} />
+          población cubierta
+        </span>
+      </div>
+      <p className="text-[11px] text-ink-2 leading-snug">
+        Con <strong className="tabular">{p.k}</strong> patrullas el plan cubre{" "}
+        <strong className="tabular">{pct(p.riesgo)}</strong> del riesgo y{" "}
+        <strong className="tabular">{pct(p.poblacion)}</strong> de la población:{" "}
+        <strong className="tabular">{num(p.habitantes ?? 0)}</strong> personas a menos de{" "}
+        {pob.radio_m} m de calle de un puesto.
+      </p>
+      {p.poblacion_si_optimiza_poblacion != null && p.riesgo_si_optimiza_poblacion != null && (
+        <p className="text-[10.5px] text-ink-muted leading-snug">
+          El riesgo siempre queda más cubierto que la gente, porque no están repartidos igual:
+          el microcentro concentra delito con poca gente viviendo ahí. Optimizando población en
+          vez de riesgo, el mismo presupuesto cubriría{" "}
+          <span className="tabular">{pct(p.poblacion_si_optimiza_poblacion)}</span> de los
+          habitantes pero solo <span className="tabular">{pct(p.riesgo_si_optimiza_poblacion)}</span>{" "}
+          del riesgo
+          {p.solape_planes != null && <>, y solo <span className="tabular">
+            {pct(p.solape_planes, 0)}</span> de las ubicaciones coincidiría</>}
+          . Cuál de los dos objetivos se elige es una decisión de política, no del modelo.
+        </p>
+      )}
+    </div>
   );
 }
 

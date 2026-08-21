@@ -26,6 +26,9 @@ Salidas en dashboard/public/data/:
 - perfil_temporal.json     cuándo ocurren: por hora, por día de la semana y por
                            turno, cortado por tipo. Es lo que alimenta los
                            indicadores de frecuencia del tablero.
+- cobertura_poblacion.json cuanta *gente* cubre el Modulo A, no solo cuanto
+                           riesgo, y cuanto cambiaria el plan si el objetivo
+                           fuera la poblacion en vez del riesgo.
 - demografia.json          cuanta gente vive en cada barrio y comuna, con el
                            corte por sexo (Censo 2010) y la estructura etaria
                            por comuna (Censo 2022). Dos censos distintos, cada
@@ -845,6 +848,7 @@ def main() -> None:
     exportar_comunas()
     copiar_json(FEATURES / "modulo_a_curva_k.json", "curva_k.json")
     copiar_json(FEATURES / "sensibilidad_radio_patrullas.json", "sensibilidad_radio.json")
+    copiar_json(FEATURES / "cobertura_poblacion.json", "cobertura_poblacion.json")
     exportar_serie_delitos()
     exportar_perfil_temporal()
     exportar_pronostico()

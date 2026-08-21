@@ -16,7 +16,9 @@ import {
   ChipsActivos, ControlK, SelectorCapa, SelectorComuna, SelectorSuperficie, SelectorTipo,
   SelectorTurno, ToggleTema,
 } from "./Controles";
-import { BarrasComuna, CurvaCobertura, SensibilidadAlRadio, SerieAnual } from "./Graficos";
+import {
+  BarrasComuna, BrechaCobertura, CurvaCobertura, SensibilidadAlRadio, SerieAnual,
+} from "./Graficos";
 import TablaBarrios from "./TablaBarrios";
 import Salvedades from "./Salvedades";
 import Pronostico from "./Pronostico";
@@ -132,6 +134,7 @@ export default function Dashboard() {
       && foco.some((b) => tasaInflada(b.presion_visitantes as number | null));
 
     const punto = datos.curvaK.curva.find((p) => p.k === kPatrullas);
+    const puntoPob = datos.coberturaPob.curva.find((p) => p.k === kPatrullas);
     const cob = punto?.cobertura ?? null;
     const actual = datos.curvaK.cobertura_actual;
 
@@ -189,15 +192,21 @@ export default function Dashboard() {
       {
         etiqueta: "Cobertura actual",
         valor: pct(actual),
-        nota: <>{datos.curvaK.n_comisarias} comisarías, donde están hoy</>,
-        ayuda: `Riesgo que queda a ${datos.curvaK.radio_m} m de calle de alguna comisaría.`,
+        nota: <>{datos.curvaK.n_comisarias} comisarías · {pct(datos.coberturaPob.actual.poblacion)}{" "}
+          de la población</>,
+        ayuda: `Riesgo que queda a ${datos.curvaK.radio_m} m de calle de alguna comisaría. `
+             + `Medido en habitantes en vez de en riesgo, esas mismas comisarías alcanzan a `
+             + `${num(datos.coberturaPob.actual.habitantes)} personas, el `
+             + `${pct(datos.coberturaPob.actual.poblacion)} de la Ciudad: el riesgo está más `
+             + `concentrado que la gente, así que cubrirlo no es lo mismo que cubrir residentes.`,
       },
       {
         etiqueta: `Cobertura con ${kPatrullas}`,
         valor: cob === null ? "—" : pct(cob),
         nota: cob === null
           ? <span className="text-[var(--bad)]">Sin solución: la equidad no se puede cumplir</span>
-          : <>{punto?.reusa_comisaria ?? 0} reutilizan comisaría</>,
+          : <>{punto?.reusa_comisaria ?? 0} reutilizan comisaría
+              {puntoPob?.poblacion != null && <> · {pct(puntoPob.poblacion)} de la población</>}</>,
         delta: cob === null ? undefined : { texto: pp(cob - actual), tono: cob >= actual ? "bueno" as const : "malo" as const },
         ayuda: "Resultado del optimizador para ese presupuesto de patrullas.",
       },
@@ -345,7 +354,11 @@ export default function Dashboard() {
               <p className="text-[11px] text-ink-muted mb-2">
                 Cada punto es una optimización completa, no una interpolación. Clic para fijar el escenario.
               </p>
-              <CurvaCobertura curva={datos.curvaK} kActual={kPatrullas} onK={setKPatrullas} />
+              <CurvaCobertura curva={datos.curvaK} pob={datos.coberturaPob}
+                              kActual={kPatrullas} onK={setKPatrullas} />
+              <div className="mt-2">
+                <BrechaCobertura pob={datos.coberturaPob} kActual={kPatrullas} />
+              </div>
             </section>
 
             <Cuando perfil={datos.perfil} tipo={tipo}

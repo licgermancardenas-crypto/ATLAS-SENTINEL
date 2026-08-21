@@ -119,19 +119,28 @@ def matriz_cobertura_euclidiana(demanda: pd.DataFrame, candidatos: pd.DataFrame)
 
 def resolver_mclp(
     demanda: pd.DataFrame, candidatos: pd.DataFrame, cobertura: np.ndarray, k: int,
-    devolver_estado: bool = False,
+    devolver_estado: bool = False, peso: str = "score_riesgo",
 ) -> list[int] | tuple[list[int], str]:
     """Con devolver_estado=True devuelve además el status del solver. Hace falta
     para el barrido de K (`barrido_k_patrullas.py`): con K chico la restricción
     de equidad vuelve el problema infactible, y ahí `elegidos` trae basura que
-    NO se puede reportar como cobertura — hay que descartar la corrida entera."""
+    NO se puede reportar como cobertura — hay que descartar la corrida entera.
+
+    `peso` es la columna de `demanda` que se maximiza. El default es el riesgo
+    predicho y es el único que usa el Módulo A; el parámetro existe para poder
+    resolver el mismo problema maximizando **población cubierta** y comparar
+    los dos planes (`cobertura_poblacion.py`). Va como parámetro y no como una
+    copia del solver para que la formulación —la restricción de equidad por
+    comuna, el radio, el manejo de hexágonos sin candidato a tiro— sea
+    literalmente la misma y la comparación mida el objetivo, no dos modelos
+    que se fueron separando."""
     n_dem, n_can = cobertura.shape
     prob = pulp.LpProblem("patrullas_mclp", pulp.LpMaximize)
 
     y = [pulp.LpVariable(f"y_{j}", cat="Binary") for j in range(n_can)]
     x = [pulp.LpVariable(f"x_{i}", cat="Binary") for i in range(n_dem)]
 
-    prob += pulp.lpSum(demanda["score_riesgo"].iloc[i] * x[i] for i in range(n_dem))
+    prob += pulp.lpSum(demanda[peso].iloc[i] * x[i] for i in range(n_dem))
     prob += pulp.lpSum(y) <= k
 
     for i in range(n_dem):
@@ -156,11 +165,15 @@ def resolver_mclp(
     return elegidos
 
 
-def cobertura_lograda(demanda: pd.DataFrame, cobertura: np.ndarray, indices_activos: list[int]) -> float:
+def cobertura_lograda(demanda: pd.DataFrame, cobertura: np.ndarray, indices_activos: list[int],
+                      peso: str = "score_riesgo") -> float:
+    """Fracción del `peso` total que queda cubierta. Con el default mide riesgo
+    cubierto, que es lo que reporta el Módulo A; con `peso="poblacion_hex"`
+    mide gente cubierta sobre los mismos hexágonos y el mismo plan."""
     if not indices_activos:
         return 0.0
     cubierto = cobertura[:, indices_activos].any(axis=1)
-    return demanda.loc[cubierto, "score_riesgo"].sum() / demanda["score_riesgo"].sum()
+    return demanda.loc[cubierto, peso].sum() / demanda[peso].sum()
 
 
 def ruta_salida(k: int) -> Path:
