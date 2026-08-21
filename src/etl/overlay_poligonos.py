@@ -15,6 +15,10 @@ por eso quedaron afuera de assign_hex_puntual.py:
   área terminaría siendo casi lo mismo que dividir por cantidad de hex,
   pero se calcula con el área real de cada uno para no asumirlo.
 
+- NBI por hex -> interpolacion areal desde los radios censales (overlay
+  real, no el prorrateo por barrio): el NBI varia mucho dentro de un mismo
+  barrio y promediarlo borraria la senal.
+
 Todo en EPSG:5347 (POSGAR 2007 faja 5) para que las áreas sean metros
 cuadrados reales, no grados².
 """
@@ -85,6 +89,39 @@ def poblacion_por_hex(hex_gdf: gpd.GeoDataFrame, hex_maestra: pd.DataFrame) -> p
     return resultado[["hex_id", "poblacion_hex"]]
 
 
+def nbi_por_hex(hex_gdf: gpd.GeoDataFrame) -> pd.DataFrame:
+    """Hogares y hogares con NBI por hexagono, por interpolacion areal.
+
+    Aca si conviene un overlay real contra los radios censales, y no el atajo
+    que usa `poblacion_por_hex` de prorratear dentro del barrio: el radio es
+    la unidad mas fina que existe (~800 habitantes contra ~7.200 de un hex) y
+    el NBI **varia muchisimo dentro de un mismo barrio** —es justo lo que
+    mide—. Prorratear el promedio del barrio borraria esa variacion, que es
+    la senal entera.
+
+    El supuesto de la interpolacion areal es que los hogares estan repartidos
+    de forma pareja dentro de cada radio. A esta escala es razonable: un radio
+    censal se dibuja precisamente para ser homogeneo.
+
+    Se devuelve el conteo y no el porcentaje: un porcentaje por hexagono no se
+    puede volver a agregar sin los pesos, y el uso de esta tabla es sumar
+    hogares sobre conjuntos de hexagonos (los que cubre un plan de patrullas).
+    """
+    radios = pd.read_parquet(PROCESSED / "radios_censales.parquet")
+    gdf = gpd.GeoDataFrame(
+        radios[["id_radio", "hogares_total", "hogares_con_nbi"]],
+        geometry=radios["geometry_wkt"].map(wkt.loads), crs=CRS_GEO).to_crs(CRS_METROS)
+    gdf["area_radio_m2"] = gdf.geometry.area
+
+    inter = gpd.overlay(hex_gdf[["hex_id", "geometry"]], gdf, how="intersection")
+    frac = inter.geometry.area / inter["area_radio_m2"]
+    inter["hogares_hex"] = inter["hogares_total"] * frac
+    inter["hogares_nbi_hex"] = inter["hogares_con_nbi"] * frac
+
+    return (inter.groupby("hex_id")[["hogares_hex", "hogares_nbi_hex"]].sum()
+            .reindex(hex_gdf["hex_id"]).fillna(0).reset_index())
+
+
 def main() -> None:
     hex_maestra = pd.read_parquet(FEATURES / "hex_maestra.parquet").dropna(subset=["barrio_id"])
     hex_gdf = cargar_gdf(FEATURES / "hex_maestra.parquet", ["hex_id"])
@@ -104,7 +141,16 @@ def main() -> None:
           f"(vs. {pd.read_parquet(PROCESSED / 'poblacion_barrio.parquet')['poblacion'].sum():,.0f} real)")
     poblacion.to_parquet(FEATURES / "hex_poblacion.parquet", index=False)
 
-    print("\nGuardado: hex_espacios_verdes.parquet, hex_comisaria_patrullaje.parquet, hex_poblacion.parquet")
+    nbi = nbi_por_hex(hex_gdf)
+    radios = pd.read_parquet(PROCESSED / "radios_censales.parquet")
+    print(f"NBI por hex: {nbi['hogares_hex'].sum():,.0f} hogares "
+          f"(vs. {radios['hogares_total'].sum():,.0f} en los radios), "
+          f"{nbi['hogares_nbi_hex'].sum():,.0f} con NBI "
+          f"({nbi['hogares_nbi_hex'].sum() / nbi['hogares_hex'].sum():.2%})")
+    nbi.to_parquet(FEATURES / "hex_nbi.parquet", index=False)
+
+    print("\nGuardado: hex_espacios_verdes.parquet, hex_comisaria_patrullaje.parquet, "
+          "hex_poblacion.parquet, hex_nbi.parquet")
 
 
 if __name__ == "__main__":

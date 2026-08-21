@@ -206,6 +206,10 @@ export interface PuntoCoberturaPoblacion {
   /** Fracción de la población cubierta por ese mismo plan. */
   poblacion: number | null;
   habitantes?: number;
+  /** Fracción de los hogares con NBI cubierta por el plan que optimiza riesgo. */
+  nbi?: number;
+  /** Ídem mayores de 65. Estimado: la edad solo existe por comuna. */
+  mayores?: number;
   /** Lo que cubriría un plan que maximizara población, al mismo K. */
   poblacion_si_optimiza_poblacion?: number;
   /** Y cuánto riesgo dejaría sin cubrir ese plan. */
@@ -220,7 +224,11 @@ export interface CoberturaPoblacion {
   n_demanda: number;
   n_comisarias: number;
   poblacion_total: number;
-  actual: { riesgo: number; poblacion: number; habitantes: number };
+  poblacion_vulnerable: { hogares_nbi: number; mayores_65: number };
+  actual: {
+    riesgo: number; poblacion: number; habitantes: number;
+    nbi: number; mayores: number;
+  };
   curva: PuntoCoberturaPoblacion[];
 }
 

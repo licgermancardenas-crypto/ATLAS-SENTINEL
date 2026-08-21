@@ -17,7 +17,7 @@ import {
   SelectorTurno, ToggleTema,
 } from "./Controles";
 import {
-  BarrasComuna, BrechaCobertura, CurvaCobertura, SensibilidadAlRadio, SerieAnual,
+  BarrasComuna, BrechaCobertura, CurvaCobertura, SensibilidadAlRadio, SerieAnual, Vulnerables,
 } from "./Graficos";
 import TablaBarrios from "./TablaBarrios";
 import Salvedades from "./Salvedades";
@@ -357,8 +357,9 @@ export default function Dashboard() {
               </p>
               <CurvaCobertura curva={datos.curvaK} pob={datos.coberturaPob}
                               kActual={kPatrullas} onK={setKPatrullas} />
-              <div className="mt-2">
+              <div className="mt-2 flex flex-col gap-2.5">
                 <BrechaCobertura pob={datos.coberturaPob} kActual={kPatrullas} />
+                <Vulnerables pob={datos.coberturaPob} kActual={kPatrullas} />
               </div>
             </section>
 

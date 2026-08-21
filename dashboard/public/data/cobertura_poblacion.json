@@ -4,10 +4,16 @@
  "n_demanda": 401,
  "n_comisarias": 75,
  "poblacion_total": 2890151,
+ "poblacion_vulnerable": {
+  "hogares_nbi": 68296,
+  "mayores_65": 501018
+ },
  "actual": {
   "riesgo": 0.35092838880283334,
   "poblacion": 0.2502608065879045,
-  "habitantes": 723292
+  "habitantes": 723292,
+  "nbi": 0.3208395538339062,
+  "mayores": 0.24615382932490207
  },
  "curva": [
   {
@@ -24,7 +30,9 @@
    "poblacion_si_optimiza_poblacion": 0.09280374335093196,
    "riesgo_si_optimiza_poblacion": 0.08104761402505067,
    "solape_planes": 0.3,
-   "habitantes": 200999
+   "habitantes": 200999,
+   "nbi": 0.09319113536241437,
+   "mayores": 0.0695018628034877
   },
   {
    "k": 15,
@@ -34,7 +42,9 @@
    "poblacion_si_optimiza_poblacion": 0.15100201840669772,
    "riesgo_si_optimiza_poblacion": 0.1450905318805581,
    "solape_planes": 0.4,
-   "habitantes": 357777
+   "habitantes": 357777,
+   "nbi": 0.19364838431308398,
+   "mayores": 0.12277478988100057
   },
   {
    "k": 20,
@@ -44,7 +54,9 @@
    "poblacion_si_optimiza_poblacion": 0.19333676161585994,
    "riesgo_si_optimiza_poblacion": 0.20427367396839038,
    "solape_planes": 0.4,
-   "habitantes": 446936
+   "habitantes": 446936,
+   "nbi": 0.24268008839147737,
+   "mayores": 0.15088830042661913
   },
   {
    "k": 30,
@@ -54,7 +66,9 @@
    "poblacion_si_optimiza_poblacion": 0.2564344641322125,
    "riesgo_si_optimiza_poblacion": 0.255348661069494,
    "solape_planes": 0.4666666666666667,
-   "habitantes": 624814
+   "habitantes": 624814,
+   "nbi": 0.3295232284299929,
+   "mayores": 0.2105101121771675
   },
   {
    "k": 40,
@@ -64,7 +78,9 @@
    "poblacion_si_optimiza_poblacion": 0.31014494562422873,
    "riesgo_si_optimiza_poblacion": 0.29672513149269636,
    "solape_planes": 0.475,
-   "habitantes": 774634
+   "habitantes": 774634,
+   "nbi": 0.4193929200767802,
+   "mayores": 0.25728689214097694
   },
   {
    "k": 50,
@@ -74,7 +90,9 @@
    "poblacion_si_optimiza_poblacion": 0.35959008319334035,
    "riesgo_si_optimiza_poblacion": 0.3893011327298393,
    "solape_planes": 0.56,
-   "habitantes": 890630
+   "habitantes": 890630,
+   "nbi": 0.49283799525451977,
+   "mayores": 0.2972412388379816
   },
   {
    "k": 60,
@@ -84,7 +102,9 @@
    "poblacion_si_optimiza_poblacion": 0.40386025266964715,
    "riesgo_si_optimiza_poblacion": 0.43154648899394116,
    "solape_planes": 0.5333333333333333,
-   "habitantes": 1018673
+   "habitantes": 1018673,
+   "nbi": 0.5525137296527168,
+   "mayores": 0.3423884219323875
   },
   {
    "k": 75,
@@ -94,7 +114,9 @@
    "poblacion_si_optimiza_poblacion": 0.4684656316500824,
    "riesgo_si_optimiza_poblacion": 0.4801621605530753,
    "solape_planes": 0.56,
-   "habitantes": 1183489
+   "habitantes": 1183489,
+   "nbi": 0.6024361715978483,
+   "mayores": 0.40416799778627455
   },
   {
    "k": 90,
@@ -104,7 +126,9 @@
    "poblacion_si_optimiza_poblacion": 0.5300201603016599,
    "riesgo_si_optimiza_poblacion": 0.5445074522400036,
    "solape_planes": 0.6222222222222222,
-   "habitantes": 1330477
+   "habitantes": 1330477,
+   "nbi": 0.675427641433229,
+   "mayores": 0.4560330949427263
   },
   {
    "k": 110,
@@ -114,7 +138,9 @@
    "poblacion_si_optimiza_poblacion": 0.6013452365859727,
    "riesgo_si_optimiza_poblacion": 0.6109557241924068,
    "solape_planes": 0.6363636363636364,
-   "habitantes": 1523768
+   "habitantes": 1523768,
+   "nbi": 0.7600020021259724,
+   "mayores": 0.5227940137762617
   }
  ]
 }

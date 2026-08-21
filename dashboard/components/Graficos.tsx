@@ -166,6 +166,82 @@ export function BrechaCobertura({
   );
 }
 
+/* ¿A quién llega el plan? Es la versión operacionalizable de la pregunta que
+   dejó abierta la auditoría de equidad, y la única que estos datos permiten
+   contestar: no se puede saber a quién le roban —los delitos no traen ningún
+   atributo del damnificado— pero sí quién queda cerca de un puesto.
+
+   El resultado contradice lo que uno esperaría: los hogares con NBI quedan
+   **mejor** cubiertos que el residente promedio, no peor. Tiene explicación —
+   el NBI se concentra en el corredor sureste (Constitución, La Boca,
+   Monserrat, Barracas) que es también donde se concentra el delito
+   registrado, así que optimizar por riesgo aterriza ahí.
+
+   Y el mismo número admite dos lecturas opuestas, así que el panel las pone
+   las dos en vez de elegir una. */
+
+export function Vulnerables({
+  pob, kActual,
+}: { pob: CoberturaPoblacion; kActual: number }) {
+  const p = pob.curva.find((q) => q.k === kActual);
+  if (!p || p.poblacion == null || p.nbi == null || p.mayores == null) return null;
+  const a = pob.actual;
+
+  const filas = [
+    { etiqueta: "Población", hoy: a.poblacion, plan: p.poblacion,
+      universo: `${num(pob.poblacion_total)} habitantes` },
+    { etiqueta: "Hogares con NBI", hoy: a.nbi, plan: p.nbi,
+      universo: `${num(pob.poblacion_vulnerable.hogares_nbi)} hogares`, destacar: true },
+    { etiqueta: "Mayores de 65", hoy: a.mayores, plan: p.mayores,
+      universo: `${num(pob.poblacion_vulnerable.mayores_65)} personas · estimado`, flojo: true },
+  ];
+
+  return (
+    <div className="flex flex-col gap-1.5 border-t border-line pt-2.5">
+      <p className="text-[11px] text-ink-2">¿A quién llega esa cobertura?</p>
+
+      <table className="w-full text-[10.5px] border-collapse">
+        <thead>
+          <tr className="text-ink-muted">
+            <th scope="col" className="text-left font-normal pb-1">Grupo</th>
+            <th scope="col" className="text-right font-normal pb-1">Hoy</th>
+            <th scope="col" className="text-right font-normal pb-1 tabular">Con {kActual}</th>
+            <th scope="col" className="text-right font-normal pb-1">Sobre</th>
+          </tr>
+        </thead>
+        <tbody>
+          {filas.map((f) => (
+            <tr key={f.etiqueta} className={f.flojo ? "text-ink-muted" : "text-ink-2"}>
+              <th scope="row" className={`text-left font-normal py-[1px] pr-2 ${
+                f.destacar ? "text-brand font-semibold" : ""}`}>
+                {f.etiqueta}
+              </th>
+              <td className="text-right tabular py-[1px]">{pct(f.hoy)}</td>
+              <td className={`text-right tabular py-[1px] ${
+                f.destacar ? "text-brand font-semibold" : ""}`}>{pct(f.plan)}</td>
+              <td className="text-right py-[1px] text-ink-muted">{f.universo}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <p className="text-[10.5px] text-ink-muted leading-snug">
+        Los hogares con NBI quedan <strong>mejor</strong> cubiertos que el residente promedio, no
+        peor: el NBI se concentra en el corredor sureste, que es también donde se concentra el
+        delito registrado, así que optimizar por riesgo aterriza ahí. El mismo número se puede
+        leer de dos formas opuestas —que el plan alcanza a quien más lo necesita, o que la
+        vigilancia se concentra donde hay pobreza, que es justo el riesgo de retroalimentación
+        que señala la literatura— y este dato no decide entre las dos: solo las vuelve precisas.
+      </p>
+      <p className="text-[10.5px] text-ink-muted leading-snug">
+        La fila de mayores no aporta señal propia: la edad solo existe por comuna, así que dentro
+        de cada una la tasa es constante y el número termina siguiendo a la población. Va igual
+        para que se vea que se miró.
+      </p>
+    </div>
+  );
+}
+
 /* -------------------------------------------------------- barras por comuna */
 
 export function BarrasComuna({

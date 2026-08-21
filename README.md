@@ -734,6 +734,38 @@ La curva de cobertura pasó a tener **dos series** —riesgo en el azul de marca
 
 Nota de método: la población por hexágono sale del prorrateo por área de `overlay_poligonos.py` y es Censo 2010, el mismo denominador que la tasa cada 100.000. Un hexágono sin población cruzada haría el script abortar en vez de contarlo como cero — contarlo como cero lo sacaría del numerador y del denominador a la vez, y la cobertura saldría inflada.
 
+### ¿A quién llega esa cobertura? (`hex_nbi.parquet`, `cobertura_poblacion.py`)
+
+La auditoría de equidad dejó anotado que el modelo aprende de delitos **denunciados** y que, si el patrullaje histórico estuvo sesgado, el riesgo aprendido puede formalizar ese sesgo. Eso no se puede resolver con estos datos. Lo que sí se puede contestar ahora es una versión operacionalizable: **¿el plan que propone el optimizador llega a los hogares que más lo necesitan?**
+
+Para poder preguntarlo hizo falta bajar el NBI a hexágono. `overlay_poligonos.py` suma `nbi_por_hex()`: interpolación areal desde los 3.554 radios censales, y no el atajo de prorratear el promedio del barrio que usa la población. La razón es que **el NBI varía muchísimo dentro de un mismo barrio** —es justo lo que mide— y promediarlo al barrio borraría la señal entera. Salen 1.142.531 hogares sobre la grilla (0,66% menos que los 1.150.134 de los radios: es la parte de los radios de borde que cae fuera de los hexágonos) con 68.296 NBI, o sea el mismo 5,98% de la Ciudad.
+
+**El resultado contradice lo que uno esperaría.**
+
+| | Riesgo | Población | **Hogares con NBI** | Mayores de 65 |
+|---|---|---|---|---|
+| Hoy (75 comisarías) | 35,1% | 25,0% | **32,1%** | 24,6% |
+| Plan K=40 | 41,8% | 26,8% | **41,9%** | 25,7% |
+| Plan K=75 | 58,7% | 40,9% | **60,2%** | 40,4% |
+| Plan K=110 | 70,8% | 52,7% | **76,0%** | 52,3% |
+
+Los hogares con NBI quedan **mejor** cubiertos que el residente promedio, no peor, y en todos los escenarios: la cobertura de NBI va pegada a la del riesgo —a K=110 incluso la supera— mientras la población general queda unos quince puntos atrás. Tiene explicación y no es casualidad: el NBI se concentra en el corredor sureste (Constitución 24,3%, La Boca 21,2%, Monserrat 19,2%, Barracas 12,3%) que es también donde se concentra el delito registrado, así que optimizar por riesgo aterriza ahí.
+
+**El mismo número admite dos lecturas opuestas y este dato no decide entre las dos.** Una es que el plan alcanza a quien más lo necesita. La otra es que la vigilancia se concentra donde hay pobreza, que es exactamente el circuito de retroalimentación que describen Lum & Isaac (2016) y Ensign et al. (2018) y que la auditoría de equidad ya había marcado. Lo único que cambia respecto de antes es que la discusión ahora tiene un número en vez de una intuición. El tablero pone las dos lecturas, no una.
+
+**La fila de mayores no aporta señal propia**, y va igual para que se vea que se miró. La edad solo existe por comuna, así que la tasa es constante dentro de cada una y la cobertura de mayores termina siguiendo a la de población casi exactamente (24,6% contra 25,0%, 40,4% contra 40,9%). Además mezcla censos —tasa 2022 sobre población 2010—, por eso va etiquetada como estimación en todas partes.
+
+### Victimización por edad: no existe, y quedó verificado
+
+Es la primera pregunta que hace cualquiera frente al mapa de edad, y la respuesta es que **no hay dato**, en ninguna de las fuentes disponibles:
+
+- **`delitos_hex`** (1,35M hechos) no tiene ni un atributo del damnificado. Se verificó contra los **CSV crudos** de los diez años, no solo contra el parquet ingestado: las quince columnas son las mismas en 2016 y en 2025 —`id-mapa`, `anio`, `mes`, `dia`, `fecha`, `franja`, `tipo`, `subtipo`, `uso_arma`, `uso_moto`, `barrio`, `comuna`, `latitud`, `longitud`, `cantidad`— y ninguna describe a la víctima. La ingesta no descartó nada.
+- **El SNIC** (Sistema Nacional de Información Criminal, `snic-provincias.csv`, 2000-2025) sí trae víctimas, pero **por sexo y no por edad**: `cantidad_victimas`, `cantidad_victimas_masc`, `cantidad_victimas_fem`, `cantidad_victimas_sd`. No hay ninguna columna de edad. Y el desglose más fino es la **provincia** —CABA entera— así que ni siquiera el corte por sexo se puede mapear: la base por departamentos no está publicada.
+
+O sea que "tasa de robo a mayores de 65 por barrio" no es difícil de calcular: es imposible con datos públicos. Habría que ir a las encuestas de victimización de la UTDT, que son muestrales y no georreferenciadas al barrio.
+
+Lo que **sí** se podría sumar, si alguna vez hace falta, es el corte por sexo de las víctimas a nivel Ciudad desde el SNIC: sobre 2022-2025 da 71,6% de víctimas femeninas en violaciones, 59,7% en abuso sexual simple, 37,9% en lesiones dolosas y 24,8% en siniestros viales. Va con una salvedad grande —el 27% de las víctimas de lesiones dolosas figura como "sin dato" de sexo— y no es espacial, así que no entra en el mapa ni en los filtros por barrio.
+
 ### Cómo se reparte esa cobertura (`src/optimization/equidad_cobertura.py`)
 
 El MCLP tiene una restricción de equidad y es un **piso muy bajo**: exige que quede al menos *un* hexágono cubierto por comuna. Con 401 hexágonos y comunas de 20 a 40 cada una, cumplirla no dice casi nada sobre el reparto. Nunca se había medido qué pasa por encima de ese piso, y un optimizador que maximiza un total tiene todos los incentivos para concentrar la cobertura donde es barata.

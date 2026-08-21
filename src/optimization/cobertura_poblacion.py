@@ -49,6 +49,7 @@ from modulo_a_patrullas import (
 
 RAIZ = Path(__file__).resolve().parent.parent.parent
 FEATURES = RAIZ / "data" / "features"
+PROCESSED = RAIZ / "data" / "processed"
 SALIDA = FEATURES / "cobertura_poblacion.json"
 
 # Los mismos K que la curva de riesgo, para que las dos series se puedan
@@ -70,6 +71,21 @@ def con_poblacion(demanda: pd.DataFrame) -> pd.DataFrame:
     d = demanda.copy()
     d["hex_id"] = d["hex_id"].astype(str)
     d = d.merge(pob, on="hex_id", how="left")
+    nbi = pd.read_parquet(FEATURES / "hex_nbi.parquet")
+    nbi["hex_id"] = nbi["hex_id"].astype(str)
+    d = d.merge(nbi, on="hex_id", how="left")
+
+    # Mayores de 65 estimados por hexagono. La edad **solo existe por comuna**
+    # (Censo 2022), asi que se aplica la tasa de la comuna a la poblacion del
+    # hexagono. Dentro de una comuna la tasa queda constante, o sea que este
+    # numero solo captura variacion ENTRE comunas, no dentro: sirve para saber
+    # si la cobertura cae en comunas mas viejas o mas jovenes, no para decir
+    # que un hexagono concreto tiene mas mayores que su vecino. Ademas mezcla
+    # censos —tasa 2022 sobre poblacion 2010— y por eso es una estimacion
+    # etiquetada como tal en todas partes, no un conteo.
+    edad = pd.read_parquet(PROCESSED / "demografia_comuna.parquet").set_index("comuna")["pct_65"]
+    d["mayores_hex"] = d["poblacion_hex"] * d["comuna_id"].astype(int).map(edad) / 100
+
     faltan = int(d["poblacion_hex"].isna().sum())
     if faltan:
         raise SystemExit(f"{faltan} hexágonos de demanda sin población: no se puede "
@@ -97,6 +113,9 @@ def main() -> None:
     idx_actual = candidatos.index[candidatos["tipo"] == "comisaría existente"].tolist()
     riesgo_actual = cobertura_lograda(demanda, cobertura, idx_actual)
     pob_actual = cobertura_lograda(demanda, cobertura, idx_actual, peso="poblacion_hex")
+    nbi_actual = cobertura_lograda(demanda, cobertura, idx_actual, peso="hogares_nbi_hex")
+    may_actual = cobertura_lograda(demanda, cobertura, idx_actual, peso="mayores_hex")
+    print(f"  hogares con NBI: {nbi_actual:.1%} · mayores de 65 (estimado): {may_actual:.1%}")
     print(f"\nHOY ({len(idx_actual)} comisarías): {riesgo_actual:.1%} del riesgo · "
           f"{pob_actual:.1%} de la población ({pob_actual * total_hab:,.0f} personas)\n")
 
@@ -106,10 +125,16 @@ def main() -> None:
         "n_demanda": int(len(demanda)),
         "n_comisarias": len(idx_actual),
         "poblacion_total": round(total_hab),
+        "poblacion_vulnerable": {
+            "hogares_nbi": round(float(demanda["hogares_nbi_hex"].sum())),
+            "mayores_65": round(float(demanda["mayores_hex"].sum())),
+        },
         "actual": {
             "riesgo": float(riesgo_actual),
             "poblacion": float(pob_actual),
             "habitantes": round(pob_actual * total_hab),
+            "nbi": float(nbi_actual),
+            "mayores": float(may_actual),
         },
         "curva": [],
     }
@@ -143,12 +168,20 @@ def main() -> None:
             cobertura_lograda(demanda, cobertura, elegidos_p))
         fila["solape_planes"] = float(solape(elegidos_r, elegidos_p))
         fila["habitantes"] = round(fila["poblacion"] * total_hab)
+        # los dos cortes de vulnerabilidad sobre el MISMO plan que optimiza
+        # riesgo: la pregunta es a quien llega el plan que ya se propone, no
+        # que pasaria con otro objetivo
+        fila["nbi"] = float(
+            cobertura_lograda(demanda, cobertura, elegidos_r, peso="hogares_nbi_hex"))
+        fila["mayores"] = float(
+            cobertura_lograda(demanda, cobertura, elegidos_r, peso="mayores_hex"))
 
         print(f"K={k:3d} -> riesgo {fila['riesgo']:.1%} · población {fila['poblacion']:.1%} "
               f"({fila['habitantes']:,} personas) | optimizando población: "
               f"{fila['poblacion_si_optimiza_poblacion']:.1%} de gente pero "
               f"{fila['riesgo_si_optimiza_poblacion']:.1%} de riesgo · "
-              f"solape {fila['solape_planes']:.0%}")
+              f"solape {fila['solape_planes']:.0%} | NBI {fila['nbi']:.1%} · "
+              f"mayores {fila['mayores']:.1%}")
         resultado["curva"].append(fila)
 
     SALIDA.write_text(json.dumps(resultado, ensure_ascii=False, indent=1), encoding="utf-8")
