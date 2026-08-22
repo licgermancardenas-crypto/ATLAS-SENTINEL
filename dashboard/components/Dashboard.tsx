@@ -293,12 +293,27 @@ export default function Dashboard() {
               Ciudad de Buenos Aires · {datos.resumen.periodo.desde}–{datos.resumen.periodo.hasta}
             </span>
           </div>
-          <ChipsActivos
-            comuna={comuna} barrio={barrio} tipo={tipo}
-            onLimpiarComuna={() => { setComuna(null); setBarrio(null); }}
-            onLimpiarBarrio={() => setBarrio(null)}
-            onLimpiarTipo={() => setTipo("todos")}
-          />
+          {/* Los chips de filtro activo y las dos acciones globales comparten
+              la fila del título, que estaba vacía a la derecha. Antes las
+              acciones colgaban al final de la fila de filtros y empujaban al
+              deslizador de patrullas a una tercera fila: tres franjas de
+              encabezado sobre un tablero que ya scrollea mucho. */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <ChipsActivos
+              comuna={comuna} barrio={barrio} tipo={tipo}
+              onLimpiarComuna={() => { setComuna(null); setBarrio(null); }}
+              onLimpiarBarrio={() => setBarrio(null)}
+              onLimpiarTipo={() => setTipo("todos")}
+            />
+            <div className="flex items-center gap-2">
+              <Link href="/3d"
+                className="rounded border border-line bg-surface-1 px-2.5 py-1 text-[11px]
+                           hover:bg-surface-sunk">
+                Ver en 3D
+              </Link>
+              <ToggleTema tema={tema} onChange={() => setTema((t) => (t === "light" ? "dark" : "light"))} />
+            </div>
+          </div>
         </div>
         <div className="px-4 pb-2.5 flex items-end gap-3 flex-wrap">
           <SelectorTurno valor={turno} onChange={setTurno} />
@@ -307,14 +322,6 @@ export default function Dashboard() {
           <SelectorSuperficie valor={superficie} onChange={setSuperficie} />
           <SelectorCapa valor={capa} onChange={setCapa} />
           {capa === "patrullas" && <ControlK valor={kPatrullas} onChange={setKPatrullas} disponibles={ks} />}
-          <div className="ml-auto flex items-end gap-2">
-            <Link href="/3d"
-              className="rounded border border-line bg-surface-1 px-2.5 py-1 text-[11px]
-                         hover:bg-surface-sunk">
-              Ver en 3D
-            </Link>
-            <ToggleTema tema={tema} onChange={() => setTema((t) => (t === "light" ? "dark" : "light"))} />
-          </div>
         </div>
       </header>
 
