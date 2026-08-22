@@ -764,7 +764,28 @@ Es la primera pregunta que hace cualquiera frente al mapa de edad, y la respuest
 
 O sea que "tasa de robo a mayores de 65 por barrio" no es difícil de calcular: es imposible con datos públicos. Habría que ir a las encuestas de victimización de la UTDT, que son muestrales y no georreferenciadas al barrio.
 
-Lo que **sí** se podría sumar, si alguna vez hace falta, es el corte por sexo de las víctimas a nivel Ciudad desde el SNIC: sobre 2022-2025 da 71,6% de víctimas femeninas en violaciones, 59,7% en abuso sexual simple, 37,9% en lesiones dolosas y 24,8% en siniestros viales. Va con una salvedad grande —el 27% de las víctimas de lesiones dolosas figura como "sin dato" de sexo— y no es espacial, así que no entra en el mapa ni en los filtros por barrio.
+### Lo que el SNIC sí tiene, y por qué es menos de lo que parece (`pipeline/ingest_snic.py`)
+
+El corte por sexo se ingesta igual y va al tablero, porque contesta parcialmente lo que los datos georreferenciados no pueden ni empezar a contestar. Pero la fuente tiene tres límites y los tres son parte del contenido, no notas al pie:
+
+**1. Robo, hurto y amenazas no registran ni una víctima.** No es que falten algunas: el SNIC solo carga víctimas en delitos contra las personas. Sobre **902.898 hechos en 50 categorías** no hay nadie caracterizado, y ahí adentro están los dos tipos que dominan el tablero:
+
+| Categoría SNIC | Hechos 2022-2025 | Víctimas |
+|---|---|---|
+| Robos (excluye agravados por lesiones/muerte) | 238.207 | **0** |
+| Hurtos | 231.688 | **0** |
+| Amenazas | 36.554 | **0** |
+| Robos agravados por lesiones/muerte | 2.798 | **0** |
+
+**2. El "sin dato" es enorme donde sí hay registro.** Del 26% al 44% en las categorías grandes, 74% en "otros delitos contra las personas" y 92% en delitos contra el honor. Solo homicidios y suicidios están completos. Por eso el panel muestra **tres barras** —varones, mujeres, sin dato— y no un porcentaje: un "51% de las víctimas de lesiones dolosas son mujeres" calculado sobre los caracterizados es cierto y engañoso a la vez si no se ve que cuatro de cada diez casos quedaron afuera.
+
+**3. La unidad es la provincia.** CABA entera. No se puede mapear ni cruzar con el filtro de comuna o barrio, y la base por departamentos no está publicada. Es el único panel del tablero que no es espacial.
+
+Sobre 2022-2025 y contando solo las víctimas con sexo registrado: 87% mujeres en abuso sexual simple, 83% en "otros delitos contra la integridad sexual", 51% en lesiones dolosas, 36% en lesiones culposas por siniestros viales. Homicidios dolosos, la única categoría sin ningún "sin dato": 274 varones y 65 mujeres.
+
+Las categorías son las del código penal que usa el SNIC y **no** las seis del Mapa del Delito de GCBA. No son intercambiables, así que el panel tampoco sigue el filtro de tipo del tablero — fingir que sí sería el error más fácil de cometer con esta tabla.
+
+Control de la ingesta: `masc + fem + sin dato` tiene que dar exactamente el total de víctimas en las 1.104 filas de la serie, o el script aborta. Da 0 de desvío.
 
 ### Cómo se reparte esa cobertura (`src/optimization/equidad_cobertura.py`)
 

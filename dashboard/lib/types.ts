@@ -449,6 +449,44 @@ export interface Demografia {
   };
 }
 
+/* ------------------------------------------------------------- víctimas
+ *
+ *  La única fuente del tablero que no es espacial. El SNIC publica hasta
+ *  provincia y CABA es una sola, así que estos números no se pueden mapear ni
+ *  cruzar con los filtros. Y solo registran **sexo**: no hay ninguna columna
+ *  de edad en la serie entera.
+ */
+
+export interface DelitoVictimas {
+  delito: string;
+  hechos: number;
+  victimas: number;
+  masc: number;
+  fem: number;
+  /** Víctimas cuyo sexo no quedó registrado. Del 26% al 74% según categoría. */
+  sd: number;
+}
+
+export interface Victimas {
+  fuente: string;
+  desde: number;
+  hasta: number;
+  unidad: string;
+  delitos: DelitoVictimas[];
+  /** Categorías sin ninguna víctima cargada: robo, hurto y amenazas entre ellas. */
+  sin_caracterizar: {
+    n_categorias: number;
+    hechos: number;
+    principales: { delito: string; hechos: number }[];
+  };
+  notas: {
+    sin_edad: string;
+    no_espacial: string;
+    sin_dato: string;
+    otra_nomenclatura: string;
+  };
+}
+
 export interface Resumen {
   periodo: { desde: number; hasta: number };
   delitos_ultimo_anio: number;
@@ -485,6 +523,7 @@ export interface DatosDashboard {
   comunasGeo: ComunasGeoJSON;
   coberturaPob: CoberturaPoblacion;
   equidad: EquidadCobertura;
+  victimas: Victimas;
   resumen: Resumen;
 }
 

@@ -33,6 +33,9 @@ Salidas en dashboard/public/data/:
 - cobertura_poblacion.json cuanta *gente* cubre el Modulo A, no solo cuanto
                            riesgo, y cuanto cambiaria el plan si el objetivo
                            fuera la poblacion en vez del riesgo.
+- victimas.json            quien es la victima, a nivel Ciudad (SNIC). El unico
+                           panel no espacial del tablero, y el que documenta que
+                           robo, hurto y amenazas no registran ni una victima.
 - demografia.json          cuanta gente vive en cada barrio y comuna, con el
                            corte por sexo (Censo 2010) y la estructura etaria
                            por comuna (Censo 2022). Dos censos distintos, cada
@@ -799,6 +802,107 @@ def _comunas_geojson(comunas: list[dict]) -> None:
     destino.write_text(json.dumps({"type": "FeatureCollection", "features": features}),
                        encoding="utf-8")
     print(f"comunas.geojson: {len(features)} polígonos, {destino.stat().st_size // 1024} KB")
+# ─────────────────────────────────────────────────── víctimas (SNIC, Ciudad)
+
+# La ventana: los mismos cuatro años recientes que usa el resto del tablero.
+# Se acumulan y no se muestra el último suelto porque las categorías chicas
+# —homicidios son ~85 por año— no dicen nada en un solo año.
+ANIOS_VICTIMAS = 4
+
+# Debajo de esto la categoría no se publica: con menos de cien víctimas en
+# cuatro años, un porcentaje por sexo se mueve entero con cinco casos.
+MIN_VICTIMAS = 100
+
+# Las categorías del SNIC que corresponden a los tipos que dominan el tablero.
+# Se nombran explícitamente porque el hallazgo principal de esta fuente es que
+# **no tienen ni una víctima caracterizada**, y eso hay que poder decirlo con
+# los números al lado en vez de en general.
+#
+# Van como prefijos y no como nombres exactos: el SNIC llama a la categoría
+# principal de robo "Robos (excluye los agravados por el resultado de lesiones
+# y/o muertes)", así que un match exacto la dejaba afuera justo a ella.
+SIN_VICTIMA_CLAVE = ("Robos", "Hurtos", "Amenazas")
+
+
+def exportar_victimas() -> None:
+    """Quién es la víctima, a nivel Ciudad, y hasta dónde llega ese dato.
+
+    Es el único panel del tablero que **no es espacial**: el SNIC publica
+    hasta provincia y CABA es una sola, así que no sigue el filtro de comuna
+    ni el de barrio. Va igual porque contesta —parcialmente— la pregunta que
+    los datos de delito georreferenciados no pueden ni empezar a contestar.
+
+    Se publican los tres números crudos (varones, mujeres, sin dato) y no un
+    porcentaje: en las categorías grandes el "sin dato" va del 26% al 44%, y
+    un "38% de las víctimas de lesiones son mujeres" calculado sobre el total
+    sería falso mientras que calculado sobre los caracterizados escondería
+    que se descartó cuatro de cada diez casos. Con las tres barras el lector
+    ve el denominador.
+    """
+    ruta = PROCESSED / "snic_victimas_caba.parquet"
+    if not ruta.exists():
+        print("victimas.json: falta correr pipeline/ingest_snic.py — se omite")
+        return
+
+    d = pd.read_parquet(ruta)
+    hasta = int(d["anio"].max())
+    desde = hasta - ANIOS_VICTIMAS + 1
+    v = d[d["anio"].between(desde, hasta)]
+
+    agg = (v.groupby("delito")[["cantidad_hechos", "cantidad_victimas",
+                                "cantidad_victimas_masc", "cantidad_victimas_fem",
+                                "cantidad_victimas_sd"]].sum().reset_index())
+
+    con = agg[agg["cantidad_victimas"] >= MIN_VICTIMAS].sort_values(
+        "cantidad_victimas", ascending=False)
+    delitos = [{
+        "delito": r.delito,
+        "hechos": int(r.cantidad_hechos),
+        "victimas": int(r.cantidad_victimas),
+        "masc": int(r.cantidad_victimas_masc),
+        "fem": int(r.cantidad_victimas_fem),
+        "sd": int(r.cantidad_victimas_sd),
+    } for r in con.itertuples()]
+
+    sin = agg[agg["cantidad_victimas"] == 0]
+    claves = sin[sin["delito"].str.startswith(SIN_VICTIMA_CLAVE)]
+    salida = {
+        "fuente": "SNIC · Ministerio de Seguridad de la Nación",
+        "desde": desde, "hasta": hasta,
+        "unidad": "Ciudad Autónoma de Buenos Aires",
+        "delitos": delitos,
+        "sin_caracterizar": {
+            "n_categorias": int(sin["delito"].nunique()),
+            "hechos": int(sin["cantidad_hechos"].sum()),
+            "principales": [{"delito": r.delito, "hechos": int(r.cantidad_hechos)}
+                            for r in claves.sort_values("cantidad_hechos", ascending=False)
+                            .itertuples()],
+        },
+        "notas": {
+            "sin_edad":
+                "El SNIC registra el sexo de la víctima y no su edad: no hay ninguna columna "
+                "de edad en los veintiséis años de serie. Y los delitos georreferenciados del "
+                "tablero no traen ningún atributo del damnificado. Por eso no existe, con datos "
+                "públicos, una tasa de victimización por grupo etario y menos por barrio.",
+            "no_espacial":
+                "El desglose más fino que publica el SNIC es la provincia, y CABA es una sola. "
+                "Estos números son de toda la Ciudad y no siguen el filtro de comuna ni el de "
+                "barrio; la base por departamentos no está publicada.",
+            "sin_dato":
+                "El 'sin dato' es la proporción de víctimas cuyo sexo no quedó registrado. En "
+                "las categorías grandes va del 26% al 44%, así que se muestra como una barra "
+                "más en vez de excluirse del denominador.",
+            "otra_nomenclatura":
+                "Las categorías son las del código penal que usa el SNIC y no las seis del "
+                "tablero, que vienen del Mapa del Delito de GCBA. No son intercambiables y por "
+                "eso este panel no sigue el filtro de tipo.",
+        },
+    }
+    (OUT / "victimas.json").write_text(json.dumps(salida, ensure_ascii=False),
+                                       encoding="utf-8")
+    print(f"victimas.json: {len(delitos)} categorías con víctimas ({desde}-{hasta}), "
+          f"{salida['sin_caracterizar']['n_categorias']} sin ninguna "
+          f"({salida['sin_caracterizar']['hechos']:,} hechos)".replace(",", "."))
 
 def exportar_resumen() -> None:
     """Los números de las tarjetas de KPI. Van acá y no hardcodeados en el
@@ -858,6 +962,7 @@ def main() -> None:
     exportar_perfil_temporal()
     exportar_pronostico()
     exportar_demografia()
+    exportar_victimas()
     exportar_resumen()
     print(f"\nTodo en {OUT}")
 

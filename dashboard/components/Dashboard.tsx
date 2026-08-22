@@ -24,6 +24,7 @@ import Salvedades from "./Salvedades";
 import Pronostico from "./Pronostico";
 import Poblacion from "./Poblacion";
 import Equidad from "./Equidad";
+import Victimas from "./Victimas";
 import Cuando from "./Cuando";
 
 // Leaflet toca `window` al importarse, así que no puede renderizar en el servidor
@@ -367,6 +368,8 @@ export default function Dashboard() {
 
             <Cuando perfil={datos.perfil} tipo={tipo}
                     delitosSeleccion={delitosFoco} ambito={ambito} />
+
+            <Victimas datos={datos.victimas} />
 
             <section className="card p-3">
               <h2 className="text-xs font-semibold uppercase tracking-[0.07em] text-ink-2 mb-1">
