@@ -1,16 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import type { BarrioProps, Capa, DatosDashboard, Superficie, TipoDelito, Turno } from "@/lib/types";
+import type { BarrioProps } from "@/lib/types";
 import {
-  CAPAS, claveDelitos, claveRiesgo, esDemografica, riesgoEsDelTipo, SUPERFICIES,
-  superficieInfo, tasaInflada, TIPOS, tipoInfo, TURNOS,
+  CAPAS, claveDelitos, claveRiesgo, esDemografica, riesgoEsDelTipo,
+  superficieInfo, tasaInflada, tipoInfo,
 } from "@/lib/types";
-import { cargarDatos } from "@/lib/data";
-import { delta, num, num1, num3, pct, pp, tasa100k } from "@/lib/formato";
-import { cortesPorCuantil, ETIQUETAS_CLASE, VAR_EDAD, VAR_RIESGO } from "@/lib/escala";
+import { delta, num, pct, pp, tasa100k } from "@/lib/formato";
+import { cortesPorCuantil } from "@/lib/escala";
 import { KpiRow } from "./Kpi";
 import {
   ChipsActivos, ControlK, SelectorCapa, SelectorComuna, SelectorSuperficie, SelectorTipo,
@@ -26,6 +25,8 @@ import Poblacion from "./Poblacion";
 import Equidad from "./Equidad";
 import Victimas from "./Victimas";
 import { AnclaSeccion, NavSecciones } from "./Secciones";
+import { AvisoSuperficie, Leyenda, LeyendaPuntos } from "./MapaChrome";
+import { useSeleccion } from "@/lib/useSeleccion";
 import Cuando from "./Cuando";
 
 // Leaflet toca `window` al importarse, así que no puede renderizar en el servidor
@@ -38,82 +39,19 @@ const Mapa = dynamic(() => import("./Mapa"), {
   ),
 });
 
-/* La selección vive también en la query string. Sirve para dos cosas:
-   mandarle a alguien el tablero ya filtrado ("mirá hurto en la Comuna 1") y
-   poder capturarlo o revisarlo sin tener que manejar el navegador a mano.
-   Se lee una vez al montar y se reescribe con replaceState, así el botón de
-   atrás no se llena de entradas por cada clic en un filtro. */
-function leerURL<T extends string>(clave: string, validos: readonly T[], porDefecto: T): T {
-  if (typeof window === "undefined") return porDefecto;
-  const v = new URLSearchParams(window.location.search).get(clave);
-  return validos.includes(v as T) ? (v as T) : porDefecto;
-}
-
-function leerNum(clave: string, porDefecto: number | null): number | null {
-  if (typeof window === "undefined") return porDefecto;
-  const v = new URLSearchParams(window.location.search).get(clave);
-  if (v === null) return porDefecto;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : porDefecto;
-}
-
 export default function Dashboard() {
   // el scroll no lo tiene el window sino este contenedor, así que el
-  // observador de sección y el salto por ancla necesitan la referencia
+  // scroll-spy de secciones y el salto por ancla necesitan la referencia
   const cuerpo = useRef<HTMLDivElement>(null);
-  const [datos, setDatos] = useState<DatosDashboard | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
-  const [turno, setTurno] = useState<Turno>(
-    () => leerURL("turno", TURNOS.map((t) => t.key), "tarde"));
-  const [comuna, setComuna] = useState<number | null>(() => leerNum("comuna", null));
-  const [capa, setCapa] = useState<Capa>(
-    () => leerURL("capa", CAPAS.map((c) => c.key), "patrullas"));
-  const [superficie, setSuperficie] = useState<Superficie>(
-    () => leerURL("superficie", SUPERFICIES.map((s) => s.key), "riesgo"));
-  const [tipo, setTipo] = useState<TipoDelito>(
-    () => leerURL("tipo", TIPOS.map((t) => t.key), "todos"));
-  const [kPatrullas, setKPatrullas] = useState(() => leerNum("k", 75) ?? 75);
-  const [barrio, setBarrio] = useState<string | null>(
-    () => (typeof window === "undefined"
-      ? null : new URLSearchParams(window.location.search).get("barrio")));
-  const [tema, setTema] = useState<"light" | "dark">(
-    () => leerURL("tema", ["light", "dark"] as const, "light"));
-
-  useEffect(() => {
-    cargarDatos().then(setDatos).catch((e: Error) => setError(e.message));
-  }, []);
-
-  useEffect(() => {
-    document.documentElement.setAttribute("data-theme", tema);
-  }, [tema]);
-
-  // solo se escriben los valores que no son el default: una URL con seis
-  // parámetros siempre puestos es ilegible y no se puede compartir a mano
-  useEffect(() => {
-    const p = new URLSearchParams();
-    if (turno !== "tarde") p.set("turno", turno);
-    if (tipo !== "todos") p.set("tipo", tipo);
-    if (comuna !== null) p.set("comuna", String(comuna));
-    if (barrio) p.set("barrio", barrio);
-    if (capa !== "patrullas") p.set("capa", capa);
-    if (superficie !== "riesgo") p.set("superficie", superficie);
-    if (kPatrullas !== 75) p.set("k", String(kPatrullas));
-    if (tema !== "light") p.set("tema", tema);
-    const q = p.toString();
-    window.history.replaceState(null, "", q ? `?${q}` : window.location.pathname);
-  }, [turno, tipo, comuna, barrio, capa, superficie, kPatrullas, tema]);
-
-  // al elegir un barrio conviene fijar también su comuna: si no, el mapa
-  // resalta un polígono y la tabla sigue mostrando los otros 47. Va en el
-  // handler y no en un efecto: derivarlo después del render hace que el tablero
-  // se pinte una vez con la selección a medias.
-  const elegirBarrio = useCallback((nombre: string | null) => {
-    setBarrio(nombre);
-    if (!nombre || !datos) return;
-    const b = datos.barrios.features.find((f) => f.properties.nombre === nombre);
-    if (b?.properties.comuna != null) setComuna(b.properties.comuna);
-  }, [datos]);
+  /* Todo el estado de selección y la sincronización con la URL viven en el
+     hook, compartidos con la página del mapa a pantalla completa. Duplicarlos
+     era garantizar que un día se separaran. */
+  const {
+    datos, error, turno, setTurno, tipo, setTipo, comuna, elegirComuna, setComuna,
+    barrio, elegirBarrio, capa, setCapa, superficie, setSuperficie,
+    kPatrullas, setKPatrullas, tema, alternarTema, qs,
+  } = useSeleccion();
 
   const props: BarrioProps[] = useMemo(
     () => datos?.barrios.features.map((f) => f.properties) ?? [], [datos],
@@ -307,24 +245,31 @@ export default function Dashboard() {
           <div className="flex items-center gap-3 flex-wrap">
             <ChipsActivos
               comuna={comuna} barrio={barrio} tipo={tipo}
-              onLimpiarComuna={() => { setComuna(null); setBarrio(null); }}
-              onLimpiarBarrio={() => setBarrio(null)}
+              onLimpiarComuna={() => elegirComuna(null)}
+              onLimpiarBarrio={() => elegirBarrio(null)}
               onLimpiarTipo={() => setTipo("todos")}
             />
             <div className="flex items-center gap-2">
+              {/* los dos links llevan la selección puesta: el mapa a pantalla
+                  completa es la misma vista, no otro tablero */}
+              <Link href={`/mapa${qs ? `?${qs}` : ""}`}
+                className="rounded border border-line bg-surface-1 px-2.5 py-1 text-[11px]
+                           hover:bg-surface-sunk">
+                Mapa completo
+              </Link>
               <Link href="/3d"
                 className="rounded border border-line bg-surface-1 px-2.5 py-1 text-[11px]
                            hover:bg-surface-sunk">
                 Ver en 3D
               </Link>
-              <ToggleTema tema={tema} onChange={() => setTema((t) => (t === "light" ? "dark" : "light"))} />
+              <ToggleTema tema={tema} onChange={alternarTema} />
             </div>
           </div>
         </div>
         <div className="px-4 pb-2.5 flex items-end gap-3 flex-wrap">
           <SelectorTurno valor={turno} onChange={setTurno} />
           <SelectorTipo valor={tipo} onChange={setTipo} />
-          <SelectorComuna valor={comuna} onChange={(c) => { setComuna(c); setBarrio(null); }} comunas={datos.comunas} />
+          <SelectorComuna valor={comuna} onChange={elegirComuna} comunas={datos.comunas} />
           <SelectorSuperficie valor={superficie} onChange={setSuperficie} />
           <SelectorCapa valor={capa} onChange={setCapa} />
           {capa === "patrullas" && <ControlK valor={kPatrullas} onChange={setKPatrullas} disponibles={ks} />}
@@ -385,7 +330,7 @@ export default function Dashboard() {
                   Clic para filtrar todo el tablero.
                 </p>
                 <BarrasComuna comunas={datos.comunas} turno={turno} tipo={tipo} seleccion={comuna}
-                              onSeleccion={(c) => { setComuna(c); setBarrio(null); }} />
+                              onSeleccion={elegirComuna} />
               </section>
 
               <Cuando perfil={datos.perfil} tipo={tipo}
@@ -462,109 +407,5 @@ export default function Dashboard() {
         </AnclaSeccion>
       </div>
     </main>
-  );
-}
-
-/* La rampa de la edad es azul y la del riesgo ámbar, y no es decoración: con
-   la misma rampa, un mapa de "% de mayores de 65" sale del color del peligro y
-   se lee como uno. Los cortes son quintiles en los dos casos, pero sobre
-   conjuntos distintos — 48 barrios o 15 comunas. */
-function Leyenda({
-  cortes, demografica, formato,
-}: { cortes: number[]; demografica: boolean; formato: "riesgo" | "pct" | "entero" }) {
-  const vars = demografica ? VAR_EDAD : VAR_RIESGO;
-  const fmt = (v: number) =>
-    formato === "pct" ? `${num1(v)}%` : formato === "entero" ? num(v) : num3(v);
-  return (
-    <div className="flex items-center gap-2 shrink-0">
-      <span className="text-[10px] text-ink-muted">{demografica ? "menos" : "bajo"}</span>
-      <div className="flex" role="img"
-           aria-label={`Escala de ${demografica ? "edad" : "riesgo"} en cinco grupos con la misma `
-                       + `cantidad de barrios cada uno`}>
-        {/* borde hairline en cada muestra: la clase más baja de las dos rampas
-            está a 1,1:1 del fondo de la tarjeta —medido— y sin delimitar se lee
-            como un hueco en la leyenda. En el mapa la clase clara se deja como
-            está: ahí abajo hay basemap, no una superficie blanca. */}
-        {vars.map((v, i) => (
-          <span key={v} className="w-6 h-3 first:rounded-l-sm last:rounded-r-sm border border-line"
-                style={{ background: `var(${v})` }}
-                title={`${ETIQUETAS_CLASE[i]}${cortes[i] !== undefined ? ` · hasta ${fmt(cortes[i])}` : ""}`} />
-        ))}
-      </div>
-      <span className="text-[10px] text-ink-muted">{demografica ? "más" : "alto"}</span>
-    </div>
-  );
-}
-
-/* Las dos cosas que el filtro por tipo NO cambia, dichas donde se las puede
-   leer mal. Sin esto, alguien filtra por hurto, ve moverse la coropleta y las
-   patrullas quietas, y concluye que ese es el plan óptimo para hurto — cuando
-   los Módulos A/B/C se resuelven sobre el modelo agregado. El README lo tiene
-   medido: hurto y lesiones comparten solo el 60% de las ubicaciones. */
-
-function AvisoSuperficie({
-  tipo, capa, superficie,
-}: { tipo: TipoDelito; capa: Capa; superficie: Superficie }) {
-  /* Con una superficie demográfica el mapa deja de responder al turno y al
-     tipo, que siguen puestos arriba y siguen filtrando el resto del tablero.
-     Sin este cartel, mover el turno y ver el mapa quieto se lee como un bug. */
-  if (esDemografica(superficie)) {
-    const info = superficieInfo(superficie);
-    return (
-      <Aviso>
-        El mapa dibuja demografía por {info.unidad}: no cambia con el turno ni con el tipo de
-        delito, que siguen filtrando el resto del tablero.{" "}
-        {superficie === "hacinamiento"
-          ? "Hacinamiento crítico es más de 3 personas por cuarto. No está publicado por radio censal, así que no se puede bajar a barrio. En la auditoría de equidad es la única variable que cambia de signo al controlar por historial delictivo — anotada como señal a vigilar, no como hallazgo: con 15 comunas no alcanza para concluir."
-          : info.unidad === "comuna"
-          ? "El Censo 2022 no está publicado por barrio."
-          : superficie === "nbi"
-          ? "NBI mide pobreza estructural del Censo 2010, sobre hogares y no sobre personas. Y no es un mapa de riesgo: la correlación entre NBI y riesgo predicho por comuna cae de 0,41 a 0,14 al controlar por historial delictivo."
-          : "La densidad divide la población del Censo 2010 por la superficie del polígono."}
-      </Aviso>
-    );
-  }
-  if (tipo === "todos") return null;
-  const info = tipoInfo(tipo);
-  const mensaje = !info.superficie
-    ? `${info.label}: los delitos del tablero son de este tipo, pero el mapa dibuja el riesgo agregado. ${info.nota}`
-    : capa !== "ninguna"
-    ? `El mapa muestra la superficie de ${info.label.toLowerCase()}, pero las ubicaciones propuestas se optimizan sobre el modelo agregado — no son el plan óptimo para ${info.label.toLowerCase()}.`
-    : null;
-  if (!mensaje) return null;
-  return <Aviso>{mensaje}</Aviso>;
-}
-
-function Aviso({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="px-3 py-1.5 border-t border-line text-[11px] leading-snug text-ink-2
-                  flex items-start gap-1.5 bg-[var(--warn-wash,transparent)]">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--warn)" strokeWidth="2.2"
-           strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-[2px]" aria-hidden="true">
-        <circle cx="12" cy="12" r="10" /><path d="M12 8v5M12 16h.01" />
-      </svg>
-      <span>{children}</span>
-    </p>
-  );
-}
-
-function LeyendaPuntos({ capa, k }: { capa: Capa; k: number }) {
-  const items =
-    capa === "patrullas"
-      ? [{ c: "var(--pt-existente)", t: "Comisarías actuales (75)" },
-         { c: "var(--pt-propuesto)", t: `Patrullas propuestas (${k})` }]
-      : capa === "camaras"
-      ? [{ c: "var(--pt-existente)", t: "Cámaras existentes (224)" },
-         { c: "var(--pt-propuesto)", t: "Cámaras propuestas (30)" }]
-      : [{ c: "var(--pt-alerta)", t: "Accesos rankeados (9) — el tamaño es el puesto" }];
-  return (
-    <div className="px-3 py-1.5 border-t border-line flex items-center gap-4 flex-wrap">
-      {items.map((i) => (
-        <span key={i.t} className="inline-flex items-center gap-1.5 text-[11px] text-ink-2">
-          <span className="w-2.5 h-2.5 rounded-full" style={{ background: i.c }} />
-          {i.t}
-        </span>
-      ))}
-    </div>
   );
 }
