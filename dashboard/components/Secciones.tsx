@@ -92,8 +92,12 @@ export function NavSecciones({ contenedor }: { contenedor: React.RefObject<HTMLE
 
   return (
     <nav aria-label="Secciones del tablero"
-         className="sticky top-0 z-20 -mx-3 -mt-3 mb-0 px-3 py-1.5 bg-surface-0/95 backdrop-blur
-                    border-b border-line flex items-center gap-1 overflow-x-auto scroll-fino">
+         /* opaca y no translúcida: con 95% + blur, las filas de la tabla de la
+            sección anterior se veían por detrás de los botones y la barra
+            parecía rota. En una herramienta densa el vidrio esmerilado no
+            aporta nada y cuesta legibilidad. */
+         className="sticky top-0 z-20 -mx-3 -mt-3 mb-0 px-3 py-1.5 bg-surface-0
+                    border-b border-line-strong flex items-center gap-1 overflow-x-auto scroll-fino">
       {SECCIONES.map((s) => {
         const on = s.id === activa;
         return (
