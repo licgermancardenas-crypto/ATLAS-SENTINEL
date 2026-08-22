@@ -159,7 +159,7 @@ export default function MapaPantalla() {
 
         {panel && (
           <div className="card bg-surface-2/95 backdrop-blur p-3 flex flex-col gap-3
-                          max-h-[calc(100vh-8rem)] overflow-auto scroll-fino">
+                          max-h-[calc(100vh-13rem)] overflow-auto scroll-fino">
             <SelectorTurno valor={turno} onChange={setTurno} />
             <SelectorTipo valor={tipo} onChange={setTipo} />
             <SelectorComuna valor={comuna} onChange={elegirComuna} comunas={datos.comunas} />
@@ -180,8 +180,12 @@ export default function MapaPantalla() {
 
       {/* las tarjetas del ámbito elegido, abajo a la izquierda: es lo que
           contesta "¿y esto que estoy mirando cuánto es?" sin volver al tablero */}
-      <div className="absolute bottom-3 left-3 right-3 z-[1000] flex items-end gap-2 flex-wrap
-                      pointer-events-none">
+      {/* cuando el panel esta abierto las tarjetas arrancan a su derecha; con
+          el panel plegado usan el ancho completo. Antes se superponian y el
+          panel quedaba cortado por abajo. */}
+      <div className={`absolute bottom-3 right-3 z-[1000] flex items-end gap-2 flex-wrap
+                       pointer-events-none transition-[left] duration-200 ${
+        panel ? "left-[19.5rem]" : "left-3"}`}>
         <div className="flex gap-2 flex-wrap pointer-events-auto">
           <Tarjeta etiqueta={barrio ? "Barrio" : comuna !== null ? "Comuna" : "Ciudad"}
                    valor={ambito} chico />
