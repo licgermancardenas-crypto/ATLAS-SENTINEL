@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 /* El tablero creció a trece paneles y su orden era el orden en que se
    construyeron. Eso funciona mientras hay cuatro; con trece, todo lo que no
@@ -52,42 +52,53 @@ export function AnclaSeccion({
 
 export function NavSecciones({ contenedor }: { contenedor: React.RefObject<HTMLElement | null> }) {
   const [activa, setActiva] = useState(SECCIONES[0].id);
-  const clickeando = useRef(false);
 
-  /* La posición actual se observa, no se deriva del clic: alguien que scrollea
-     a mano también tiene que ver dónde está. Durante el salto programático se
-     suspende, porque el observer dispara con todas las secciones intermedias y
-     la barra parpadearía recorriéndolas. */
+  /* Scroll-spy por posición, no por intersección.
+     
+     La primera versión usaba IntersectionObserver con una banda en el tercio
+     superior y fallaba en las secciones largas: apenas el encabezado de
+     "Quiénes" pasaba arriba de la banda, ninguna sección intersectaba y la
+     barra se quedaba marcando la anterior. Con el salto por clic era peor —el
+     desplazamiento suave dura más que cualquier supresión por temporizador, así
+     que el observador se reactivaba a mitad de camino y se enganchaba a una
+     sección intermedia.
+
+     Calcular cuál es la última sección cuyo tope ya pasó el umbral es exacto
+     para secciones de cualquier largo, y no necesita suprimir nada durante el
+     salto: el propio scroll recalcula. */
   useEffect(() => {
     const raiz = contenedor.current;
     if (!raiz) return;
-    const obs = new IntersectionObserver(
-      (entradas) => {
-        if (clickeando.current) return;
-        const visible = entradas
-          .filter((e) => e.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
-        if (visible) setActiva(visible.target.id);
-      },
-      // la banda de disparo es el tercio superior del contenedor: una sección
-      // se considera "la actual" cuando su encabezado llegó arriba, no cuando
-      // asoma por abajo
-      { root: raiz, rootMargin: "-8% 0px -70% 0px", threshold: 0 },
-    );
-    SECCIONES.forEach((s) => {
-      const el = document.getElementById(s.id);
-      if (el) obs.observe(el);
-    });
-    return () => obs.disconnect();
+    let pedido = 0;
+
+    const calcular = () => {
+      pedido = 0;
+      const umbral = raiz.getBoundingClientRect().top + raiz.clientHeight * 0.25;
+      let actual = SECCIONES[0].id;
+      for (const s of SECCIONES) {
+        const el = document.getElementById(s.id);
+        if (el && el.getBoundingClientRect().top <= umbral) actual = s.id;
+      }
+      setActiva(actual);
+    };
+
+    // un cálculo por cuadro como mucho: el listener de scroll dispara decenas
+    // de veces por segundo y leer getBoundingClientRect en cada una fuerza
+    // reflow
+    const alScrollear = () => { if (!pedido) pedido = requestAnimationFrame(calcular); };
+    raiz.addEventListener("scroll", alScrollear, { passive: true });
+    calcular();
+    return () => {
+      raiz.removeEventListener("scroll", alScrollear);
+      if (pedido) cancelAnimationFrame(pedido);
+    };
   }, [contenedor]);
 
   const ir = (id: string) => {
     const el = document.getElementById(id);
     if (!el) return;
-    clickeando.current = true;
     setActiva(id);
     el.scrollIntoView({ behavior: "smooth", block: "start" });
-    window.setTimeout(() => { clickeando.current = false; }, 700);
   };
 
   return (
