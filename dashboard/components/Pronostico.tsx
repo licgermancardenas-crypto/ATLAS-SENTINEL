@@ -243,13 +243,17 @@ function Curva({
         </g>
       ))}
 
-      {/* referencia: el promedio mensual del último año cerrado */}
+      {/* Referencia: el promedio mensual del último año cerrado. En el gris de
+          "lo que ya pasó", igual que las referencias de la curva de cobertura.
+          La regla del sistema es que una línea de referencia no es una serie y
+          no le corresponde un color de serie ni el ámbar de la escala de
+          riesgo, que en el mapa significa otra cosa. */}
       <line x1={M.izq} y1={y(base)} x2={w - M.der} y2={y(base)}
-            stroke="var(--accent)" strokeWidth="1.5" strokeDasharray="4 3" />
+            stroke="var(--pt-existente)" strokeWidth="1.5" strokeDasharray="4 3" />
       {/* la etiqueta va a la izquierda, sobre la historia: pegada al borde
           derecho caía justo encima de la banda del pronóstico */}
       <text x={M.izq + 3} y={y(base) - 5} textAnchor="start" fontSize="9.5"
-            fill="var(--accent)" className="tabular">
+            fill="var(--text-secondary)" className="tabular">
         promedio {anio - 1}: {num(base)}
       </text>
 
