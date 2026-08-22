@@ -96,7 +96,8 @@ export default function Pronostico({
               key={m.key}
               onClick={() => setModeloKey(m.key)}
               aria-pressed={m.key === modeloKey}
-              title={`${m.nota} Error típico ${num(m.mae_normal)} delitos por mes en meses normales.`}
+              title={`${m.nota} Se equivoca en ${num(m.mae_normal)} delitos por mes, en promedio, `
+                     + `en los años sin sobresaltos.`}
               className={`px-2 py-0.5 text-[10.5px] rounded cursor-pointer border transition-colors duration-150 ${
                 m.key === modeloKey
                   ? "border-transparent bg-brand text-white"
@@ -135,7 +136,7 @@ export default function Pronostico({
         {esAgregado && (
           <div className="text-right shrink-0">
             <p className="text-[11px] text-ink-2">
-              Error típico <strong className="tabular">±{num(modelo.mae_normal)}</strong> por mes
+              Se equivoca <strong className="tabular">±{num(modelo.mae_normal)}</strong> por mes
             </p>
             <p className="text-[11px] text-ink-muted">
               {num(modelo.mae_por_h[0])} a un mes · {num(modelo.mae_por_h[11])} a doce
@@ -151,19 +152,21 @@ export default function Pronostico({
               meses el baseline gana, y quien mire un solo modelo no lo vería */}
           <ErrorPorHorizonte modelos={datos.modelos} activo={modeloKey} />
           <p className="text-[11px] text-ink-muted leading-snug">
-            {datos.backtest.n_origenes} orígenes de backtest ({datos.backtest.desde.slice(0, 7)} a{" "}
-            {datos.backtest.hasta.slice(0, 7)}), reentrenando en cada uno. En 2025, el año del
-            quiebre, este modelo erró <span className="tabular">{num(modelo.mae_quiebre)}</span> por
-            mes y sobreestimó <span className="tabular">{num(Math.abs(modelo.sesgo_quiebre))}</span>:
-            un cambio de nivel que no está en los datos previos no lo anticipa ningún método.
+            Se puso a prueba <span className="tabular">{datos.backtest.n_origenes}</span> veces
+            ({datos.backtest.desde.slice(0, 7)} a {datos.backtest.hasta.slice(0, 7)}): en cada una
+            se le dieron los datos hasta un mes y se le pidió adivinar los siguientes, sin dejarle
+            ver nada de lo que venía después. En 2025, el año de la caída, este modelo se equivocó
+            en <span className="tabular">{num(modelo.mae_quiebre)}</span> delitos por mes y predijo{" "}
+            <span className="tabular">{num(Math.abs(modelo.sesgo_quiebre))}</span> de más: un cambio
+            así de brusco no lo ve venir ningún método.
           </p>
         </div>
       ) : (
         <div className="flex flex-col gap-1.5 border-t border-line pt-2.5">
           <p className="text-[11px] text-ink-2 leading-snug">
             {tipoInfo(tipo).label} con <strong>{elegido.label}</strong>, el modelo elegido. La
-            apertura por tipo corre solo con ese: son seis series más cortas y comparar cuatro
-            modelos en cada una no cambiaría la lectura.
+            corte por tipo se calcula solo con ese: son seis series más cortas y probar los cuatro
+            métodos en cada una no cambiaría la lectura.
           </p>
           {pocosCasos ? (
             <p className="text-[11px] text-ink-muted leading-snug">
@@ -318,7 +321,7 @@ function ErrorPorHorizonte({
   return (
     <div className="flex flex-col gap-1">
       <p className="text-[11px] text-ink-2">
-        Error típico según cuán lejos se mire, en delitos por mes
+        Cuánto se equivoca según cuán lejos se mire, en delitos por mes
       </p>
       <table className="w-full text-[10.5px] border-collapse">
         <thead>

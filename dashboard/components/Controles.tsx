@@ -220,7 +220,7 @@ export function SelectorSuperficie({
   return (
     <div className="flex flex-col gap-1">
       <label htmlFor="f-superficie" className="text-[10px] uppercase tracking-[0.08em] text-ink-muted font-medium">
-        Superficie del mapa
+        Qué pinta el mapa
       </label>
       <select
         id="f-superficie"

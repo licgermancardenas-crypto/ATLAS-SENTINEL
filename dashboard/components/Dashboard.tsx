@@ -187,11 +187,13 @@ export default function Dashboard() {
           : <>cada 100.000 habitantes · {num(poblacion)} hab.</>,
         ayuda: `Delitos de ${tipo === "todos" ? "todos los tipos" : tipoInfo(tipo).label.toLowerCase()} `
              + `por cada 100.000 habitantes de la selección. Es lo comparable entre barrios de tamaño distinto. `
-             + `La población sale del padrón prorrateado por área (2.890.151 en total). `
+             + `La población es la del censo, repartida entre las zonas según cuánto ocupa cada una `
+             + `(2.890.151 habitantes en total). `
              + `Mide sobre población residente, así que sobreestima donde entra mucha gente que no vive ahí. `
              + `La selección actual está marcada cuando cae en el cuarto de mayor afluencia no residente, `
              + `medida con el flujo de subte, tren, colectivo y EcoBici por habitante. `
-             + `Se validó contra la Encuesta de Movilidad Domiciliaria 2018 y ordena igual (Spearman 0,81). `
+             + `Se comparó contra la Encuesta de Movilidad Domiciliaria 2018 y ordena los barrios casi `
+             + `igual: 0,81 en una escala donde 1 sería idéntico. `
              + `El colectivo entra repartido: SUBE informa por línea y no por parada, así que los boletos de cada `
              + `línea se distribuyen parejo entre sus paradas — sirve para el ranking, no para el nivel de un barrio suelto.`,
       },
@@ -214,13 +216,17 @@ export default function Dashboard() {
           : <>{punto?.reusa_comisaria ?? 0} reutilizan comisaría
               {puntoPob?.poblacion != null && <> · {pct(puntoPob.poblacion)} de la población</>}</>,
         delta: cob === null ? undefined : { texto: pp(cob - actual), tono: cob >= actual ? "bueno" as const : "malo" as const },
-        ayuda: "Resultado del optimizador para ese presupuesto de patrullas.",
+        ayuda: "Cuánto riesgo quedaría cubierto si se ubicaran esa cantidad de patrullas en los "
+             + "mejores lugares posibles, en vez de donde están las comisarías hoy.",
       },
       {
         etiqueta: "Concentración",
         valor: pct(r.modelo.concentracion_30pct_area),
         nota: <>de los delitos en el 30% del área</>,
-        ayuda: "Lo que el modelo hace bien: priorizar. PAI 2,77 y PEI 99,5% sobre el 10% del área.",
+        ayuda: "Lo que el modelo hace bien es priorizar: en el 10% del territorio que marca como más "
+             + "riesgoso ocurren 2,8 veces más delitos que si se eligiera ese 10% al azar. Y está a "
+             + "menos de un punto del mejor reparto que se podría haber hecho sabiendo de antemano "
+             + "dónde iba a pasar todo.",
       },
     ];
     // sin `turno`: desde que el riesgo medio salió de esta fila, ninguna tarjeta
@@ -370,7 +376,9 @@ export default function Dashboard() {
                   Riesgo medio por comuna
                 </h3>
                 <p className="text-[11px] text-ink-muted mb-2">
-                  Turno {turno === "manana" ? "mañana" : turno}, ×100. Clic para filtrar todo el tablero.
+                  Delitos esperados en una zona de 700 m durante el turno{" "}
+                  {turno === "manana" ? "mañana" : turno}, ×100 para que se lean.
+                  Clic para filtrar todo el tablero.
                 </p>
                 <BarrasComuna comunas={datos.comunas} turno={turno} tipo={tipo} seleccion={comuna}
                               onSeleccion={(c) => { setComuna(c); setBarrio(null); }} />
@@ -467,7 +475,8 @@ function Leyenda({
     <div className="flex items-center gap-2 shrink-0">
       <span className="text-[10px] text-ink-muted">{demografica ? "menos" : "bajo"}</span>
       <div className="flex" role="img"
-           aria-label={`Escala de ${demografica ? "edad" : "riesgo"} en cinco clases por quintiles`}>
+           aria-label={`Escala de ${demografica ? "edad" : "riesgo"} en cinco grupos con la misma `
+                       + `cantidad de barrios cada uno`}>
         {/* borde hairline en cada muestra: la clase más baja de las dos rampas
             está a 1,1:1 del fondo de la tarjeta —medido— y sin delimitar se lee
             como un hueco en la leyenda. En el mapa la clase clara se deja como

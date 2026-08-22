@@ -5,7 +5,7 @@ import { num, num1, pct } from "@/lib/formato";
 
 /** Una brecha es una distancia, siempre positiva: `pp()` le pondría un "+"
  *  que la haría leer como una variación. */
-const brechaPp = (v: number) => `${num1(v * 100)} pp`;
+const brechaPp = (v: number) => `${num1(v * 100)} puntos`;
 
 /* Cuánto cubre el plan ya está en la curva de arriba. Este panel contesta lo
    otro: **cómo lo reparte**.
@@ -36,7 +36,8 @@ export default function Equidad({
           Cómo se reparte esa cobertura
         </h2>
         <p className="text-[11px] text-ink-muted">
-          Con {kPatrullas} patrullas no hay plan factible, así que no hay reparto que mirar.
+          Con {kPatrullas} patrullas no hay ningún plan que cubra al menos una zona en cada
+          comuna, así que no hay reparto que mirar.
         </p>
       </section>
     );
@@ -72,8 +73,9 @@ export default function Equidad({
       <Dumbbell filas={filas} />
 
       <p className="text-[10.5px] text-ink-muted leading-snug border-t border-line pt-2">
-        La restricción de equidad del optimizador exige <strong>un</strong> hexágono cubierto por
-        comuna, y eso es todo: cumplirla no impide concentrar el resto.{" "}
+        El cálculo tiene una sola regla de reparto: que en cada comuna quede cubierta{" "}
+        <strong>al menos una zona</strong>. Con 401 zonas en total, cumplirla no impide
+        concentrar todo el resto en unas pocas comunas.{" "}
         {resumenPlan.brecha > rh.brecha ? (
           <>Con {kPatrullas} patrullas el plan cubre más gente que las comisarías de hoy pero la
             reparte peor —la brecha pasa de <span className="tabular">{brechaPp(rh.brecha)}</span> a{" "}

@@ -19,8 +19,13 @@ export const num3 = (v: number) => dec3.format(v);
 export const pct = (v: number, decimales = 1) =>
   `${(decimales === 0 ? entero : dec1).format(v * 100)}%`;
 
-/** Puntos porcentuales, con signo — para diferencias entre dos porcentajes. */
-export const pp = (v: number) => `${v >= 0 ? "+" : "−"}${dec1.format(Math.abs(v) * 100)} pp`;
+/** Diferencia entre dos porcentajes, con signo.
+ *
+ *  Dice "puntos" y no "pp": la abreviatura es estándar en análisis y opaca para
+ *  todos los demás, y el ahorro de dos caracteres no compra nada. La palabra
+ *  completa además evita la confusión con "por ciento", que es el error que la
+ *  unidad existe para prevenir. */
+export const pp = (v: number) => `${v >= 0 ? "+" : "−"}${dec1.format(Math.abs(v) * 100)} puntos`;
 
 /** Variación relativa con signo, para los deltas de las tarjetas. */
 export const delta = (v: number) => `${v >= 0 ? "+" : "−"}${dec1.format(Math.abs(v) * 100)}%`;

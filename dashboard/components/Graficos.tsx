@@ -326,8 +326,8 @@ export function SensibilidadAlRadio({ datos }: { datos: SensibilidadRadio }) {
                 fill="var(--text-muted)" className="tabular">{pct(v, 0)}</text>
         </g>
       ))}
-      <text x={340} y={arr - 11} textAnchor="start" fontSize="9.5" fill="var(--text-muted)">
-        mismo plan
+      <text x={330} y={arr - 11} textAnchor="start" fontSize="9.5" fill="var(--text-muted)">
+        coinciden
       </text>
 
       {filas.map((f, i) => {
@@ -362,7 +362,7 @@ export function SensibilidadAlRadio({ datos }: { datos: SensibilidadRadio }) {
               </>
             )}
             <title>{`${f.radio_m} m — hoy ${pct(hoy)}, con ${datos.k_titular} patrullas ${pct(con)}` +
-                    (solape != null ? ` · ${pct(solape, 0)} de las ubicaciones coincide con el plan de 800 m` : "")}</title>
+                    (solape != null ? ` · ${pct(solape, 0)} de las ubicaciones son las mismas que a 800 m` : "")}</title>
           </g>
         );
       })}

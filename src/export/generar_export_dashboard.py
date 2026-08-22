@@ -437,18 +437,29 @@ def exportar_perfil_temporal() -> None:
 # el que se usa, último el port literal que falla. El texto es el que explica
 # por qué están los cuatro y no solo el ganador — la conclusión del README es
 # que ninguno gana en todos los horizontes, y eso hay que poder verlo.
+# Cada modelo lleva **dos** nombres: el que se muestra y el técnico.
+#
+# Los botones decían "Prophet con regímenes" y "Holt-Winters", que para quien
+# no arma modelos es ruido: no le dice ni qué hace ni en qué se diferencian.
+# La etiqueta pasa a describir el método en castellano y el nombre propio queda
+# en la descripción, que se muestra igual debajo del gráfico. Nadie pierde: el
+# lector técnico sigue viendo cuál es, y el resto entiende qué está eligiendo.
 MODELOS_FORECAST: list[tuple[str, str, str]] = [
-    ("prophet_regimen", "Prophet con regímenes",
-     "Prophet con la pandemia y el escalón de 2025 como indicadoras multiplicativas. "
-     "Es el que menos error tiene en meses normales y a horizontes de 3 a 6 meses."),
-    ("ets", "Holt-Winters",
-     "Suavizado exponencial con estacionalidad. Es el mejor a un mes vista."),
+    ("prophet_regimen", "Tendencia con quiebres",
+     "Sigue la tendencia y la estacionalidad, pero tratando la pandemia y la caída "
+     "de 2025 como escalones aparte en vez de como parte de la tendencia. Es el que "
+     "menos se equivoca en años normales y mirando de 3 a 6 meses adelante. "
+     "Técnicamente: Prophet con los regímenes como regresores."),
+    ("ets", "Suavizado estacional",
+     "Le da más peso a los meses recientes que a los viejos y repite el patrón del "
+     "año. Es el mejor para el mes que viene. Técnicamente: Holt-Winters."),
     ("naive_estacional", "El mismo mes del año pasado",
-     "El baseline. A doce meses no hay modelo que le gane: cuanto más lejos se "
-     "mira, más pesa la estacionalidad pelada."),
-    ("prophet", "Prophet, port literal",
-     "Prophet sin regresores de régimen, como en el proyecto de LAPD. Lee la "
-     "recuperación pos-pandemia como tendencia y la extrapola: más del doble de error."),
+     "No modela nada: repite lo que pasó doce meses antes. Es el punto de "
+     "comparación, y a un año de distancia no hay modelo que le gane."),
+    ("prophet", "Tendencia sin ajustes",
+     "El mismo método que el primero pero sin avisarle de la pandemia ni de la "
+     "caída de 2025, así que lee la recuperación pos-pandemia como si fuera a "
+     "seguir: más del doble de error. Técnicamente: Prophet tal cual."),
 ]
 MODELO_ELEGIDO = "prophet_regimen"
 ANIO_PRONOSTICO = 2026

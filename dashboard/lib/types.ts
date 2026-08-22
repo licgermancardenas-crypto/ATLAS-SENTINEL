@@ -37,9 +37,10 @@ export const TIPOS: {
   { key: "lesiones", label: "Lesiones", uno: "una lesión", superficie: true },
   { key: "amenazas", label: "Amenazas", uno: "una amenaza", superficie: true },
   { key: "vialidad", label: "Vialidad", uno: "un siniestro vial", superficie: false,
-    nota: "Son siniestros viales, no delitos de seguridad: quedaron excluidos de la superficie de riesgo." },
+    nota: "Son siniestros viales, no delitos de seguridad: por eso no tienen mapa de riesgo propio." },
   { key: "homicidios", label: "Homicidios", uno: "un homicidio", superficie: false,
-    nota: "78 hechos en el año de test y PEI 54%: muy pocos casos para una superficie de riesgo propia." },
+    nota: "78 hechos en todo el año: son tan pocos que el modelo casi no le gana al azar "
+        + "al decir dónde van a ocurrir, así que no tiene mapa de riesgo propio." },
 ];
 
 export const tipoInfo = (t: TipoDelito) => TIPOS.find((x) => x.key === t)!;

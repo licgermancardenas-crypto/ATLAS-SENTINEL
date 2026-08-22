@@ -59,7 +59,10 @@ export default function TablaBarrios({
     // por tasa no se parecen
     { key: "poblacion", label: "Habitantes", numerica: true },
     { key: "tasa", label: "Cada 100k", numerica: true },
-    { key: "n_hex", label: "Celdas", numerica: true },
+    // "Celdas" eran los hexágonos de la grilla H3 y no significaba nada para
+    // quien no construyó el pipeline. "Zonas" con la medida al lado sí: dice
+    // que el barrio está dividido en pedazos y de qué tamaño son.
+    { key: "n_hex", label: "Zonas de 700 m", numerica: true },
   ];
 
   const cortes = useMemo(
@@ -150,7 +153,14 @@ export default function TablaBarrios({
                     </span>
                   </td>
                   <td className="border-b border-line px-3 py-1.5 text-right tabular text-ink-2">{b.comuna ?? "—"}</td>
-                  <td className="border-b border-line px-3 py-1.5 text-right tabular font-medium">{num3(v)}</td>
+                  {/* El número tenía unidad y no se decía: es delitos esperados en
+                      una zona de 700 m durante un turno. Dicho así deja de ser un
+                      puntaje abstracto y se puede dimensionar. */}
+                  <td className="border-b border-line px-3 py-1.5 text-right tabular font-medium"
+                      title={`${ETIQUETAS_CLASE[cl]} · ${num3(v)} delitos esperados en una zona `
+                             + `de 700 m durante un turno`}>
+                    {num3(v)}
+                  </td>
                   <td className="border-b border-line px-3 py-1.5 text-right tabular text-ink-2">{num(b[claveD] as number)}</td>
                   <td className="border-b border-line px-3 py-1.5 text-right tabular text-ink-2">
                     {b.poblacion == null ? "—" : num(b.poblacion as number)}
