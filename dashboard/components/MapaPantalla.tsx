@@ -159,7 +159,8 @@ export default function MapaPantalla() {
 
         {panel && (
           <div className="card bg-surface-2/95 backdrop-blur p-3 flex flex-col gap-3
-                          max-h-[calc(100vh-13rem)] overflow-auto scroll-fino">
+                          max-h-[calc(100vh-13rem)] overflow-y-auto overflow-x-hidden
+                          scroll-fino">
             <SelectorTurno valor={turno} onChange={setTurno} />
             <SelectorTipo valor={tipo} onChange={setTipo} />
             <SelectorComuna valor={comuna} onChange={elegirComuna} comunas={datos.comunas} />
