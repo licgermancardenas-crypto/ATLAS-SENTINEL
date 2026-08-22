@@ -345,7 +345,11 @@ export default function Dashboard() {
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
             {/* alto atado al viewport: con un min-height fijo, en una pantalla de
                 portátil el mapa empuja los KPIs fuera de la primera vista */}
-            <section className="card overflow-hidden flex flex-col h-[clamp(24rem,58vh,36rem)]">
+            {/* `isolate` no es decorativo: Leaflet numera sus panes con z-index
+                de varios cientos y, sin un contexto de apilado propio, la
+                tarjeta del mapa se dibujaba por encima de la barra pegajosa
+                de secciones y la hacía desaparecer al scrollear. */}
+            <section className="card isolate overflow-hidden flex flex-col h-[clamp(24rem,58vh,36rem)]">
               <div className="px-3 py-2 border-b border-line flex items-center justify-between gap-3 flex-wrap">
                 <div className="min-w-0">
                   <h3 className="text-xs font-semibold uppercase tracking-[0.07em] text-ink-2">
