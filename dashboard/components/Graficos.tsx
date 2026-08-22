@@ -42,14 +42,15 @@ export function CurvaCobertura({
   const actual = curva.cobertura_actual;
   const sel = puntos.reduce((a, b) => (Math.abs(b.k - kActual) < Math.abs(a.k - kActual) ? b : a));
 
-  /* La segunda serie es la misma curva medida en gente en vez de en riesgo.
-     Va en el índigo de las capas demográficas y no en un color cualquiera: en
-     este tablero el índigo ya significa "esto es población". */
+  /* Las dos series usan los slots categóricos del sistema, en orden. No se
+     eligen "a ojo que se vean distintas": el par anterior —azul de marca e
+     índigo de las capas demográficas— quedaba en ΔE 14,2 para visión normal,
+     abajo del piso de 15. Este da 32,1. Ver el comentario de --serie-1. */
   const pobPuntos = pob.curva.filter((p) => p.poblacion !== null) as
     { k: number; poblacion: number; habitantes?: number }[];
   const lineaPob = "M" + pobPuntos.map((p) => `${x(p.k).toFixed(1)},${y(p.poblacion).toFixed(1)}`).join(" L");
   const selPob = pobPuntos.reduce((a, b) => (Math.abs(b.k - kActual) < Math.abs(a.k - kActual) ? b : a));
-  const azul = "var(--edad-4)";
+  const serie2 = "var(--serie-2)";
 
   return (
     <Marco w={w} h={h} etiqueta={
@@ -66,39 +67,41 @@ export function CurvaCobertura({
         </g>
       ))}
 
-      <path d={area} fill="var(--brand-wash)" />
-      <path d={linea} fill="none" stroke="var(--brand)" strokeWidth="2" strokeLinejoin="round" />
-      <path d={lineaPob} fill="none" stroke={azul} strokeWidth="2" strokeLinejoin="round" />
+      <path d={area} fill="var(--serie-1-wash)" />
+      <path d={linea} fill="none" stroke="var(--serie-1)" strokeWidth="2" strokeLinejoin="round" />
+      <path d={lineaPob} fill="none" stroke={serie2} strokeWidth="2" strokeLinejoin="round" />
 
-      {/* las dos referencias de "hoy": el riesgo y la gente que cubren las 75
-          comisarías donde ya están. Van las dos porque la brecha entre ellas
-          es el punto — 35,1% del riesgo es 25,0% de la población */}
+      {/* Las dos referencias de "hoy". Van en el gris de "infraestructura que
+          ya existe" —el mismo de los puntos de comisarías en el mapa— y no en
+          el ámbar de acento, que estaba a un paso de --risk-4 y hacía que una
+          línea de referencia se leyera como una clase del mapa. Una referencia
+          no es una serie: no le corresponde un slot categórico. */}
       <line x1={M.izq} y1={y(actual)} x2={w - M.der} y2={y(actual)}
-            stroke="var(--accent)" strokeWidth="1.5" strokeDasharray="4 3" />
-      <text x={M.izq + 5} y={y(actual) - 5} fontSize="9.5" fill="var(--accent)" className="tabular">
+            stroke="var(--pt-existente)" strokeWidth="1.5" strokeDasharray="4 3" />
+      <text x={M.izq + 5} y={y(actual) - 5} fontSize="9.5" fill="var(--text-secondary)" className="tabular">
         hoy · {pct(actual)} del riesgo
       </text>
       <line x1={M.izq} y1={y(pob.actual.poblacion)} x2={w - M.der} y2={y(pob.actual.poblacion)}
-            stroke="var(--accent)" strokeWidth="1.5" strokeDasharray="4 3" opacity="0.6" />
+            stroke="var(--pt-existente)" strokeWidth="1.5" strokeDasharray="4 3" opacity="0.6" />
       <text x={M.izq + 5} y={y(pob.actual.poblacion) - 5} fontSize="9.5"
-            fill="var(--accent)" className="tabular" opacity="0.85">
+            fill="var(--text-secondary)" className="tabular">
         hoy · {pct(pob.actual.poblacion)} de la gente
       </text>
 
-      <line x1={x(sel.k)} y1={M.arr} x2={x(sel.k)} y2={y(0)} stroke="var(--brand)"
+      <line x1={x(sel.k)} y1={M.arr} x2={x(sel.k)} y2={y(0)} stroke="var(--serie-1)"
             strokeWidth="1" strokeDasharray="3 3" opacity="0.55" />
-      <circle cx={x(sel.k)} cy={y(sel.cobertura)} r="5" fill="var(--brand)"
+      <circle cx={x(sel.k)} cy={y(sel.cobertura)} r="5" fill="var(--serie-1)"
               stroke="var(--surface-2)" strokeWidth="2" />
-      <circle cx={x(selPob.k)} cy={y(selPob.poblacion)} r="5" fill={azul}
+      <circle cx={x(selPob.k)} cy={y(selPob.poblacion)} r="5" fill={serie2}
               stroke="var(--surface-2)" strokeWidth="2" />
 
       {puntos.map((p) => {
         const pp = pobPuntos.find((q) => q.k === p.k);
         return (
           <g key={p.k}>
-            <circle cx={x(p.k)} cy={y(p.cobertura)} r="3" fill="var(--brand)"
+            <circle cx={x(p.k)} cy={y(p.cobertura)} r="3" fill="var(--serie-1)"
                     opacity={p.k === sel.k ? 0 : 0.55} />
-            {pp && <circle cx={x(pp.k)} cy={y(pp.poblacion)} r="3" fill={azul}
+            {pp && <circle cx={x(pp.k)} cy={y(pp.poblacion)} r="3" fill={serie2}
                            opacity={pp.k === selPob.k ? 0 : 0.55} />}
             <rect x={x(p.k) - 12} y={M.arr} width="24" height={h - M.arr - M.aba}
                   fill="transparent" className="cursor-pointer" tabIndex={0} role="button"
@@ -134,11 +137,11 @@ export function BrechaCobertura({
     <div className="flex flex-col gap-1.5">
       <div className="flex gap-4 flex-wrap text-[10.5px]">
         <span className="inline-flex items-center gap-1.5 text-ink-2">
-          <span className="w-3 h-[2px] rounded" style={{ background: "var(--brand)" }} />
+          <span className="w-3 h-[2px] rounded" style={{ background: "var(--serie-1)" }} />
           riesgo cubierto
         </span>
         <span className="inline-flex items-center gap-1.5 text-ink-2">
-          <span className="w-3 h-[2px] rounded" style={{ background: "var(--edad-4)" }} />
+          <span className="w-3 h-[2px] rounded" style={{ background: "var(--serie-2)" }} />
           población cubierta
         </span>
       </div>

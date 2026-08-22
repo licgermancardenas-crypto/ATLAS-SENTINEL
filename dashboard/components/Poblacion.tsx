@@ -187,10 +187,16 @@ export default function Poblacion({
 
 /* ------------------------------------------------------------ grupos de edad */
 
+/* Las bandas etarias son una variable **ordinal**, no tres categorías sueltas:
+   0-14 < 15-64 < 65+. Antes iban con tres tonos categóricos (azul claro, azul
+   de marca, ámbar), que es el anti-patrón de gastar el canal de identidad en
+   algo que ya tiene orden natural — y encima repetía el ámbar del riesgo.
+   Ahora usan la rampa índigo, la misma con la que el mapa pinta la edad, así
+   que el panel y el mapa dicen lo mismo con el mismo color. */
 const GRUPOS = [
-  { key: "0_14", label: "0 a 14", color: "var(--brand-soft)" },
-  { key: "15_64", label: "15 a 64", color: "var(--brand)" },
-  { key: "65", label: "65 y más", color: "var(--accent)" },
+  { key: "0_14", label: "0 a 14", color: "var(--edad-2)" },
+  { key: "15_64", label: "15 a 64", color: "var(--edad-3)" },
+  { key: "65", label: "65 y más", color: "var(--edad-5)" },
 ] as const;
 
 function PorEdad({
@@ -216,13 +222,17 @@ function PorEdad({
 
       {/* una sola barra apilada y no tres barras: lo que se lee acá es el
           reparto, y tres barras sueltas obligan a sumarlas mentalmente */}
-      <div className="flex h-6 rounded overflow-hidden" role="img"
+      <div className="flex h-6 rounded overflow-hidden gap-[2px]" role="img"
            aria-label={partes.map((p) => `${p.label} años: ${num1(p.pct)}%`).join(", ")}>
         {partes.map((p) => (
           <div key={p.key} className="grid place-items-center min-w-0"
                style={{ width: `${p.pct}%`, background: p.color }}
                title={`${p.label} años: ${num(p.hab)} personas (${num1(p.pct)}%)`}>
-            <span className="text-[10px] font-semibold text-white tabular truncate px-1">
+            {/* el texto va oscuro sobre los dos pasos claros de la rampa y
+                claro sobre el oscuro: con blanco fijo, "0 a 14" quedaba
+                ilegible sobre --edad-2 */}
+            <span className={`text-[10px] font-semibold tabular truncate px-1 ${
+              p.key === "65" ? "text-white" : "text-[var(--text-primary)]"}`}>
               {p.pct >= 12 ? `${num1(p.pct)}%` : ""}
             </span>
           </div>
@@ -275,25 +285,25 @@ function PorSexo({ varones, mujeres, anio }: { varones: number; mujeres: number;
       <p className="text-[11px] text-ink-2">
         Sexo · <span className="text-ink-muted">Censo {anio}</span>
       </p>
-      <div className="flex h-5 rounded overflow-hidden" role="img"
+      <div className="flex h-5 rounded overflow-hidden gap-[2px]" role="img"
            aria-label={`Varones ${num1(pv)}%, mujeres ${num1(100 - pv)}%`}>
-        <div className="grid place-items-center" style={{ width: `${pv}%`, background: "var(--brand)" }}
+        <div className="grid place-items-center" style={{ width: `${pv}%`, background: "var(--serie-1)" }}
              title={`${num(varones)} varones (${num1(pv)}%)`}>
           <span className="text-[10px] font-semibold text-white tabular">{num1(pv)}%</span>
         </div>
         <div className="grid place-items-center"
-             style={{ width: `${100 - pv}%`, background: "var(--risk-3)" }}
+             style={{ width: `${100 - pv}%`, background: "var(--serie-2)" }}
              title={`${num(mujeres)} mujeres (${num1(100 - pv)}%)`}>
           <span className="text-[10px] font-semibold text-white tabular">{num1(100 - pv)}%</span>
         </div>
       </div>
       <div className="flex gap-4 text-[10.5px] text-ink-2">
         <span className="inline-flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-[2px]" style={{ background: "var(--brand)" }} />
+          <span className="w-2.5 h-2.5 rounded-[2px]" style={{ background: "var(--serie-1)" }} />
           {num(varones)} varones
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-[2px]" style={{ background: "var(--risk-3)" }} />
+          <span className="w-2.5 h-2.5 rounded-[2px]" style={{ background: "var(--serie-2)" }} />
           {num(mujeres)} mujeres
         </span>
       </div>

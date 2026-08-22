@@ -63,8 +63,8 @@ export default function Victimas({ datos }: { datos: DatosVictimas }) {
       <div className="flex flex-col gap-1.5">
         <p className="text-[11px] text-ink-2">Donde sí hay dato, por sexo</p>
         <div className="flex gap-3 flex-wrap text-[10px] text-ink-muted">
-          <Ref color="var(--brand)" texto="varones" />
-          <Ref color="var(--risk-3)" texto="mujeres" />
+          <Ref color="var(--serie-1)" texto="varones" />
+          <Ref color="var(--serie-2)" texto="mujeres" />
           <Ref color="var(--border-strong)" texto="sin dato" />
         </div>
 
@@ -115,10 +115,10 @@ function Barra({
         <span className="text-[10.5px] text-ink-2 truncate">{fila.delito}</span>
         <span className="text-[10px] text-ink-muted tabular shrink-0">{num(victimas)}</span>
       </div>
-      <div className="h-3 flex rounded-sm overflow-hidden bg-surface-sunk"
+      <div className="h-3 flex rounded-sm overflow-hidden gap-[2px] bg-surface-sunk"
            style={{ width: `${Math.max(ancho, 8)}%` }}>
-        <span style={{ width: `${seg(masc)}%`, background: "var(--brand)" }} />
-        <span style={{ width: `${seg(fem)}%`, background: "var(--risk-3)" }} />
+        <span style={{ width: `${seg(masc)}%`, background: "var(--serie-1)" }} />
+        <span style={{ width: `${seg(fem)}%`, background: "var(--serie-2)" }} />
         <span style={{ width: `${seg(sd)}%`, background: "var(--border-strong)" }} />
       </div>
     </div>

@@ -59,6 +59,24 @@
   --edad-4: #5b63e0;
   --edad-5: #312e81;
 
+  /* ── Slots categóricos de gráfico ────────────────────────────────────────
+     Los dos únicos colores que representan "series distintas" en todo el
+     tablero, y se asignan SIEMPRE en este orden: slot 1, después slot 2.
+     Nunca se ciclan ni se reasignan por ranking.
+
+     Existen aparte de --brand porque --brand es cromo de interfaz (botones,
+     foco, texto activo) y como marca de dato queda fuera de la banda de
+     luminosidad: medido, L 0,424 contra la banda 0,43–0,77.
+
+     Antes las dos curvas de cobertura usaban --brand y --edad-4. El validador
+     de paletas las midió en ΔE 14,2 para visión normal —abajo del piso de 15,
+     o sea difíciles de separar incluso con visión de color completa— y peor
+     todavía para daltonismo. Este par da ΔE 32,1 normal y 23,6 en protanopía.
+     Si se tocan, hay que volver a correr el validador. */
+  --serie-1: #2563eb;
+  --serie-2: #be185d;
+  --serie-1-wash: rgba(37, 99, 235, 0.10);
+
   /* capas operativas del mapa */
   --pt-existente: #64748b;
   --pt-propuesto: #1e40af;
@@ -107,6 +125,11 @@
   --edad-3: #454a9c;
   --edad-4: #7278d6;
   --edad-5: #aeb4f7;
+  /* mismo par de slots, re-elegido contra la superficie oscura y no invertido:
+     la banda de luminosidad de dark es 0,48–0,67, otra que la de light */
+  --serie-1: #5b8def;
+  --serie-2: #e0578c;
+  --serie-1-wash: rgba(91, 141, 239, 0.16);
 
     --pt-existente: #93a3b8;
     --pt-propuesto: #6ea1ff;
@@ -148,6 +171,11 @@
   --edad-3: #454a9c;
   --edad-4: #7278d6;
   --edad-5: #aeb4f7;
+  /* mismo par de slots, re-elegido contra la superficie oscura y no invertido:
+     la banda de luminosidad de dark es 0,48–0,67, otra que la de light */
+  --serie-1: #5b8def;
+  --serie-2: #e0578c;
+  --serie-1-wash: rgba(91, 141, 239, 0.16);
   --pt-existente: #93a3b8;
   --pt-propuesto: #6ea1ff;
   --pt-alerta: #f87171;

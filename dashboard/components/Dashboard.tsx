@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import type { BarrioProps, Capa, DatosDashboard, Superficie, TipoDelito, Turno } from "@/lib/types";
@@ -25,6 +25,7 @@ import Pronostico from "./Pronostico";
 import Poblacion from "./Poblacion";
 import Equidad from "./Equidad";
 import Victimas from "./Victimas";
+import { AnclaSeccion, NavSecciones } from "./Secciones";
 import Cuando from "./Cuando";
 
 // Leaflet toca `window` al importarse, así que no puede renderizar en el servidor
@@ -57,6 +58,9 @@ function leerNum(clave: string, porDefecto: number | null): number | null {
 }
 
 export default function Dashboard() {
+  // el scroll no lo tiene el window sino este contenedor, así que el
+  // observador de sección y el salto por ancla necesitan la referencia
+  const cuerpo = useRef<HTMLDivElement>(null);
   const [datos, setDatos] = useState<DatosDashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -314,45 +318,75 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* ---------- cuerpo ---------- */}
-      <div className="flex-1 min-h-0 overflow-auto scroll-fino p-3 flex flex-col gap-3">
+      {/* ---------- cuerpo ----------
+          Cuatro secciones agrupadas por la pregunta que contestan, no por el
+          módulo del que salió cada panel. Antes eran trece tarjetas apiladas en
+          el orden en que se fueron construyendo. */}
+      <div ref={cuerpo} className="flex-1 min-h-0 overflow-auto scroll-fino p-3 flex flex-col gap-3">
+        <NavSecciones contenedor={cuerpo} />
+
         <KpiRow items={kpis} />
 
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
-          {/* mapa */}
-          {/* alto atado al viewport: con un min-height fijo, en una pantalla de
-              portátil el mapa empuja los KPIs fuera de la primera vista */}
-          <section className="card overflow-hidden flex flex-col h-[clamp(24rem,58vh,36rem)]">
-            <div className="px-3 py-2 border-b border-line flex items-center justify-between gap-3 flex-wrap">
-              <div className="min-w-0">
-                <h2 className="text-xs font-semibold uppercase tracking-[0.07em] text-ink-2">
-                  {demografica ? `${supInfo.label} · por ${supInfo.unidad}`
-                    : superficiePropia ? `Riesgo de ${tipoInfo(tipo).label.toLowerCase()} por barrio`
-                    : "Riesgo por barrio"}
-                </h2>
-                <p className="text-[11px] text-ink-muted truncate">
-                  {demografica ? supInfo.descripcion : capaInfo.descripcion}
-                </p>
+        <AnclaSeccion id="donde" titulo="Dónde"
+                      bajada="Qué zonas concentran el riesgo, y con qué contexto">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
+            {/* alto atado al viewport: con un min-height fijo, en una pantalla de
+                portátil el mapa empuja los KPIs fuera de la primera vista */}
+            <section className="card overflow-hidden flex flex-col h-[clamp(24rem,58vh,36rem)]">
+              <div className="px-3 py-2 border-b border-line flex items-center justify-between gap-3 flex-wrap">
+                <div className="min-w-0">
+                  <h3 className="text-xs font-semibold uppercase tracking-[0.07em] text-ink-2">
+                    {demografica ? `${supInfo.label} · por ${supInfo.unidad}`
+                      : superficiePropia ? `Riesgo de ${tipoInfo(tipo).label.toLowerCase()} por barrio`
+                      : "Riesgo por barrio"}
+                  </h3>
+                  <p className="text-[11px] text-ink-muted truncate">
+                    {demografica ? supInfo.descripcion : capaInfo.descripcion}
+                  </p>
+                </div>
+                <Leyenda cortes={cortes} demografica={demografica} formato={supInfo.formato} />
               </div>
-              <Leyenda cortes={cortes} demografica={demografica} formato={supInfo.formato} />
-            </div>
-            <div className="flex-1 min-h-0">
-              <Mapa
-                datos={datos} turno={turno} capa={capa} superficie={superficie} tipo={tipo} comuna={comuna}
-                barrioActivo={barrio} kPatrullas={kPatrullas} tema={tema}
-                onBarrio={elegirBarrio}
-              />
-            </div>
-            <AvisoSuperficie tipo={tipo} capa={capa} superficie={superficie} />
-            {capa !== "ninguna" && <LeyendaPuntos capa={capa} k={kPatrullas} />}
-          </section>
+              <div className="flex-1 min-h-0">
+                <Mapa
+                  datos={datos} turno={turno} capa={capa} superficie={superficie} tipo={tipo} comuna={comuna}
+                  barrioActivo={barrio} kPatrullas={kPatrullas} tema={tema}
+                  onBarrio={elegirBarrio}
+                />
+              </div>
+              <AvisoSuperficie tipo={tipo} capa={capa} superficie={superficie} />
+              {capa !== "ninguna" && <LeyendaPuntos capa={capa} k={kPatrullas} />}
+            </section>
 
-          {/* panel derecho */}
-          <div className="flex flex-col gap-3 min-w-0">
+            <div className="flex flex-col gap-3 min-w-0">
+              <section className="card p-3">
+                <h3 className="text-xs font-semibold uppercase tracking-[0.07em] text-ink-2 mb-1">
+                  Riesgo medio por comuna
+                </h3>
+                <p className="text-[11px] text-ink-muted mb-2">
+                  Turno {turno === "manana" ? "mañana" : turno}, ×100. Clic para filtrar todo el tablero.
+                </p>
+                <BarrasComuna comunas={datos.comunas} turno={turno} tipo={tipo} seleccion={comuna}
+                              onSeleccion={(c) => { setComuna(c); setBarrio(null); }} />
+              </section>
+
+              <Cuando perfil={datos.perfil} tipo={tipo}
+                      delitosSeleccion={delitosFoco} ambito={ambito} />
+            </div>
+          </div>
+
+          <section className="card overflow-hidden max-h-[30rem] flex flex-col">
+            <TablaBarrios barrios={props} turno={turno} tipo={tipo} comuna={comuna}
+                          barrioActivo={barrio} onBarrio={elegirBarrio} />
+          </section>
+        </AnclaSeccion>
+
+        <AnclaSeccion id="que-hacer" titulo="Qué hacer"
+                      bajada="Los módulos de decisión, y a quién alcanzan">
+          <div className="grid gap-3 lg:grid-cols-2">
             <section className="card p-3">
-              <h2 className="text-xs font-semibold uppercase tracking-[0.07em] text-ink-2 mb-1">
+              <h3 className="text-xs font-semibold uppercase tracking-[0.07em] text-ink-2 mb-1">
                 Cobertura según cantidad de patrullas
-              </h2>
+              </h3>
               <p className="text-[11px] text-ink-muted mb-2">
                 Cada punto es una optimización completa, no una interpolación. Clic para fijar el escenario.
               </p>
@@ -364,68 +398,49 @@ export default function Dashboard() {
               </div>
             </section>
 
-            <Equidad datos={datos.equidad} kPatrullas={kPatrullas} />
+            <div className="flex flex-col gap-3 min-w-0">
+              <Equidad datos={datos.equidad} kPatrullas={kPatrullas} />
 
-            <Cuando perfil={datos.perfil} tipo={tipo}
-                    delitosSeleccion={delitosFoco} ambito={ambito} />
-
-            <Victimas datos={datos.victimas} />
-
-            <section className="card p-3">
-              <h2 className="text-xs font-semibold uppercase tracking-[0.07em] text-ink-2 mb-1">
-                Riesgo medio por comuna
-              </h2>
-              <p className="text-[11px] text-ink-muted mb-2">
-                Turno {turno === "manana" ? "mañana" : turno}, ×100. Clic para filtrar todo el tablero.
-              </p>
-              <BarrasComuna comunas={datos.comunas} turno={turno} tipo={tipo} seleccion={comuna}
-                            onSeleccion={(c) => { setComuna(c); setBarrio(null); }} />
-            </section>
+              {/* pegado a los otros dos y no al final: es lo que hay que leer
+                  antes de tomar las ubicaciones del mapa como un plan */}
+              <section className="card p-3">
+                <h3 className="text-xs font-semibold uppercase tracking-[0.07em] text-ink-2 mb-1">
+                  Si el radio no fuera {datos.curvaK.radio_m} m
+                </h3>
+                <p className="text-[11px] text-ink-muted mb-2">
+                  La ganancia aguanta en todo el barrido. Las ubicaciones no: fuera
+                  de {datos.curvaK.radio_m} m, casi ninguna se repite.
+                </p>
+                <SensibilidadAlRadio datos={datos.radio} />
+              </section>
+            </div>
           </div>
-        </div>
+        </AnclaSeccion>
 
-        {/* la demografía va a lo ancho y arriba de la tabla: es el denominador
-            de la tasa que esa tabla muestra, y leerlo después es leerlo tarde */}
-        <Poblacion
-          datos={datos.demografia} comuna={comuna} barrio={barrio}
-          onComuna={setComuna} onBarrio={elegirBarrio}
-        />
+        <AnclaSeccion id="quienes" titulo="Quiénes"
+                      bajada="Quién vive en cada zona y quién aparece como víctima">
+          <Poblacion
+            datos={datos.demografia} comuna={comuna} barrio={barrio}
+            onComuna={setComuna} onBarrio={elegirBarrio}
+          />
+          <Victimas datos={datos.victimas} />
+        </AnclaSeccion>
 
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
-          <section className="card overflow-hidden max-h-[30rem] flex flex-col">
-            <TablaBarrios barrios={props} turno={turno} tipo={tipo} comuna={comuna}
-                          barrioActivo={barrio} onBarrio={elegirBarrio} />
-          </section>
-          <div className="flex flex-col gap-3 min-w-0">
+        <AnclaSeccion id="que-viene" titulo="Qué viene"
+                      bajada="Lo registrado y la proyección, en la misma línea">
+          <div className="grid gap-3 lg:grid-cols-2">
             <section className="card p-3">
-              <h2 className="text-xs font-semibold uppercase tracking-[0.07em] text-ink-2 mb-1">
+              <h3 className="text-xs font-semibold uppercase tracking-[0.07em] text-ink-2 mb-1">
                 Delitos por mes y tipo
-              </h2>
+              </h3>
               <SerieAnual serie={datos.serie} tipo={tipo} onTipo={setTipo} />
             </section>
 
-            {/* va debajo de la serie y no arriba: primero lo registrado, después
-                la proyección, que es la única forma de que se lean como la misma
-                línea. Sigue el filtro de tipo pero no el de territorio — el
-                panel lo aclara adentro. */}
             <Pronostico datos={datos.pronostico} serie={datos.serie} tipo={tipo} />
-
-            {/* va acá, pegado a las salvedades y no al Módulo A: es lo que hay
-                que leer antes de tomar las ubicaciones del mapa como un plan */}
-            <section className="card p-3">
-              <h2 className="text-xs font-semibold uppercase tracking-[0.07em] text-ink-2 mb-1">
-                Si el radio no fuera {datos.curvaK.radio_m} m
-              </h2>
-              <p className="text-[11px] text-ink-muted mb-2">
-                La ganancia aguanta en todo el barrido. Las ubicaciones no: fuera
-                de {datos.curvaK.radio_m} m, casi ninguna se repite.
-              </p>
-              <SensibilidadAlRadio datos={datos.radio} />
-            </section>
-
-            <Salvedades items={datos.resumen.salvedades} />
           </div>
-        </div>
+
+          <Salvedades items={datos.resumen.salvedades} />
+        </AnclaSeccion>
       </div>
     </main>
   );
@@ -446,8 +461,12 @@ function Leyenda({
       <span className="text-[10px] text-ink-muted">{demografica ? "menos" : "bajo"}</span>
       <div className="flex" role="img"
            aria-label={`Escala de ${demografica ? "edad" : "riesgo"} en cinco clases por quintiles`}>
+        {/* borde hairline en cada muestra: la clase más baja de las dos rampas
+            está a 1,1:1 del fondo de la tarjeta —medido— y sin delimitar se lee
+            como un hueco en la leyenda. En el mapa la clase clara se deja como
+            está: ahí abajo hay basemap, no una superficie blanca. */}
         {vars.map((v, i) => (
-          <span key={v} className="w-6 h-3 first:rounded-l-sm last:rounded-r-sm"
+          <span key={v} className="w-6 h-3 first:rounded-l-sm last:rounded-r-sm border border-line"
                 style={{ background: `var(${v})` }}
                 title={`${ETIQUETAS_CLASE[i]}${cortes[i] !== undefined ? ` · hasta ${fmt(cortes[i])}` : ""}`} />
         ))}
