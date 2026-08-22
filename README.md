@@ -1182,6 +1182,43 @@ Cuatro decisiones, y las cuatro salen de cosas que este README ya tenía medidas
 
 Con homicidios (5 por mes proyectados, banda 0–10) el panel reemplaza la variación por una advertencia de ruido, mismo criterio y mismo umbral que el panel de "cuándo ocurren": abajo de 1.000 casos al año el signo se da vuelta con dos o tres hechos. La salvedad de fondo —pronostica delito registrado, no delito— viaja en el propio JSON y se muestra al pie del panel, para que no dependa de que alguien abra las salvedades generales.
 
+### Auditoría visual: lo que el validador encontró y lo que se decidió a mano
+
+El tablero llegó a trece paneles sumando uno por vez, y nunca se lo miró como un todo. Esta pasada usa el validador de paletas del skill de dataviz —que mide separación en OKLab bajo visión normal y bajo los tres tipos de daltonismo— en vez de decidir por impresión. Cuatro hallazgos, los cuatro medidos:
+
+| Qué | Medición | Qué se hizo |
+|---|---|---|
+| Las dos curvas de cobertura eran indistinguibles | ΔE **14,2** normal (piso: 15), peor bajo daltonismo | Dos slots categóricos nuevos: ΔE 32,1 normal, 23,6 protanopía |
+| `--brand` no sirve como marca de dato | L 0,424, fuera de la banda 0,43–0,77 | Sigue siendo cromo de interfaz; ya no pinta series |
+| Las bandas etarias usaban 3 tonos categóricos | Variable **ordinal** pintada con canal de identidad | Pasan a la rampa índigo, la misma del mapa |
+| `--accent` (#d97706) ≈ `--risk-4` (#dc6803) | La referencia "hoy" se leía como clase del mapa | Va al gris de "infraestructura existente" |
+
+**Los dos slots categóricos son ahora los dos únicos colores que significan "series distintas"** en todo el tablero, y se asignan siempre en ese orden: `--serie-1` para la primera, `--serie-2` para la segunda. Riesgo/población en la curva de cobertura y varones/mujeres en los paneles de sexo usan el mismo par, porque en los dos casos son dos categorías nominales. El gris de "sin dato" no es un slot: es un neutro deliberado.
+
+Se eligieron por separado para claro y oscuro. **No son el mismo color aclarado**: la banda de luminosidad que pide el validador es 0,43–0,77 en claro y 0,48–0,67 en oscuro, así que un flip automático falla el check.
+
+**Una desviación consciente.** El validador marca la rampa amarillo→marrón del riesgo por dispersión de tono (58°, sobre el límite de 40° para "una sola rampa de un tono"). Se mantiene igual: es el esquema secuencial YlOrBr de ColorBrewer, y la propia guía admite la excepción de "vecinos análogos / calor semántico" siempre que haya leyenda de escala. La hay. Lo que sí se corrigió es que la clase más baja estaba a **1,08:1** del fondo de la tarjeta: las muestras de la leyenda llevan borde hairline. En el mapa la clase clara se deja como está — ahí abajo hay basemap, no una superficie blanca.
+
+### El orden: cuatro secciones en vez de trece tarjetas
+
+Los paneles estaban apilados en el orden en que se construyeron, que no le sirve a nadie que no los haya construido. Ahora se agrupan por **la pregunta que contesta cada uno**:
+
+| Sección | Qué contesta | Paneles |
+|---|---|---|
+| **Dónde** | qué zonas concentran riesgo | mapa, riesgo por comuna, cuándo ocurren, tabla de barrios |
+| **Qué hacer** | los módulos de decisión | cobertura y a quién alcanza, equidad entre comunas, sensibilidad al radio |
+| **Quiénes** | el contexto humano | población y demografía, víctimas |
+| **Qué viene** | la proyección | serie mensual, pronóstico 2026, salvedades |
+
+Con una barra pegajosa que marca la posición actual. La posición se **observa** con `IntersectionObserver` y no se deriva del clic: quien scrollea a mano también tiene que ver dónde está. Durante el salto programático el observador se suspende, porque si no dispara con todas las secciones intermedias y la barra parpadea recorriéndolas.
+
+No es un router: sigue siendo una sola página con una sola selección compartida. Es un índice, que es lo que faltaba.
+
+**Lo que queda sin resolver, a propósito o por falta de verificación:**
+
+- **Scroll anidado.** La tabla de barrios tiene su propio `overflow-auto`, así que con el cursor encima la rueda mueve la tabla y no la página. Es el precio de una tabla larga y ordenable dentro de una página larga; con la barra de secciones al menos hay una salida que no depende de la rueda.
+- **Mobile no está verificado.** Es una herramienta analítica densa, pensada para pantalla grande, y esta pasada se probó en desktop claro y oscuro. No se afirma que 375 px funcione porque no se miró.
+
 ## Demografía: quién vive en cada zona (`pipeline/ingest_demografia.py`, `dashboard/components/Poblacion.tsx`)
 
 La población ya se usaba desde antes —es el denominador de la tasa cada 100.000— pero solo existía por detrás: el tablero no la mostraba en ninguna pantalla y el desglose no estaba ingestado. El panel **"Quién vive acá"** la pone adelante, con densidad, sexo y estructura etaria, y sigue el filtro de comuna y de barrio.
